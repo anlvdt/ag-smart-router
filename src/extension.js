@@ -415,223 +415,27 @@ function openSettingsPanel(context) {
 }
 
 function getSettingsHtml(cfg) {
-    const patternsJson = JSON.stringify(cfg.clickPatterns);
-    const disabledPatternsJson = JSON.stringify(cfg.disabledClickPatterns);
     const lang = cfg.language || 'vi';
+    const templatePath = path.join(__dirname, '..', 'media', 'settings.html');
+    let html = fs.readFileSync(templatePath, 'utf8');
 
-    return `<!DOCTYPE html>
-<html lang="${lang}">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AG Autopilot Settings</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#1e1e2e;color:#e8ecf4;padding:24px;line-height:1.6}
-h1{font-size:1.6em;background:linear-gradient(135deg,#89b4fa,#a6e3a1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
-.subtitle{color:#9098b0;margin-bottom:24px;font-size:0.9em}
-.title-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
-.click-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#45475a,#313244);border:1px solid #585b70;border-radius:20px;padding:4px 12px;font-size:0.8em;color:#a6e3a1;font-weight:600}
-.click-badge .count{color:#f9e2af;font-size:1.1em}
-.btn-reset-stats{background:none;border:1px solid #585b70;border-radius:12px;color:#f38ba8;font-size:0.7em;padding:2px 10px;cursor:pointer}
-.btn-reset-stats:hover{background:#f38ba8;color:#1e1e2e}
-.top-row{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}.top-row>*{flex:1;min-width:240px}
-.stats-card,.clicklog-card{background:#313244;border-radius:12px;padding:16px;border:1px solid #45475a}
-.stats-card-title,.clicklog-title{font-size:0.9em;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.stats-card-title{color:#89b4fa}.clicklog-title{color:#f9e2af}
-.stats-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.stats-label{min-width:100px;font-size:0.8em;color:#cdd6f4;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stats-bar-bg{flex:1;height:18px;background:#1e1e2e;border-radius:9px;overflow:hidden}
-.stats-bar{height:100%;border-radius:9px;transition:width 0.6s cubic-bezier(0.22,1,0.36,1)}
-.stats-bar.bar-1{background:linear-gradient(90deg,#89b4fa,#74c7ec)}.stats-bar.bar-2{background:linear-gradient(90deg,#a6e3a1,#94e2d5)}
-.stats-bar.bar-3{background:linear-gradient(90deg,#f9e2af,#fab387)}.stats-bar.bar-4{background:linear-gradient(90deg,#f38ba8,#eba0ac)}
-.stats-bar.bar-5{background:linear-gradient(90deg,#cba6f7,#b4befe)}.stats-bar.bar-6{background:linear-gradient(90deg,#94e2d5,#89dceb)}
-.stats-count{min-width:36px;font-size:0.8em;color:#bac2de;font-weight:600;text-align:left}
-.stats-crown{font-size:0.9em}
-.clicklog-entry{padding:6px 10px;border-bottom:1px solid #1e1e2e;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.clicklog-entry:last-child{border-bottom:none}
-.clicklog-pattern{font-weight:600;font-size:0.85em}.clicklog-time{color:#bac2de;font-size:0.75em;white-space:nowrap}
-.card{background:#313244;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid #45475a;transition:border-color 0.2s}
-.card:hover{border-color:#89b4fa}
-.card-title{font-size:1.1em;font-weight:600;color:#89b4fa;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.field{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.field:last-child{margin-bottom:0}
-label{color:#d4daf0;font-size:0.95em}
-input[type="number"],select{width:140px;padding:8px 12px;border:1px solid #45475a;border-radius:8px;background:#1e1e2e;color:#cdd6f4;font-size:0.95em;outline:none}
-input[type="number"]:focus,select:focus{border-color:#89b4fa}
-.toggle{position:relative;width:50px;height:26px;cursor:pointer}
-.toggle input{display:none}
-.toggle .slider{position:absolute;inset:0;background:#45475a;border-radius:26px;transition:0.3s}
-.toggle .slider::before{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;background:#cdd6f4;border-radius:50%;transition:0.3s}
-.toggle input:checked+.slider{background:#00d26a;box-shadow:0 0 12px rgba(0,210,106,0.5)}
-.toggle input:checked+.slider::before{transform:translateX(24px);background:#fff}
-.pattern-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.btn{padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:0.95em;font-weight:600;transition:all 0.2s}
-.btn-primary{background:linear-gradient(135deg,#89b4fa,#74c7ec);color:#1e1e2e}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(137,180,250,0.4)}
-.actions{display:flex;justify-content:flex-end;margin-top:24px;gap:12px}
-.hint{color:#b8c0d8;font-size:0.85em;display:block;margin-top:6px;font-style:italic;opacity:0.9}
-</style>
-</head>
-<body>
-<div class="title-row">
-    <h1>⚡ AG Autopilot</h1>
-    <span class="click-badge">🎯 <span class="count" id="totalCount">${cfg.totalClicks || 0}</span> clicks</span>
-</div>
-<div class="top-row">
-    <div class="stats-card">
-        <div class="stats-card-title">📊 Click Stats <button class="btn-reset-stats" onclick="resetStats()">↺ Reset</button></div>
-        <div id="statsBars"></div>
-    </div>
-    <div class="clicklog-card">
-        <div class="clicklog-title">🎯 Click Log <button class="btn-reset-stats" onclick="clearClickLog()">↺ Clear</button></div>
-        <div id="clickLogList" style="max-height:300px;overflow-y:auto"><div style="color:#6c7086;padding:8px;font-size:0.85em">No clicks yet</div></div>
-    </div>
-</div>
-<p class="subtitle">All-in-one: Auto Click & Scroll + Smart Model Router + Quota Fallback</p>
+    html = html.replace(/\{\{LANG\}\}/g, lang);
+    html = html.replace('{{TOTAL_CLICKS}}', String(cfg.totalClicks || 0));
+    html = html.replace('{{ENABLED_CHK}}', cfg.enabled ? 'checked' : '');
+    html = html.replace('{{SCROLL_CHK}}', cfg.scrollEnabled !== false ? 'checked' : '');
+    html = html.replace('{{ROUTER_CHK}}', cfg.smartRouter ? 'checked' : '');
+    html = html.replace('{{QUOTA_CHK}}', cfg.quotaFallback ? 'checked' : '');
+    html = html.replace(/\{\{CLICK_MS\}\}/g, String(cfg.clickIntervalMs || 1000));
+    html = html.replace(/\{\{SCROLL_MS\}\}/g, String(cfg.scrollIntervalMs || 500));
+    html = html.replace(/\{\{PAUSE_MS\}\}/g, String(cfg.scrollPauseMs || 7000));
+    html = html.replace('{{LANG_VI}}', lang === 'vi' ? 'selected' : '');
+    html = html.replace('{{LANG_EN}}', lang === 'en' ? 'selected' : '');
+    html = html.replace('{{LANG_ZH}}', lang === 'zh' ? 'selected' : '');
+    html = html.replace('{{PATTERNS_JSON}}', JSON.stringify(cfg.clickPatterns));
+    html = html.replace('{{DISABLED_JSON}}', JSON.stringify(cfg.disabledClickPatterns));
+    html = html.replace('{{STATS_JSON}}', JSON.stringify(cfg.clickStats || {}));
 
-<!-- Master + Language -->
-<div class="card">
-    <div class="card-title">🔌 Status</div>
-    <div class="field"><label>Enable Auto Click & Scroll</label>
-        <label class="toggle"><input type="checkbox" id="chkEnabled" ${cfg.enabled ? 'checked' : ''} onchange="instantToggle()"><span class="slider"></span></label></div>
-    <div class="field" style="margin-top:12px"><label>Language</label>
-        <select id="selLang" onchange="changeLang()">
-            <option value="vi" ${lang === 'vi' ? 'selected' : ''}>Tiếng Việt</option>
-            <option value="en" ${lang === 'en' ? 'selected' : ''}>English</option>
-            <option value="zh" ${lang === 'zh' ? 'selected' : ''}>中文</option>
-        </select></div>
-</div>
-
-<!-- Smart Router -->
-<div class="card">
-    <div class="card-title">🧠 Smart Model Router</div>
-    <div class="field"><label id="lbl-router">Auto-select model based on prompt content</label>
-        <label class="toggle"><input type="checkbox" id="chkRouter" ${cfg.smartRouter ? 'checked' : ''} onchange="routerToggle()"><span class="slider"></span></label></div>
-    <p class="hint" id="hint-router">Cheap (Flash) for simple questions, Extreme (Opus) for architecture/debug, Default (Pro) for the rest</p>
-</div>
-
-<!-- Quota Fallback -->
-<div class="card">
-    <div class="card-title">🔄 Quota Fallback</div>
-    <div class="field"><label id="lbl-quota">Auto-switch model on quota exhaustion + send "Continue"</label>
-        <label class="toggle"><input type="checkbox" id="chkQuota" ${cfg.quotaFallback ? 'checked' : ''} onchange="quotaToggle()"><span class="slider"></span></label></div>
-    <p class="hint" id="hint-quota">When current model hits quota limit, automatically switch to another and continue</p>
-</div>
-
-<!-- Scroll -->
-<div class="card">
-    <div class="card-title">📜 Auto Scroll</div>
-    <div class="field"><label>Enable Auto Scroll</label>
-        <label class="toggle"><input type="checkbox" id="chkScroll" ${cfg.scrollEnabled !== false ? 'checked' : ''} onchange="scrollToggle()"><span class="slider"></span></label></div>
-    <div class="field" style="margin-top:12px"><label>Pause time (ms)</label>
-        <input type="number" id="txtPauseMs" value="${cfg.scrollPauseMs}" min="1000" max="60000" step="500"></div>
-    <div class="field"><label>Scroll speed (ms)</label>
-        <input type="number" id="txtScrollMs" value="${cfg.scrollIntervalMs}" min="100" max="5000" step="100"></div>
-</div>
-
-<!-- Click -->
-<div class="card">
-    <div class="card-title">🎯 Auto Click</div>
-    <div class="field"><label>Click speed (ms)</label>
-        <input type="number" id="txtClickMs" value="${cfg.clickIntervalMs}" min="200" max="5000" step="100"></div>
-    <div style="margin-top:16px"><label>BUTTON TEMPLATES</label><div class="pattern-list" id="templateList"></div></div>
-</div>
-
-<div class="actions">
-    <button class="btn" style="background:#45475a;color:#e8ecf4" onclick="vscode.postMessage({command:'reload'})">🔄 Reload</button>
-    <button class="btn btn-primary" onclick="saveSettings()">💾 Save & Apply</button>
-</div>
-
-<script>
-const vscode=acquireVsCodeApi();
-const DEFAULT_PATTERNS=['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Allow This Con','Accept all'];
-const DEFAULT_DISABLED=['Accept all'];
-let patterns=${patternsJson};
-let disabledPatterns=${disabledPatternsJson};
-DEFAULT_PATTERNS.forEach(function(p){if(patterns.indexOf(p)===-1&&disabledPatterns.indexOf(p)===-1){if(DEFAULT_DISABLED.indexOf(p)!==-1)disabledPatterns.push(p);else patterns.push(p);}});
-var DISPLAY_NAMES={'Allow This Con':'Allow This Conversion'};
-function displayName(p){return DISPLAY_NAMES[p]||p;}
-function renderPatterns(){
-    var list=document.getElementById('templateList');
-    var allP=[],seen={};
-    DEFAULT_PATTERNS.concat(patterns).concat(disabledPatterns).forEach(function(p){if(!seen[p]){seen[p]=true;allP.push(p);}});
-    var h='';
-    allP.forEach(function(p){
-        var isOn=patterns.indexOf(p)!==-1;
-        var bg=isOn?'#1e1e2e':'#2a2a3a';var brd=isOn?'#585b70':'#45475a';var opa=isOn?'1':'0.5';
-        var stColor=isOn?'#a6e3a1':'#f38ba8';
-        h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:'+bg+';border:1px solid '+brd+';border-radius:8px;margin-bottom:6px;opacity:'+opa+'">';
-        h+='<div style="display:flex;align-items:center;gap:10px">';
-        h+='<input type="checkbox" '+(isOn?'checked':'')+' onchange="togPat(&quot;'+p+'&quot;)" style="width:16px;height:16px;cursor:pointer;accent-color:#a6e3a1">';
-        h+='<span style="font-weight:600;color:#cdd6f4">'+displayName(p)+'</span></div>';
-        h+='<span style="font-size:0.75em;padding:2px 8px;border-radius:4px;background:'+(isOn?'#1a3a1a':'#3a1a1a')+';color:'+stColor+';font-weight:600">'+(isOn?'ON':'OFF')+'</span>';
-        h+='</div>';
-    });
-    list.innerHTML=h;
-}
-function togPat(v){
-    if(patterns.indexOf(v)!==-1){patterns=patterns.filter(function(x){return x!==v});if(disabledPatterns.indexOf(v)===-1)disabledPatterns.push(v);}
-    else{disabledPatterns=disabledPatterns.filter(function(x){return x!==v});if(patterns.indexOf(v)===-1)patterns.push(v);}
-    renderPatterns();
-}
-function saveSettings(){
-    vscode.postMessage({command:'save',data:{
-        enabled:document.getElementById('chkEnabled').checked,
-        scrollEnabled:document.getElementById('chkScroll').checked,
-        smartRouter:document.getElementById('chkRouter').checked,
-        quotaFallback:document.getElementById('chkQuota').checked,
-        scrollPauseMs:parseInt(document.getElementById('txtPauseMs').value)||7000,
-        scrollIntervalMs:parseInt(document.getElementById('txtScrollMs').value)||500,
-        clickIntervalMs:parseInt(document.getElementById('txtClickMs').value)||1000,
-        clickPatterns:patterns,disabledClickPatterns:disabledPatterns,
-        language:document.getElementById('selLang').value
-    }});
-}
-renderPatterns();
-// --- i18n for labels ---
-var _i18n = {
-    vi: { 'lbl-router': 'Tự chọn model theo nội dung prompt', 'hint-router': 'Cheap (Flash) cho câu đơn giản, Extreme (Opus) cho kiến trúc/debug, Default (Pro) cho còn lại', 'lbl-quota': 'Tự đổi model khi hết quota + gửi "Continue"', 'hint-quota': 'Khi model hiện tại hết quota, tự chuyển sang model khác và tiếp tục' },
-    en: { 'lbl-router': 'Auto-select model based on prompt content', 'hint-router': 'Cheap (Flash) for simple questions, Extreme (Opus) for architecture/debug, Default (Pro) for the rest', 'lbl-quota': 'Auto-switch model on quota exhaustion + send "Continue"', 'hint-quota': 'When current model hits quota limit, automatically switch to another and continue' },
-    zh: { 'lbl-router': '根据提示内容自动选择模型', 'hint-router': '简单问题用 Flash，架构/调试用 Opus，其余用 Pro', 'lbl-quota': '配额耗尽时自动切换模型 + 发送 "Continue"', 'hint-quota': '当前模型达到配额限制时，自动切换到另一个模型并继续' }
-};
-function applyI18n(lang) { var s = _i18n[lang] || _i18n['en']; for (var id in s) { var el = document.getElementById(id); if (el) el.textContent = s[id]; } }
-applyI18n('${lang}');
-function instantToggle(){vscode.postMessage({command:'toggle',enabled:document.getElementById('chkEnabled').checked});}
-function scrollToggle(){vscode.postMessage({command:'scrollToggle',enabled:document.getElementById('chkScroll').checked});}
-function routerToggle(){vscode.postMessage({command:'routerToggle',enabled:document.getElementById('chkRouter').checked});}
-function quotaToggle(){vscode.postMessage({command:'quotaToggle',enabled:document.getElementById('chkQuota').checked});}
-function changeLang(){vscode.postMessage({command:'changeLang',lang:document.getElementById('selLang').value});}
-function resetStats(){vscode.postMessage({command:'resetStats'});document.getElementById('totalCount').textContent='0';renderStatsBars({});}
-function clearClickLog(){vscode.postMessage({command:'clearClickLog'});document.getElementById('clickLogList').innerHTML='<div style="color:#6c7086;padding:8px;font-size:0.85em">No clicks yet</div>';}
-var allPatterns=DEFAULT_PATTERNS.slice();
-function renderStatsBars(stats){
-    var container=document.getElementById('statsBars');var maxCount=0;
-    for(var i=0;i<allPatterns.length;i++){var c=stats[allPatterns[i]]||0;if(c>maxCount)maxCount=c;}
-    var html='';
-    for(var i=0;i<allPatterns.length;i++){
-        var name=allPatterns[i];var count=stats[name]||0;var pct=maxCount>0?Math.round((count/maxCount)*100):0;
-        var barClass='bar-'+((i%6)+1);var crown=(count>0&&count===maxCount)?' 👑':'';
-        html+='<div class="stats-row"><span class="stats-label">'+displayName(name)+'</span>';
-        html+='<div class="stats-bar-bg"><div class="stats-bar '+barClass+'" style="width:'+pct+'%"></div></div>';
-        html+='<span class="stats-count">'+count+crown+'</span></div>';
-    }
-    container.innerHTML=html;
-}
-function renderClickLog(log){
-    var el=document.getElementById('clickLogList');if(!log||log.length===0){el.innerHTML='<div style="color:#6c7086;padding:8px;font-size:0.85em">No clicks yet</div>';return;}
-    var html='';var colors={Run:'#a6e3a1',Allow:'#89b4fa',Accept:'#fab387','Always Allow':'#89dceb',Retry:'#cba6f7','Keep Waiting':'#94e2d5',Continue:'#74c7ec'};
-    for(var i=0;i<log.length;i++){var c=log[i];var col=colors[c.pattern]||'#cdd6f4';
-        html+='<div class="clicklog-entry"><span class="clicklog-pattern" style="color:'+col+'">'+c.pattern+'</span><span class="clicklog-time">'+c.time+'</span></div>';}
-    el.innerHTML=html;
-}
-window.addEventListener('message',function(event){
-    var msg=event.data;
-    if(msg.command==='statsUpdated'){document.getElementById('totalCount').textContent=msg.totalClicks||0;renderStatsBars(msg.clickStats||{});}
-    if(msg.command==='clickLogUpdate')renderClickLog(msg.log);
-});
-vscode.postMessage({command:'getStats'});vscode.postMessage({command:'getClickLog'});
-renderStatsBars(${JSON.stringify(cfg.clickStats || {})});
-</script>
-</body></html>`;
+    return html;
 }
 
 // =============================================================
