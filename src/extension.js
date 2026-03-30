@@ -780,7 +780,7 @@ function startCommandsLoop() {
 // ACTIVATION
 // =============================================================
 function activate(context) {
-    console.log('[AG Autopilot] Activating v3.0.0...');
+    console.log('[AG Autopilot] Activating v' + (context.extension?.packageJSON?.version || '3.x') + '...');
     _extensionContext = context;
     _clickStats = context.globalState.get('clickStats', {});
     _totalClicks = context.globalState.get('totalClicks', 0);

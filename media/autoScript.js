@@ -404,14 +404,17 @@
                 if (btns[i].offsetParent !== null) return btns[i];
             }
         }
-        // Strategy 2: Close icon buttons (codicon-close) near error/notification areas
-        var closeIcons = document.querySelectorAll(
-            '.codicon-close, .codicon-notifications-clear, ' +
-            '[aria-label="Close"], [aria-label="Dismiss"], [aria-label*="close" i], ' +
-            '.notification-toast .action-label, .dialog-button'
+        // Strategy 2: Close icon buttons ONLY inside notification/dialog areas
+        var errorContainers = document.querySelectorAll(
+            '.notifications-toasts, .notification-toast, .dialog-box, ' +
+            '[class*="notification"], [class*="dialog"], [class*="error-widget"], [class*="message-widget"]'
         );
-        for (var i = 0; i < closeIcons.length; i++) {
-            if (closeIcons[i].offsetParent !== null) return closeIcons[i];
+        for (var c = 0; c < errorContainers.length; c++) {
+            var closeBtn = errorContainers[c].querySelector(
+                '.codicon-close, .codicon-notifications-clear, ' +
+                '[aria-label="Close"], [aria-label="Dismiss"], .action-label'
+            );
+            if (closeBtn && closeBtn.offsetParent !== null) return closeBtn;
         }
         return null;
     }
@@ -425,15 +428,20 @@
             'rate limit',
             'too many requests',
             'capacity on this model',
-            'model quota',
-            'exceeded.*quota',
-            'limit.*reached'
+            'model quota'
+        ];
+        var quotaRegexes = [
+            /exceeded\s.*quota/i,
+            /limit\s.*reached/i
         ];
         for (var i = 0; i < elements.length; i++) {
             var t = (elements[i].innerText || '').toLowerCase();
             if (!t || t.length > 500) continue;
             for (var q = 0; q < quotaPhrases.length; q++) {
                 if (t.indexOf(quotaPhrases[q]) !== -1) return true;
+            }
+            for (var r = 0; r < quotaRegexes.length; r++) {
+                if (quotaRegexes[r].test(t)) return true;
             }
         }
         return false;
@@ -702,5 +710,5 @@
     };
     window.addEventListener('scroll', window._agScrollListener, true);
 
-    console.log("[AG Autopilot] 🚀 v3.0.0 | Auto Click & Scroll + Smart Router + Quota Fallback | Patterns:", JSON.stringify(CLICK_PATTERNS));
+    console.log("[AG Autopilot] 🚀 Loaded | Auto Click & Scroll + Smart Router + Quota Fallback | Patterns:", JSON.stringify(CLICK_PATTERNS));
 })();

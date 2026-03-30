@@ -2,7 +2,7 @@
     "name": "ag-autopilot",
     "displayName": "AG Autopilot",
     "description": "Autopilot for Antigravity AI: Auto Click, Auto Scroll, Smart Model Router, Quota Fallback. | Tự lái mọi thứ cho Antigravity AI.",
-    "version": "3.0.2",
+    "version": "3.0.3",
     "publisher": "zixfel",
     "repository": {
         "type": "git",
