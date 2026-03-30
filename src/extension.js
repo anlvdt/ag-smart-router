@@ -351,7 +351,7 @@ function openSettingsPanel(context) {
                 smartRouter: cfg.get('smartRouter', true), quotaFallback: cfg.get('quotaFallback', true),
                 scrollPauseMs: cfg.get('scrollPauseMs', 7000), scrollIntervalMs: cfg.get('scrollIntervalMs', 500),
                 clickIntervalMs: cfg.get('clickIntervalMs', 1000),
-                clickPatterns: cfg.get('clickPatterns', ['Run', 'Allow', 'Always Allow', 'Accept']),
+                clickPatterns: cfg.get('clickPatterns', ['Run', 'Allow', 'Always Allow', 'Keep Waiting', 'Accept']),
                 disabledClickPatterns: context.globalState.get('disabledClickPatterns', []),
                 language: msg.lang, clickStats: _clickStats, totalClicks: _totalClicks
             });
@@ -378,6 +378,7 @@ function openSettingsPanel(context) {
         if (msg.command === 'save') {
             const cfg = vscode.workspace.getConfiguration('ag-auto');
             await cfg.update('enabled', msg.data.enabled, vscode.ConfigurationTarget.Global);
+            await cfg.update('scrollEnabled', msg.data.scrollEnabled, vscode.ConfigurationTarget.Global);
             await cfg.update('scrollPauseMs', msg.data.scrollPauseMs, vscode.ConfigurationTarget.Global);
             await cfg.update('scrollIntervalMs', msg.data.scrollIntervalMs, vscode.ConfigurationTarget.Global);
             await cfg.update('clickIntervalMs', msg.data.clickIntervalMs, vscode.ConfigurationTarget.Global);
@@ -387,6 +388,7 @@ function openSettingsPanel(context) {
             await context.globalState.update('disabledClickPatterns', msg.data.disabledClickPatterns);
             try { await cfg.update('language', msg.data.language, vscode.ConfigurationTarget.Global); } catch (e) {}
             _autoAcceptEnabled = msg.data.enabled;
+            _httpScrollEnabled = msg.data.scrollEnabled !== false;
             _httpClickPatterns = msg.data.clickPatterns.filter(p => !msg.data.disabledClickPatterns.includes(p));
             writeConfigJson(context); updateStatusBarItem();
             vscode.window.setStatusBarMessage('$(check) [AG Autopilot] ✅ Saved!', 3000);
@@ -432,7 +434,7 @@ h1{font-size:1.6em;background:linear-gradient(135deg,#89b4fa,#a6e3a1);-webkit-ba
 .click-badge .count{color:#f9e2af;font-size:1.1em}
 .btn-reset-stats{background:none;border:1px solid #585b70;border-radius:12px;color:#f38ba8;font-size:0.7em;padding:2px 10px;cursor:pointer}
 .btn-reset-stats:hover{background:#f38ba8;color:#1e1e2e}
-.top-row{display:flex;gap:16px;margin-bottom:16px}.top-row>*{flex:1;min-width:0}
+.top-row{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}.top-row>*{flex:1;min-width:240px}
 .stats-card,.clicklog-card{background:#313244;border-radius:12px;padding:16px;border:1px solid #45475a}
 .stats-card-title,.clicklog-title{font-size:0.9em;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .stats-card-title{color:#89b4fa}.clicklog-title{color:#f9e2af}
@@ -502,17 +504,17 @@ input[type="number"]:focus,select:focus{border-color:#89b4fa}
 <!-- Smart Router -->
 <div class="card">
     <div class="card-title">🧠 Smart Model Router</div>
-    <div class="field"><label>Tự chọn model theo nội dung prompt</label>
+    <div class="field"><label id="lbl-router">Auto-select model based on prompt content</label>
         <label class="toggle"><input type="checkbox" id="chkRouter" ${cfg.smartRouter ? 'checked' : ''} onchange="routerToggle()"><span class="slider"></span></label></div>
-    <p class="hint">Cheap (Flash) cho câu đơn giản, Extreme (Opus) cho kiến trúc/debug, Default (Pro) cho còn lại</p>
+    <p class="hint" id="hint-router">Cheap (Flash) for simple questions, Extreme (Opus) for architecture/debug, Default (Pro) for the rest</p>
 </div>
 
 <!-- Quota Fallback -->
 <div class="card">
     <div class="card-title">🔄 Quota Fallback</div>
-    <div class="field"><label>Tự đổi model khi hết quota + gửi "Continue"</label>
+    <div class="field"><label id="lbl-quota">Auto-switch model on quota exhaustion + send "Continue"</label>
         <label class="toggle"><input type="checkbox" id="chkQuota" ${cfg.quotaFallback ? 'checked' : ''} onchange="quotaToggle()"><span class="slider"></span></label></div>
-    <p class="hint">Khi model hiện tại hết quota, tự chuyển sang model khác và tiếp tục</p>
+    <p class="hint" id="hint-quota">When current model hits quota limit, automatically switch to another and continue</p>
 </div>
 
 <!-- Scroll -->
@@ -574,6 +576,7 @@ function togPat(v){
 function saveSettings(){
     vscode.postMessage({command:'save',data:{
         enabled:document.getElementById('chkEnabled').checked,
+        scrollEnabled:document.getElementById('chkScroll').checked,
         smartRouter:document.getElementById('chkRouter').checked,
         quotaFallback:document.getElementById('chkQuota').checked,
         scrollPauseMs:parseInt(document.getElementById('txtPauseMs').value)||7000,
@@ -584,6 +587,14 @@ function saveSettings(){
     }});
 }
 renderPatterns();
+// --- i18n for labels ---
+var _i18n = {
+    vi: { 'lbl-router': 'Tự chọn model theo nội dung prompt', 'hint-router': 'Cheap (Flash) cho câu đơn giản, Extreme (Opus) cho kiến trúc/debug, Default (Pro) cho còn lại', 'lbl-quota': 'Tự đổi model khi hết quota + gửi "Continue"', 'hint-quota': 'Khi model hiện tại hết quota, tự chuyển sang model khác và tiếp tục' },
+    en: { 'lbl-router': 'Auto-select model based on prompt content', 'hint-router': 'Cheap (Flash) for simple questions, Extreme (Opus) for architecture/debug, Default (Pro) for the rest', 'lbl-quota': 'Auto-switch model on quota exhaustion + send "Continue"', 'hint-quota': 'When current model hits quota limit, automatically switch to another and continue' },
+    zh: { 'lbl-router': '根据提示内容自动选择模型', 'hint-router': '简单问题用 Flash，架构/调试用 Opus，其余用 Pro', 'lbl-quota': '配额耗尽时自动切换模型 + 发送 "Continue"', 'hint-quota': '当前模型达到配额限制时，自动切换到另一个模型并继续' }
+};
+function applyI18n(lang) { var s = _i18n[lang] || _i18n['en']; for (var id in s) { var el = document.getElementById(id); if (el) el.textContent = s[id]; } }
+applyI18n('${lang}');
 function instantToggle(){vscode.postMessage({command:'toggle',enabled:document.getElementById('chkEnabled').checked});}
 function scrollToggle(){vscode.postMessage({command:'scrollToggle',enabled:document.getElementById('chkScroll').checked});}
 function routerToggle(){vscode.postMessage({command:'routerToggle',enabled:document.getElementById('chkRouter').checked});}

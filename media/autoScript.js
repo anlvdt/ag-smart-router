@@ -144,13 +144,11 @@
         "Claude Opus 4.6 (Thinking)",
         "Claude Sonnet 4.5",
         "Gemini 3.1 Pro (High)",
-        "Gemini 3.1 Pro",
         "Gemini 3 Flash",
-        "GPT-OSS 120B (Medium)",
-        "GPT-OSS 120B"
+        "GPT-OSS 120B (Medium)"
     ];
     // Unique model families for matching (partial match)
-    var MODEL_KEYWORDS = ["Claude", "Gemini", "GPT", "Opus", "Sonnet", "Flash"];
+    var MODEL_KEYWORDS = ["Claude", "Gemini", "GPT"];
 
     var TIER_CHEAP = "Gemini 3 Flash";
     var TIER_EXTREME = "Claude Opus 4.6 (Thinking)";
@@ -656,13 +654,15 @@
         }
 
         if (targetBtn) {
-            try {
-                var _lx = new XMLHttpRequest();
-                _lx.open('POST', 'http://127.0.0.1:' + AG_HTTP_PORT + '/api/click-log', true);
-                _lx.setRequestHeader('Content-Type', 'application/json');
-                _lx.timeout = 3000;
-                _lx.send(JSON.stringify({ button: targetBtn.innerText.trim().substring(0, 100), pattern: matchedPattern }));
-            } catch (_e) {}
+            if (AG_HTTP_PORT > 0) {
+                try {
+                    var _lx = new XMLHttpRequest();
+                    _lx.open('POST', 'http://127.0.0.1:' + AG_HTTP_PORT + '/api/click-log', true);
+                    _lx.setRequestHeader('Content-Type', 'application/json');
+                    _lx.timeout = 3000;
+                    _lx.send(JSON.stringify({ button: targetBtn.innerText.trim().substring(0, 100), pattern: matchedPattern }));
+                } catch (_e) {}
+            }
             console.log('[AG Autopilot] 🎯 Click: [' + (targetBtn.innerText || '').trim().substring(0, 40) + '] pattern=' + matchedPattern);
             _clicked.add(targetBtn);
             targetBtn.click();
