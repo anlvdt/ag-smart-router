@@ -95,7 +95,12 @@
     }
 
     function _agApplyConfig(cfg) {
-        if (typeof cfg.enabled === 'boolean') window._agAutoEnabled = cfg.enabled;
+        if (typeof cfg.enabled === 'boolean') {
+            if (window._agAutoEnabled !== cfg.enabled) {
+                console.log('[AG Autopilot] ' + (cfg.enabled ? '✅ ON' : '❌ OFF') + ' (live toggle via HTTP)');
+            }
+            window._agAutoEnabled = cfg.enabled;
+        }
         if (typeof cfg.scrollEnabled === 'boolean') window._agScrollEnabled = cfg.scrollEnabled;
         if (cfg.clickPatterns && Array.isArray(cfg.clickPatterns)) CLICK_PATTERNS = cfg.clickPatterns.filter(function (p) { return p !== 'Accept'; });
         if (typeof cfg.acceptInChatOnly === 'boolean') window._agAcceptChatOnly = cfg.acceptInChatOnly;
@@ -104,7 +109,9 @@
         if (cfg.clickIntervalMs) CLICK_INTERVAL_MS = cfg.clickIntervalMs;
         if (typeof cfg.smartRouter === 'boolean') window._agSmartRouter = cfg.smartRouter;
         if (typeof cfg.quotaFallback === 'boolean') window._agQuotaFallback = cfg.quotaFallback;
-        if (cfg.resetStats) { window._agClickStats = {}; window._agTotalClicks = 0; _agSessionStats = {}; _agSessionTotal = 0; }
+        if (cfg.clickStats) window._agClickStats = cfg.clickStats;
+        if (typeof cfg.totalClicks === 'number') window._agTotalClicks = cfg.totalClicks;
+        if (cfg.resetStats) { window._agClickStats = {}; window._agTotalClicks = 0; _agSessionStats = {}; _agSessionTotal = 0; console.log('[AG Autopilot] 🔄 Stats reset by user'); }
     }
 
     _agDiscoverPort(function (port, cfg) { _agApplyConfig(cfg); _agPollErrors = 0; });
@@ -656,6 +663,7 @@
                 _lx.timeout = 3000;
                 _lx.send(JSON.stringify({ button: targetBtn.innerText.trim().substring(0, 100), pattern: matchedPattern }));
             } catch (_e) {}
+            console.log('[AG Autopilot] 🎯 Click: [' + (targetBtn.innerText || '').trim().substring(0, 40) + '] pattern=' + matchedPattern);
             _clicked.add(targetBtn);
             targetBtn.click();
             _agSessionTotal++;
@@ -676,11 +684,18 @@
     var BOTTOM_THRESHOLD = 150;
     var isAutoScrolling = false;
 
+    var _agCachedPanel = null;
+    var _agPanelCheckCount = 0;
+
     var autoScroll = setInterval(function () {
         if (!window._agAutoEnabled || !window._agScrollEnabled) return;
-        var panel = document.querySelector('.antigravity-agent-side-panel');
-        if (!panel) return;
-        var scrollables = Array.from(panel.querySelectorAll('*')).filter(function (el) {
+        // Re-query panel every 20 cycles (~10s) or if cached ref is detached
+        if (!_agCachedPanel || !_agCachedPanel.isConnected || ++_agPanelCheckCount > 20) {
+            _agCachedPanel = document.querySelector('.antigravity-agent-side-panel');
+            _agPanelCheckCount = 0;
+        }
+        if (!_agCachedPanel) return;
+        var scrollables = Array.from(_agCachedPanel.querySelectorAll('*')).filter(function (el) {
             var style = window.getComputedStyle(el);
             return el.scrollHeight > el.clientHeight &&
                 (style.overflowY === 'auto' || style.overflowY === 'scroll') &&

@@ -365,7 +365,7 @@ function openSettingsPanel(context) {
         if (msg.command === 'scrollToggle') {
             _httpScrollEnabled = msg.enabled;
             await vscode.workspace.getConfiguration('ag-auto').update('scrollEnabled', msg.enabled, vscode.ConfigurationTarget.Global);
-            updateStatusBarItem(); return;
+            writeConfigJson(context); updateStatusBarItem(); return;
         }
         if (msg.command === 'routerToggle') {
             await vscode.workspace.getConfiguration('ag-auto').update('smartRouter', msg.enabled, vscode.ConfigurationTarget.Global);
