@@ -220,63 +220,67 @@
     function selectModelInDropdown(targetModel, callback) {
         var selectorBtn = findModelSelectorButton();
         if (!selectorBtn) {
-            console.log('[AG Autopilot] ❌ Cannot switch model: selector not found');
+            console.log('[AG Autopilot] Cannot switch model: selector not found');
             if (callback) callback(false);
             return;
         }
 
-        console.log('[AG Autopilot] 🖱️ Clicking model selector...');
+        console.log('[AG Autopilot] Clicking model selector to open dropdown...');
         selectorBtn.click();
 
-        // Wait for dropdown to appear, then search for target model
         var attempts = 0;
-        var maxAttempts = 10;
+        var maxAttempts = 15; // 15 x 200ms = 3s max wait
         var searchInterval = setInterval(function () {
             attempts++;
 
-            // Search in multiple possible dropdown containers
+            // Search for dropdown menu items
             var menuItems = document.querySelectorAll(
-                '[role="menuitem"], [role="option"], [role="listbox"] > *, ' +
-                '.action-item, .action-label, .monaco-list-row, ' +
-                '.quick-input-list .monaco-list-row, ' +
-                '[class*="dropdown"] li, [class*="dropdown"] [role="option"], ' +
-                '[class*="menu"] [role="menuitem"], ' +
-                '.context-view [role="menuitem"], .context-view .action-label'
+                '[role="menuitem"], [role="option"], ' +
+                '.monaco-list-row, .action-item .action-label, ' +
+                '.context-view .action-label, ' +
+                '.quick-input-list .monaco-list-row'
             );
 
+            // Only proceed if we found menu items (dropdown is open)
+            if (menuItems.length === 0 && attempts < maxAttempts) return;
+
             var clicked = false;
+
+            // Pass 1: exact match
             for (var i = 0; i < menuItems.length; i++) {
                 var itemText = (menuItems[i].innerText || menuItems[i].textContent || '').trim();
                 if (itemText.indexOf(targetModel) !== -1) {
-                    console.log('[AG Autopilot] ✅ Found model in dropdown: "' + itemText.substring(0, 50) + '"');
+                    console.log('[AG Autopilot] Found model (exact): "' + itemText.substring(0, 50) + '"');
                     menuItems[i].click();
                     clicked = true;
                     break;
                 }
             }
 
+            // Pass 2: partial match (first 2 words)
+            if (!clicked) {
+                var shortName = targetModel.split(' ').slice(0, 2).join(' ');
+                for (var i = 0; i < menuItems.length; i++) {
+                    var itemText = (menuItems[i].innerText || menuItems[i].textContent || '').trim();
+                    if (shortName && itemText.indexOf(shortName) !== -1) {
+                        console.log('[AG Autopilot] Found model (partial): "' + itemText.substring(0, 50) + '"');
+                        menuItems[i].click();
+                        clicked = true;
+                        break;
+                    }
+                }
+            }
+
             if (clicked || attempts >= maxAttempts) {
                 clearInterval(searchInterval);
                 if (!clicked) {
-                    // Try partial match as last resort
-                    var shortName = targetModel.split(' ')[0] + ' ' + (targetModel.split(' ')[1] || '');
-                    for (var i = 0; i < menuItems.length; i++) {
-                        var itemText = (menuItems[i].innerText || menuItems[i].textContent || '').trim();
-                        if (itemText.indexOf(shortName) !== -1) {
-                            menuItems[i].click();
-                            clicked = true;
-                            console.log('[AG Autopilot] ✅ Found model (partial): "' + itemText.substring(0, 50) + '"');
-                            break;
-                        }
-                    }
-                    if (!clicked) {
-                        console.log('[AG Autopilot] ❌ Model "' + targetModel + '" not found in dropdown (' + menuItems.length + ' items scanned)');
-                        document.body.click(); // Close dropdown
-                    }
+                    console.log('[AG Autopilot] Model "' + targetModel + '" not found (' + menuItems.length + ' items). Closing dropdown.');
+                    // Press Escape to close dropdown cleanly
+                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
                 }
                 if (callback) callback(clicked);
             }
-        }, 150);
+        }, 200);
     }
 
     function evaluateTargetModel(promptText) {
@@ -398,124 +402,145 @@
     }, true);
 
     // =================================================================
-    // QUOTA FALLBACK (from ag-auto-model-switch)
+    // QUOTA FALLBACK
     // =================================================================
     function findDismissButton() {
-        // Strategy 1: Text-based search
-        var btns = document.querySelectorAll('button, a.action-label, [role="button"], .monaco-button');
-        for (var i = 0; i < btns.length; i++) {
-            var text = (btns[i].innerText || btns[i].textContent || '').trim().toLowerCase();
-            if (text === 'dismiss' || text === 'ok' || text === 'close' || text === 'got it' || text === 'đóng') {
-                if (btns[i].offsetParent !== null) return btns[i];
-            }
-        }
-        // Strategy 2: Close icon buttons ONLY inside notification/dialog areas
-        var errorContainers = document.querySelectorAll(
-            '.notifications-toasts, .notification-toast, .dialog-box, ' +
-            '[class*="notification"], [class*="dialog"], [class*="error-widget"], [class*="message-widget"]'
+        // Only look inside notification/dialog containers — never in chat content
+        var containers = document.querySelectorAll(
+            '.notifications-toasts .notification-toast, .dialog-box, ' +
+            '.notification-list-item'
         );
-        for (var c = 0; c < errorContainers.length; c++) {
-            var closeBtn = errorContainers[c].querySelector(
-                '.codicon-close, .codicon-notifications-clear, ' +
-                '[aria-label="Close"], [aria-label="Dismiss"], .action-label'
-            );
-            if (closeBtn && closeBtn.offsetParent !== null) return closeBtn;
+        for (var c = 0; c < containers.length; c++) {
+            // Check if this container actually has quota-related text
+            var containerText = (containers[c].innerText || '').toLowerCase();
+            var isQuotaRelated = false;
+            var strictPhrases = ['exhausted your capacity', 'quota will reset', 'baseline model quota reached'];
+            for (var q = 0; q < strictPhrases.length; q++) {
+                if (containerText.indexOf(strictPhrases[q]) !== -1) { isQuotaRelated = true; break; }
+            }
+            if (!isQuotaRelated) continue;
+
+            // Found a quota error container — look for dismiss/close button inside it
+            var btns = containers[c].querySelectorAll('button, a.action-label, [role="button"], .codicon-close, .codicon-notifications-clear');
+            for (var b = 0; b < btns.length; b++) {
+                if (btns[b].offsetParent !== null) return btns[b];
+            }
         }
         return null;
     }
 
+    // Strict quota detection — only match EXACT quota error phrases in notification containers
+    // NEVER scan general chat content to avoid false positives
+    var _quotaDetectedAt = 0;
     function isQuotaErrorVisible() {
-        var elements = document.querySelectorAll('span, div, p, [class*="message"], [class*="error"], [class*="notification"]');
-        var quotaPhrases = [
+        // Only check inside notification toasts and dialog boxes
+        var containers = document.querySelectorAll(
+            '.notifications-toasts .notification-toast, .notification-list-item, ' +
+            '.dialog-box, .dialog-message'
+        );
+        if (containers.length === 0) return false;
+
+        var strictPhrases = [
             'exhausted your capacity',
             'quota will reset',
-            'quota reached',
-            'rate limit',
-            'too many requests',
-            'capacity on this model',
-            'model quota'
+            'baseline model quota reached',
+            'exhausted your capacity on this model'
         ];
-        var quotaRegexes = [
-            /exceeded\s.*quota/i,
-            /limit\s.*reached/i
-        ];
-        for (var i = 0; i < elements.length; i++) {
-            var t = (elements[i].innerText || '').toLowerCase();
-            if (!t || t.length > 500) continue;
-            for (var q = 0; q < quotaPhrases.length; q++) {
-                if (t.indexOf(quotaPhrases[q]) !== -1) return true;
-            }
-            for (var r = 0; r < quotaRegexes.length; r++) {
-                if (quotaRegexes[r].test(t)) return true;
+
+        for (var c = 0; c < containers.length; c++) {
+            var t = (containers[c].innerText || '').toLowerCase();
+            if (!t || t.length > 300) continue;
+            for (var q = 0; q < strictPhrases.length; q++) {
+                if (t.indexOf(strictPhrases[q]) !== -1) {
+                    console.log('[AG Autopilot] Quota error found in notification: "' + t.substring(0, 80) + '"');
+                    return true;
+                }
             }
         }
         return false;
     }
 
     function getNextFallbackModel(currentModel) {
-        // Find current model in fallback list and return next one
         var currentIdx = -1;
         for (var i = 0; i < FALLBACK_MODELS.length; i++) {
-            if (currentModel.indexOf(FALLBACK_MODELS[i]) !== -1) {
-                currentIdx = i;
-                break;
-            }
+            if (currentModel.indexOf(FALLBACK_MODELS[i]) !== -1) { currentIdx = i; break; }
         }
-        // Return next model in rotation
         var nextIdx = (currentIdx + 1) % FALLBACK_MODELS.length;
-        // Skip if same as current (shouldn't happen but safety check)
         if (FALLBACK_MODELS[nextIdx] === FALLBACK_MODELS[currentIdx]) {
             nextIdx = (nextIdx + 1) % FALLBACK_MODELS.length;
         }
         return FALLBACK_MODELS[nextIdx];
     }
 
-    function triggerSwitchSequence() {
-        if (Date.now() - _modelSwitchingAt < 15000) return;
-        _modelSwitchingAt = Date.now();
-        console.log('[AG Autopilot] 🔄 Quota error detected! Initiating model switch...');
+    var _quotaSwitchInProgress = false;
 
-        // Step 1: Dismiss error dialog
+    function triggerSwitchSequence() {
+        // Hard guards against repeated triggers
+        if (_quotaSwitchInProgress) return;
+        if (Date.now() - _modelSwitchingAt < 30000) return; // 30s cooldown (was 15s)
+        _quotaSwitchInProgress = true;
+        _modelSwitchingAt = Date.now();
+        console.log('[AG Autopilot] Quota error detected! Starting switch sequence...');
+
+        // Step 1: Dismiss the quota error notification
         var dismissBtn = findDismissButton();
         if (dismissBtn) {
-            console.log('[AG Autopilot] 🔄 Dismissing error dialog...');
+            console.log('[AG Autopilot] Clicking dismiss button...');
             dismissBtn.click();
         }
 
-        // Step 2: Wait for dismiss animation, then switch model
+        // Step 2: Wait for dismiss, verify error is gone, then switch model
         setTimeout(function () {
-            // Try dismiss again in case first attempt missed
+            // Try dismiss again
             var dismissBtn2 = findDismissButton();
             if (dismissBtn2) dismissBtn2.click();
 
+            // Verify the error is actually dismissed before proceeding
             setTimeout(function () {
-                var selectorBtn = findModelSelectorButton();
-                var currentModel = selectorBtn ? (selectorBtn.innerText || selectorBtn.textContent || '').trim() : '';
-                var targetModel = getNextFallbackModel(currentModel);
+                if (isQuotaErrorVisible()) {
+                    console.log('[AG Autopilot] Error still visible after dismiss, trying once more...');
+                    var dismissBtn3 = findDismissButton();
+                    if (dismissBtn3) dismissBtn3.click();
+                }
 
-                console.log('[AG Autopilot] 🔄 Quota fallback: "' + currentModel.substring(0, 30) + '" → ' + targetModel);
-
-                selectModelInDropdown(targetModel, function (success) {
-                    if (success) {
-                        console.log('[AG Autopilot] ✅ Model switched, sending Continue in 2s...');
-                        setTimeout(sendContinueMessage, 2000);
-                    } else {
-                        console.log('[AG Autopilot] ❌ Failed to switch model, trying Continue anyway...');
-                        setTimeout(sendContinueMessage, 2000);
+                // Step 3: Switch model
+                setTimeout(function () {
+                    var selectorBtn = findModelSelectorButton();
+                    if (!selectorBtn) {
+                        console.log('[AG Autopilot] Model selector not found, aborting switch');
+                        _quotaSwitchInProgress = false;
+                        return;
                     }
-                });
+                    var currentModel = (selectorBtn.innerText || selectorBtn.textContent || '').trim();
+                    var targetModel = getNextFallbackModel(currentModel);
+                    console.log('[AG Autopilot] Switching: "' + currentModel.substring(0, 30) + '" -> ' + targetModel);
+
+                    selectModelInDropdown(targetModel, function (success) {
+                        if (success) {
+                            console.log('[AG Autopilot] Model switched OK, sending Continue in 2s...');
+                            setTimeout(function () {
+                                sendContinueMessage();
+                                // Release lock after everything is done
+                                setTimeout(function () { _quotaSwitchInProgress = false; }, 3000);
+                            }, 2000);
+                        } else {
+                            console.log('[AG Autopilot] Failed to select model in dropdown');
+                            _quotaSwitchInProgress = false;
+                        }
+                    });
+                }, 500);
             }, 500);
-        }, 800);
+        }, 1000);
     }
 
     function sendContinueMessage() {
         var inputArea = findChatTextarea();
         if (!inputArea) {
-            console.log('[AG Autopilot] ❌ Cannot send Continue: no textarea found');
+            console.log('[AG Autopilot] Cannot send Continue: no textarea found');
             return;
         }
 
-        console.log('[AG Autopilot] 📤 Typing "Continue" into chat...');
+        console.log('[AG Autopilot] Typing "Continue" into chat...');
         inputArea.focus();
 
         // Use native setter to bypass React controlled input
@@ -526,52 +551,79 @@
             inputArea.value = 'Continue';
         }
 
-        // Trigger React's synthetic events
+        // Trigger React synthetic events
         inputArea.dispatchEvent(new Event('input', { bubbles: true }));
         inputArea.dispatchEvent(new Event('change', { bubbles: true }));
-        // Also trigger React 18+ compatible events
-        inputArea.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'Continue', inputType: 'insertText' }));
+        try { inputArea.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'Continue', inputType: 'insertText' })); } catch (e) {}
 
-        // Wait for React to process the input, then send
+        // Wait for React to process, then send
         setTimeout(function () {
-            _isRoutingInProgress = true; // Bypass smart router for this send
+            _isRoutingInProgress = true;
 
-            // Method 1: Keyboard Enter event
+            // Method 1: Full keyboard Enter sequence
             var opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
             inputArea.dispatchEvent(new KeyboardEvent('keydown', opts));
             inputArea.dispatchEvent(new KeyboardEvent('keypress', opts));
             inputArea.dispatchEvent(new KeyboardEvent('keyup', opts));
 
-            // Method 2: Click Send button (fallback, 300ms later)
+            // Method 2: Click Send button (fallback after 500ms)
             setTimeout(function () {
                 var sendBtn = findSendButton();
                 if (sendBtn) {
-                    console.log('[AG Autopilot] 📤 Clicking Send button');
+                    console.log('[AG Autopilot] Clicking Send button as fallback');
                     sendBtn.click();
                 }
-                setTimeout(function () { _isRoutingInProgress = false; }, 300);
-            }, 300);
-        }, 600);
+                setTimeout(function () { _isRoutingInProgress = false; }, 500);
+            }, 500);
+        }, 800);
     }
 
-    // Quota observer — watch for error messages appearing
-    var _quotaObserverTarget = document.querySelector('.antigravity-agent-side-panel') || document.body;
-    var quotaObserver = new MutationObserver(function (mutations) {
-        if (!window._agAutoEnabled || !window._agQuotaFallback) return;
-        if (Date.now() - _modelSwitchingAt < 15000) return;
-        // Only check on childList changes (new elements added)
-        var hasNewNodes = false;
-        for (var i = 0; i < mutations.length; i++) {
-            if (mutations[i].addedNodes && mutations[i].addedNodes.length > 0) {
-                hasNewNodes = true;
-                break;
-            }
+    // Quota observer — ONLY watch notification containers, not chat content
+    (function initQuotaObserver() {
+        // Watch the notifications area specifically
+        var notifContainer = document.querySelector('.notifications-toasts') || document.querySelector('.notification-center');
+
+        if (notifContainer) {
+            var observer = new MutationObserver(function () {
+                if (!window._agAutoEnabled || !window._agQuotaFallback) return;
+                if (_quotaSwitchInProgress) return;
+                if (Date.now() - _modelSwitchingAt < 30000) return;
+                if (isQuotaErrorVisible()) {
+                    triggerSwitchSequence();
+                }
+            });
+            observer.observe(notifContainer, { childList: true, subtree: true });
+            console.log('[AG Autopilot] Quota observer attached to notifications container');
+        } else {
+            // Fallback: watch body but with strict checks
+            console.log('[AG Autopilot] Notifications container not found, using body fallback with strict checks');
+            var bodyObserver = new MutationObserver(function (mutations) {
+                if (!window._agAutoEnabled || !window._agQuotaFallback) return;
+                if (_quotaSwitchInProgress) return;
+                if (Date.now() - _modelSwitchingAt < 30000) return;
+
+                // Only check if a notification-like element was added
+                var hasNotification = false;
+                for (var i = 0; i < mutations.length; i++) {
+                    var added = mutations[i].addedNodes;
+                    for (var j = 0; j < added.length; j++) {
+                        var node = added[j];
+                        if (node.nodeType !== 1) continue;
+                        var cls = (node.className || '').toString().toLowerCase();
+                        if (cls.indexOf('notification') !== -1 || cls.indexOf('dialog') !== -1 || cls.indexOf('toast') !== -1) {
+                            hasNotification = true;
+                            break;
+                        }
+                    }
+                    if (hasNotification) break;
+                }
+                if (hasNotification && isQuotaErrorVisible()) {
+                    triggerSwitchSequence();
+                }
+            });
+            bodyObserver.observe(document.body, { childList: true, subtree: true });
         }
-        if (hasNewNodes && isQuotaErrorVisible()) {
-            triggerSwitchSequence();
-        }
-    });
-    quotaObserver.observe(_quotaObserverTarget, { childList: true, subtree: true });
+    })();
 
     // =================================================================
     // AUTO CLICK (from ag-auto-click-scroll)
