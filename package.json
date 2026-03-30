@@ -1,0 +1,42 @@
+{
+  "name": "ag-auto-model-switch",
+  "displayName": "AG Smart Router (Auto Model Switch)",
+  "description": "Layer 0 Intelligent model routing and auto-fallback for Antigravity AI quotas.",
+  "version": "2.0.0",
+  "publisher": "zixfel",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ag-model-switch.enable",
+        "title": "AG Model Switch: Enable Auto-Switch"
+      },
+      {
+        "command": "ag-model-switch.disable",
+        "title": "AG Model Switch: Disable"
+      }
+    ],
+    "configuration": {
+      "title": "AG Auto Model Switch",
+      "properties": {
+        "ag-model-switch.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic model switching on quota error."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "echo ok"
+  }
+}
