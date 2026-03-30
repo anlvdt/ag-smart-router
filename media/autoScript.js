@@ -135,44 +135,143 @@
     // =================================================================
     var FALLBACK_MODELS = [
         "Claude Opus 4.6 (Thinking)",
+        "Claude Sonnet 4.5",
         "Gemini 3.1 Pro (High)",
+        "Gemini 3.1 Pro",
         "Gemini 3 Flash",
-        "GPT-OSS 120B (Medium)"
+        "GPT-OSS 120B (Medium)",
+        "GPT-OSS 120B"
     ];
+    // Unique model families for matching (partial match)
+    var MODEL_KEYWORDS = ["Claude", "Gemini", "GPT", "Opus", "Sonnet", "Flash"];
+
     var TIER_CHEAP = "Gemini 3 Flash";
     var TIER_EXTREME = "Claude Opus 4.6 (Thinking)";
     var TIER_DEFAULT = "Gemini 3.1 Pro (High)";
-    var REGEX_CHEAP = /(explain|giải thích|hỏi|comment|format|typo|spell|rename|lint|clean|tóm tắt|summary|translate)/i;
-    var REGEX_EXTREME = /(architecture|kiến trúc|setup|mới|debug|refactor|complex|plan|structure|design|error|lỗi|build)/i;
+    var REGEX_CHEAP = /(explain|giải thích|hỏi|comment|format|typo|spell|rename|lint|clean|tóm tắt|summary|translate|what is|là gì)/i;
+    var REGEX_EXTREME = /(architecture|kiến trúc|setup|mới|debug|refactor|complex|plan|structure|design|error|lỗi|build|migrate|deploy|security|optimize|performance)/i;
 
     var _modelSwitchingAt = 0;
     var _isRoutingInProgress = false;
 
-    function findModelSelectorButton(containsText) {
-        var btns = document.querySelectorAll('.monaco-button, button, [role="button"]');
-        for (var i = 0; i < btns.length; i++) {
-            var text = (btns[i].innerText || '').trim();
-            if (containsText && text.indexOf(containsText) !== -1) return btns[i];
+    // --- Robust model selector finder ---
+    // AG model selector can be: dropdown button, select element, or custom widget
+    function findModelSelectorButton() {
+        // Strategy 1: Look for button/element inside chat panel that contains a known model name
+        var chatPanel = document.querySelector('.antigravity-agent-side-panel');
+        var searchRoot = chatPanel || document;
+
+        // Check all interactive elements
+        var candidates = searchRoot.querySelectorAll(
+            'button, [role="button"], [role="combobox"], [role="listbox"], ' +
+            '.monaco-button, .monaco-dropdown, select, ' +
+            '[class*="model"], [class*="selector"], [class*="picker"], [class*="dropdown"], ' +
+            '[aria-label*="model" i], [aria-label*="Model" i], [title*="model" i]'
+        );
+
+        // First pass: exact model name match
+        for (var i = 0; i < candidates.length; i++) {
+            var text = (candidates[i].innerText || candidates[i].textContent || '').trim();
+            if (!text || text.length > 100) continue;
             for (var m = 0; m < FALLBACK_MODELS.length; m++) {
-                if (text.indexOf(FALLBACK_MODELS[m]) !== -1) return btns[i];
+                if (text.indexOf(FALLBACK_MODELS[m]) !== -1) {
+                    console.log('[AG Autopilot] 🔍 Found model selector (exact): "' + text.substring(0, 50) + '"');
+                    return candidates[i];
+                }
             }
         }
+
+        // Second pass: keyword match (Claude, Gemini, GPT, etc.)
+        for (var i = 0; i < candidates.length; i++) {
+            var text = (candidates[i].innerText || candidates[i].textContent || '').trim();
+            if (!text || text.length > 100) continue;
+            for (var k = 0; k < MODEL_KEYWORDS.length; k++) {
+                if (text.indexOf(MODEL_KEYWORDS[k]) !== -1) {
+                    console.log('[AG Autopilot] 🔍 Found model selector (keyword): "' + text.substring(0, 50) + '"');
+                    return candidates[i];
+                }
+            }
+        }
+
+        // Strategy 2: Broader search across entire document
+        if (chatPanel) {
+            var allBtns = document.querySelectorAll('button, [role="button"], [role="combobox"]');
+            for (var i = 0; i < allBtns.length; i++) {
+                var text = (allBtns[i].innerText || '').trim();
+                if (!text || text.length > 100) continue;
+                for (var m = 0; m < FALLBACK_MODELS.length; m++) {
+                    if (text.indexOf(FALLBACK_MODELS[m]) !== -1) return allBtns[i];
+                }
+                for (var k = 0; k < MODEL_KEYWORDS.length; k++) {
+                    if (text.indexOf(MODEL_KEYWORDS[k]) !== -1) return allBtns[i];
+                }
+            }
+        }
+
+        console.log('[AG Autopilot] ⚠️ Model selector not found');
         return null;
     }
 
     function selectModelInDropdown(targetModel, callback) {
         var selectorBtn = findModelSelectorButton();
-        if (!selectorBtn) { if (callback) callback(false); return; }
+        if (!selectorBtn) {
+            console.log('[AG Autopilot] ❌ Cannot switch model: selector not found');
+            if (callback) callback(false);
+            return;
+        }
+
+        console.log('[AG Autopilot] 🖱️ Clicking model selector...');
         selectorBtn.click();
-        setTimeout(function () {
-            var menuItems = document.querySelectorAll('.action-item, .action-label, [role="menuitem"]');
+
+        // Wait for dropdown to appear, then search for target model
+        var attempts = 0;
+        var maxAttempts = 10;
+        var searchInterval = setInterval(function () {
+            attempts++;
+
+            // Search in multiple possible dropdown containers
+            var menuItems = document.querySelectorAll(
+                '[role="menuitem"], [role="option"], [role="listbox"] > *, ' +
+                '.action-item, .action-label, .monaco-list-row, ' +
+                '.quick-input-list .monaco-list-row, ' +
+                '[class*="dropdown"] li, [class*="dropdown"] [role="option"], ' +
+                '[class*="menu"] [role="menuitem"], ' +
+                '.context-view [role="menuitem"], .context-view .action-label'
+            );
+
             var clicked = false;
             for (var i = 0; i < menuItems.length; i++) {
-                if ((menuItems[i].innerText || '').indexOf(targetModel) !== -1) { menuItems[i].click(); clicked = true; break; }
+                var itemText = (menuItems[i].innerText || menuItems[i].textContent || '').trim();
+                if (itemText.indexOf(targetModel) !== -1) {
+                    console.log('[AG Autopilot] ✅ Found model in dropdown: "' + itemText.substring(0, 50) + '"');
+                    menuItems[i].click();
+                    clicked = true;
+                    break;
+                }
             }
-            if (!clicked) document.body.click();
-            if (callback) callback(clicked);
-        }, 300);
+
+            if (clicked || attempts >= maxAttempts) {
+                clearInterval(searchInterval);
+                if (!clicked) {
+                    // Try partial match as last resort
+                    var shortName = targetModel.split(' ')[0] + ' ' + (targetModel.split(' ')[1] || '');
+                    for (var i = 0; i < menuItems.length; i++) {
+                        var itemText = (menuItems[i].innerText || menuItems[i].textContent || '').trim();
+                        if (itemText.indexOf(shortName) !== -1) {
+                            menuItems[i].click();
+                            clicked = true;
+                            console.log('[AG Autopilot] ✅ Found model (partial): "' + itemText.substring(0, 50) + '"');
+                            break;
+                        }
+                    }
+                    if (!clicked) {
+                        console.log('[AG Autopilot] ❌ Model "' + targetModel + '" not found in dropdown (' + menuItems.length + ' items scanned)');
+                        document.body.click(); // Close dropdown
+                    }
+                }
+                if (callback) callback(clicked);
+            }
+        }, 150);
     }
 
     function evaluateTargetModel(promptText) {
@@ -189,26 +288,63 @@
         el.dispatchEvent(evt);
     }
 
+    // --- Find chat input textarea (robust) ---
+    function findChatTextarea() {
+        // Strategy 1: Inside AG panel
+        var panel = document.querySelector('.antigravity-agent-side-panel');
+        if (panel) {
+            var ta = panel.querySelector('textarea');
+            if (ta) return ta;
+        }
+        // Strategy 2: By class
+        var chatInput = document.querySelector('textarea.chat-input');
+        if (chatInput) return chatInput;
+        // Strategy 3: Any focused textarea
+        if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') return document.activeElement;
+        // Strategy 4: First textarea in document
+        return document.querySelector('textarea');
+    }
+
     // Smart Router: intercept Enter on textarea
     document.addEventListener('keydown', function (e) {
         if (!window._agAutoEnabled || !window._agSmartRouter) return;
         if (_isRoutingInProgress) return;
         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
             var el = e.target;
-            if (el && el.tagName === 'TEXTAREA' && (el.classList.contains('chat-input') || (el.closest && el.closest('.antigravity-agent-side-panel')))) {
-                var prompt = (el.value || '').trim();
-                if (!prompt) return;
-                var targetModel = evaluateTargetModel(prompt);
-                var currentBtn = findModelSelectorButton();
-                var currentModel = currentBtn ? currentBtn.innerText.trim() : '';
-                if (currentModel && currentModel.indexOf(targetModel) === -1) {
-                    e.preventDefault(); e.stopImmediatePropagation(); e.stopPropagation();
-                    _isRoutingInProgress = true;
-                    console.log('[AG Autopilot] 🧠 Smart Router → ' + targetModel);
-                    selectModelInDropdown(targetModel, function (success) {
-                        setTimeout(function () { _isRoutingInProgress = false; emulateSendEvent(el); }, 300);
-                    });
-                }
+            // Accept any textarea that looks like a chat input
+            var isChatInput = el && el.tagName === 'TEXTAREA' && (
+                el.classList.contains('chat-input') ||
+                (el.closest && el.closest('.antigravity-agent-side-panel')) ||
+                (el.closest && el.closest('[class*="chat"]')) ||
+                (el.closest && el.closest('[class*="agent"]'))
+            );
+            if (!isChatInput) return;
+
+            var prompt = (el.value || '').trim();
+            if (!prompt) return;
+
+            var targetModel = evaluateTargetModel(prompt);
+            var currentBtn = findModelSelectorButton();
+            var currentModel = currentBtn ? (currentBtn.innerText || currentBtn.textContent || '').trim() : '';
+
+            if (!currentModel) {
+                console.log('[AG Autopilot] 🧠 Smart Router: no current model detected, skipping');
+                return;
+            }
+
+            if (currentModel.indexOf(targetModel) === -1) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                e.stopPropagation();
+                _isRoutingInProgress = true;
+                console.log('[AG Autopilot] 🧠 Smart Router: "' + currentModel.substring(0, 30) + '" → ' + targetModel);
+
+                selectModelInDropdown(targetModel, function (success) {
+                    setTimeout(function () {
+                        _isRoutingInProgress = false;
+                        emulateSendEvent(el);
+                    }, success ? 400 : 100);
+                });
             }
         }
     }, true);
@@ -219,84 +355,133 @@
     function findDismissButton() {
         var btns = document.querySelectorAll('button, a.action-label, [role="button"], .monaco-button');
         for (var i = 0; i < btns.length; i++) {
-            if ((btns[i].innerText || '').trim() === 'Dismiss') return btns[i];
+            var text = (btns[i].innerText || '').trim().toLowerCase();
+            if (text === 'dismiss' || text === 'ok' || text === 'close') return btns[i];
         }
         return null;
     }
 
     function isQuotaErrorVisible() {
-        var elements = document.querySelectorAll('span, div, p');
+        var elements = document.querySelectorAll('span, div, p, [class*="message"], [class*="error"], [class*="notification"]');
+        var quotaPhrases = [
+            'exhausted your capacity',
+            'quota will reset',
+            'quota reached',
+            'rate limit',
+            'too many requests',
+            'capacity on this model',
+            'model quota',
+            'exceeded.*quota',
+            'limit.*reached'
+        ];
         for (var i = 0; i < elements.length; i++) {
-            var t = elements[i].innerText;
-            if (t && (t.indexOf('exhausted your capacity on this model') !== -1 ||
-                      t.indexOf('Your quota will reset after') !== -1 ||
-                      t.indexOf('Baseline model quota reached') !== -1)) return true;
+            var t = (elements[i].innerText || '').toLowerCase();
+            if (!t || t.length > 500) continue;
+            for (var q = 0; q < quotaPhrases.length; q++) {
+                if (t.indexOf(quotaPhrases[q]) !== -1) return true;
+            }
         }
         return false;
+    }
+
+    function getNextFallbackModel(currentModel) {
+        // Find current model in fallback list and return next one
+        var currentIdx = -1;
+        for (var i = 0; i < FALLBACK_MODELS.length; i++) {
+            if (currentModel.indexOf(FALLBACK_MODELS[i]) !== -1) {
+                currentIdx = i;
+                break;
+            }
+        }
+        // Return next model in rotation
+        var nextIdx = (currentIdx + 1) % FALLBACK_MODELS.length;
+        // Skip if same as current (shouldn't happen but safety check)
+        if (FALLBACK_MODELS[nextIdx] === FALLBACK_MODELS[currentIdx]) {
+            nextIdx = (nextIdx + 1) % FALLBACK_MODELS.length;
+        }
+        return FALLBACK_MODELS[nextIdx];
     }
 
     function triggerSwitchSequence() {
         if (Date.now() - _modelSwitchingAt < 15000) return;
         _modelSwitchingAt = Date.now();
-        console.log('[AG Autopilot] 🔄 Quota error! Switching model...');
+        console.log('[AG Autopilot] 🔄 Quota error detected! Initiating model switch...');
+
+        // Step 1: Dismiss error dialog
         var dismissBtn = findDismissButton();
-        if (dismissBtn) dismissBtn.click();
+        if (dismissBtn) {
+            console.log('[AG Autopilot] 🔄 Dismissing error dialog...');
+            dismissBtn.click();
+        }
+
+        // Step 2: Wait, then switch model
         setTimeout(function () {
             var selectorBtn = findModelSelectorButton();
-            var currentModel = selectorBtn ? selectorBtn.innerText.trim() : '';
-            var targetModel = FALLBACK_MODELS[0];
-            var foundCurrent = false;
-            for (var i = 0; i < FALLBACK_MODELS.length; i++) {
-                if (foundCurrent) { targetModel = FALLBACK_MODELS[i]; break; }
-                if (currentModel.indexOf(FALLBACK_MODELS[i]) !== -1) foundCurrent = true;
-            }
-            if (targetModel === currentModel) {
-                var idx = FALLBACK_MODELS.indexOf(targetModel);
-                targetModel = FALLBACK_MODELS[(idx + 1) % FALLBACK_MODELS.length] || FALLBACK_MODELS[0];
-            }
-            console.log('[AG Autopilot] 🔄 Switching to: ' + targetModel);
+            var currentModel = selectorBtn ? (selectorBtn.innerText || selectorBtn.textContent || '').trim() : '';
+            var targetModel = getNextFallbackModel(currentModel);
+
+            console.log('[AG Autopilot] 🔄 Quota fallback: "' + currentModel.substring(0, 30) + '" → ' + targetModel);
+
             selectModelInDropdown(targetModel, function (success) {
-                if (success) setTimeout(sendContinueMessage, 1500);
+                if (success) {
+                    console.log('[AG Autopilot] ✅ Model switched, sending Continue in 1.5s...');
+                    setTimeout(sendContinueMessage, 1500);
+                } else {
+                    console.log('[AG Autopilot] ❌ Failed to switch model');
+                }
             });
-        }, 300);
+        }, 500);
     }
 
     function sendContinueMessage() {
-        var inputArea = null;
-        var textareas = document.querySelectorAll('textarea');
-        for (var i = 0; i < textareas.length; i++) {
-            if (textareas[i].closest && (textareas[i].closest('.antigravity-agent-side-panel') || textareas[i].classList.contains('chat-input'))) {
-                inputArea = textareas[i]; break;
-            }
+        var inputArea = findChatTextarea();
+        if (!inputArea) {
+            console.log('[AG Autopilot] ❌ Cannot send Continue: no textarea found');
+            return;
         }
-        if (!inputArea) inputArea = document.querySelector('textarea, [contenteditable="true"]');
-        if (inputArea) {
-            inputArea.focus();
-            var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-            if (nativeSetter) nativeSetter.call(inputArea, 'Continue');
-            else inputArea.value = 'Continue';
-            inputArea.dispatchEvent(new Event('input', { bubbles: true }));
-            inputArea.dispatchEvent(new Event('change', { bubbles: true }));
-            setTimeout(function () {
-                _isRoutingInProgress = true;
-                inputArea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, keyCode: 13, key: 'Enter' }));
-                setTimeout(function () { _isRoutingInProgress = false; }, 500);
-            }, 500);
+
+        console.log('[AG Autopilot] 📤 Sending "Continue"...');
+        inputArea.focus();
+
+        // Use native setter to bypass React controlled input
+        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+        if (nativeSetter && nativeSetter.set) {
+            nativeSetter.set.call(inputArea, 'Continue');
+        } else {
+            inputArea.value = 'Continue';
         }
+
+        // Trigger React's synthetic events
+        inputArea.dispatchEvent(new Event('input', { bubbles: true }));
+        inputArea.dispatchEvent(new Event('change', { bubbles: true }));
+
+        setTimeout(function () {
+            _isRoutingInProgress = true; // Bypass smart router for this send
+            inputArea.dispatchEvent(new KeyboardEvent('keydown', {
+                bubbles: true, cancelable: true, keyCode: 13, key: 'Enter'
+            }));
+            setTimeout(function () { _isRoutingInProgress = false; }, 500);
+        }, 500);
     }
 
-    // Quota observer
-    var chatPanel = document.querySelector('.antigravity-agent-side-panel') || document.body;
-    if (chatPanel) {
-        var quotaObserver = new MutationObserver(function (mutations) {
-            if (!window._agAutoEnabled || !window._agQuotaFallback) return;
-            if (Date.now() - _modelSwitchingAt < 15000) return;
-            for (var i = 0; i < mutations.length; i++) {
-                if (mutations[i].type === 'childList' && isQuotaErrorVisible()) { triggerSwitchSequence(); break; }
+    // Quota observer — watch for error messages appearing
+    var _quotaObserverTarget = document.querySelector('.antigravity-agent-side-panel') || document.body;
+    var quotaObserver = new MutationObserver(function (mutations) {
+        if (!window._agAutoEnabled || !window._agQuotaFallback) return;
+        if (Date.now() - _modelSwitchingAt < 15000) return;
+        // Only check on childList changes (new elements added)
+        var hasNewNodes = false;
+        for (var i = 0; i < mutations.length; i++) {
+            if (mutations[i].addedNodes && mutations[i].addedNodes.length > 0) {
+                hasNewNodes = true;
+                break;
             }
-        });
-        quotaObserver.observe(chatPanel, { childList: true, subtree: true, characterData: true });
-    }
+        }
+        if (hasNewNodes && isQuotaErrorVisible()) {
+            triggerSwitchSequence();
+        }
+    });
+    quotaObserver.observe(_quotaObserverTarget, { childList: true, subtree: true });
 
     // =================================================================
     // AUTO CLICK (from ag-auto-click-scroll)
