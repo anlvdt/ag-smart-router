@@ -7,37 +7,42 @@
 :root{--bg:#1e1e2e;--surface:#313244;--surface2:#45475a;--border:#585b70;--text:#e8ecf4;--text2:#bac2de;--text3:#6c7086;--accent:#89b4fa;--green:#a6e3a1;--red:#f38ba8;--yellow:#f9e2af;--teal:#94e2d5;--purple:#cba6f7;--peach:#fab387}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow:hidden;height:100vh;display:flex;flex-direction:column;font-size:15px}
+svg.icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+svg.icon-sm{width:16px;height:16px}
+svg.icon-lg{width:24px;height:24px}
 
-/* Header */
 .header{padding:20px 24px 0;flex-shrink:0}
-.header h1{font-size:1.5em;background:linear-gradient(135deg,var(--accent),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:inline}
 .header-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.logo{display:flex;align-items:center;gap:10px}
+.logo svg{width:28px;height:28px;stroke:var(--accent)}
+.logo h1{font-size:1.5em;background:linear-gradient(135deg,var(--accent),var(--green));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .header-right{display:flex;align-items:center;gap:12px}
 .master-toggle{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:0.9em;color:var(--text2)}
 .master-toggle.on{border-color:var(--green);color:var(--green)}
 .master-toggle.off{border-color:var(--red);color:var(--red)}
-.badge{padding:4px 14px;border-radius:14px;font-size:0.9em;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--yellow)}
+.badge{display:flex;align-items:center;gap:6px;padding:4px 14px;border-radius:14px;font-size:0.9em;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--yellow)}
 
-/* Tabs */
 .tabs{display:flex;gap:2px;padding:14px 24px 0;flex-shrink:0}
-.tab{padding:10px 20px;border-radius:8px 8px 0 0;background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:1em;font-weight:500;transition:all 0.2s}
+.tab{display:flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px 8px 0 0;background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:1em;font-weight:500;transition:all 0.2s}
 .tab:hover{color:var(--text2);background:var(--surface)}
 .tab.active{color:var(--accent);background:var(--surface);border-bottom:2px solid var(--accent)}
+.tab svg{width:16px;height:16px}
 
-/* Content */
 .content{flex:1;overflow-y:auto;padding:18px 24px 24px}
-.panel{display:none}
-.panel.active{display:block}
+.panel{display:none}.panel.active{display:block}
 
-/* Feature row */
-.feat{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--surface);border-radius:12px;margin-bottom:10px;border:1px solid transparent;transition:border-color 0.2s}
+.feat{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--surface);border-radius:12px;margin-bottom:10px;border:1px solid transparent;transition:border-color 0.2s;cursor:pointer}
 .feat:hover{border-color:var(--border)}
 .feat-left{display:flex;align-items:center;gap:14px}
-.feat-icon{font-size:1.5em;width:36px;text-align:center}
+.feat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.feat-icon svg{width:22px;height:22px}
+.feat-icon.ic-click{background:#89b4fa22;color:var(--accent)}
+.feat-icon.ic-scroll{background:#a6e3a122;color:var(--green)}
+.feat-icon.ic-router{background:#cba6f722;color:var(--purple)}
+.feat-icon.ic-quota{background:#f9e2af22;color:var(--yellow)}
 .feat-name{font-weight:600;font-size:1.05em}
 .feat-desc{font-size:0.88em;color:var(--text3);margin-top:3px}
 
-/* Toggle switch */
 .sw{position:relative;width:52px;height:28px;flex-shrink:0}
 .sw input{display:none}
 .sw span{position:absolute;inset:0;background:var(--surface2);border-radius:28px;transition:0.25s;cursor:pointer}
@@ -45,13 +50,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .sw input:checked+span{background:var(--green)}
 .sw input:checked+span::before{transform:translateX(24px);background:#fff}
 
-/* Slider input */
 .slider-row{display:flex;align-items:center;gap:14px;padding:14px 20px;background:var(--surface);border-radius:12px;margin-bottom:10px}
 .slider-row label{font-size:0.95em;color:var(--text2);min-width:110px}
 .slider-row input[type=range]{flex:1;accent-color:var(--accent);height:6px}
 .slider-row .val{font-size:0.95em;color:var(--accent);font-weight:600;min-width:60px;text-align:right}
 
-/* Button patterns */
 .btn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 .btn-pat{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border-radius:10px;cursor:pointer;border:1px solid transparent;transition:all 0.15s;user-select:none}
 .btn-pat:hover{border-color:var(--border)}
@@ -62,7 +65,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .btn-pat.off .dot{background:var(--red)}
 .btn-pat .name{font-size:0.95em;font-weight:500}
 
-/* Stats */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 .stat-card{padding:16px;background:var(--surface);border-radius:12px;text-align:center}
 .stat-num{font-size:2.2em;font-weight:700;color:var(--accent)}
@@ -75,21 +77,24 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .log-list{max-height:240px;overflow-y:auto;background:var(--surface);border-radius:12px;padding:10px}
 .log-item{display:flex;justify-content:space-between;padding:6px 10px;font-size:0.9em;border-bottom:1px solid var(--bg)}
 .log-item:last-child{border:none}
+.log-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.log-header span{font-size:0.9em;color:var(--text2);display:flex;align-items:center;gap:6px}
+.btn-sm{background:none;border:1px solid var(--border);border-radius:8px;color:var(--red);font-size:0.85em;padding:4px 12px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.btn-sm:hover{background:var(--red);color:var(--bg)}
+.btn-reset{margin-top:12px;width:100%;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--red);cursor:pointer;font-size:0.9em;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-reset:hover{background:var(--red);color:var(--bg)}
 
-/* Toast */
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green);color:var(--bg);padding:10px 24px;border-radius:20px;font-size:1em;font-weight:600;opacity:0;transition:all 0.3s;pointer-events:none;z-index:999}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
-/* Footer */
 .footer{padding:12px 24px;flex-shrink:0;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--surface2)}
 .footer select{background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:0.9em}
 .footer-btns{display:flex;gap:10px}
-.footer-btns button{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-size:0.95em;font-weight:600;transition:all 0.15s}
+.footer-btns button{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-size:0.95em;font-weight:600;transition:all 0.15s;display:flex;align-items:center;gap:6px}
 .btn-reload{background:var(--surface2);color:var(--text)}
 .btn-save{background:var(--accent);color:var(--bg)}
 .btn-save:hover{filter:brightness(1.1)}
 
-/* Colors for bars */
 .c1{background:linear-gradient(90deg,#89b4fa,#74c7ec)}.c2{background:linear-gradient(90deg,#a6e3a1,#94e2d5)}
 .c3{background:linear-gradient(90deg,#f9e2af,#fab387)}.c4{background:linear-gradient(90deg,#f38ba8,#eba0ac)}
 .c5{background:linear-gradient(90deg,#cba6f7,#b4befe)}.c6{background:linear-gradient(90deg,#94e2d5,#89dceb)}
@@ -100,11 +105,17 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 <!-- HEADER -->
 <div class="header">
     <div class="header-row">
-        <h1>⚡ AG Autopilot</h1>
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <h1>AG Autopilot</h1>
+        </div>
         <div class="header-right">
-            <span class="badge" id="totalBadge">🎯 <span id="totalCount">{{TOTAL_CLICKS}}</span></span>
+            <span class="badge" id="totalBadge">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                <span id="totalCount">{{TOTAL_CLICKS}}</span>
+            </span>
             <div class="master-toggle on" id="masterToggle" onclick="toggleMaster()">
-                <span id="masterLabel">● ON</span>
+                <span id="masterLabel">ON</span>
             </div>
         </div>
     </div>
@@ -112,56 +123,54 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 <!-- TABS -->
 <div class="tabs">
-    <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
-    <button class="tab" onclick="switchTab('controls')">Controls</button>
-    <button class="tab" onclick="switchTab('buttons')">Buttons</button>
-    <button class="tab" onclick="switchTab('stats')">Stats</button>
+    <button class="tab active" onclick="switchTab('dashboard')"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Dashboard</button>
+    <button class="tab" onclick="switchTab('controls')"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Controls</button>
+    <button class="tab" onclick="switchTab('buttons')"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg> Buttons</button>
+    <button class="tab" onclick="switchTab('stats')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> Stats</button>
 </div>
 
 <!-- DASHBOARD -->
 <div class="content">
 <div class="panel active" id="p-dashboard">
     <div class="feat" onclick="toggleFeat('chkEnabled')">
-        <div class="feat-left"><span class="feat-icon">🎯</span><div><div class="feat-name">Auto Click</div><div class="feat-desc" data-i18n="desc-click">Auto-click Run, Allow, Accept buttons</div></div></div>
+        <div class="feat-left">
+            <div class="feat-icon ic-click"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9l6 6m0-6l-6 6"/><circle cx="12" cy="12" r="10"/></svg></div>
+            <div><div class="feat-name">Auto Click</div><div class="feat-desc" data-i18n="desc-click">Auto-click Run, Allow, Accept buttons</div></div>
+        </div>
         <label class="sw"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()"><span></span></label>
     </div>
     <div class="feat" onclick="toggleFeat('chkScroll')">
-        <div class="feat-left"><span class="feat-icon">📜</span><div><div class="feat-name">Auto Scroll</div><div class="feat-desc" data-i18n="desc-scroll">Stick-to-bottom chat panel</div></div></div>
+        <div class="feat-left">
+            <div class="feat-icon ic-scroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+            <div><div class="feat-name">Auto Scroll</div><div class="feat-desc" data-i18n="desc-scroll">Stick-to-bottom chat panel</div></div>
+        </div>
         <label class="sw"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()"><span></span></label>
     </div>
     <div class="feat" onclick="toggleFeat('chkRouter')">
-        <div class="feat-left"><span class="feat-icon">🧠</span><div><div class="feat-name">Smart Router</div><div class="feat-desc" data-i18n="desc-router">Auto-select model by prompt</div></div></div>
+        <div class="feat-left">
+            <div class="feat-icon ic-router"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <div><div class="feat-name">Smart Router</div><div class="feat-desc" data-i18n="desc-router">Auto-select model by prompt</div></div>
+        </div>
         <label class="sw"><input type="checkbox" id="chkRouter" {{ROUTER_CHK}} onchange="routerToggle()"><span></span></label>
     </div>
     <div class="feat" onclick="toggleFeat('chkQuota')">
-        <div class="feat-left"><span class="feat-icon">🔄</span><div><div class="feat-name">Quota Fallback</div><div class="feat-desc" data-i18n="desc-quota">Switch model on quota limit</div></div></div>
+        <div class="feat-left">
+            <div class="feat-icon ic-quota"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+            <div><div class="feat-name">Quota Fallback</div><div class="feat-desc" data-i18n="desc-quota">Switch model on quota limit</div></div>
+        </div>
         <label class="sw"><input type="checkbox" id="chkQuota" {{QUOTA_CHK}} onchange="quotaToggle()"><span></span></label>
     </div>
 </div>
 
 <!-- CONTROLS -->
 <div class="panel" id="p-controls">
-    <div class="slider-row">
-        <label data-i18n="lbl-click-speed">Click speed</label>
-        <input type="range" id="rngClick" min="200" max="5000" step="100" value="{{CLICK_MS}}" oninput="document.getElementById('valClick').textContent=this.value+'ms'">
-        <span class="val" id="valClick">{{CLICK_MS}}ms</span>
-    </div>
-    <div class="slider-row">
-        <label data-i18n="lbl-scroll-speed">Scroll speed</label>
-        <input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="document.getElementById('valScroll').textContent=this.value+'ms'">
-        <span class="val" id="valScroll">{{SCROLL_MS}}ms</span>
-    </div>
-    <div class="slider-row">
-        <label data-i18n="lbl-pause">Scroll pause</label>
-        <input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="document.getElementById('valPause').textContent=this.value+'ms'">
-        <span class="val" id="valPause">{{PAUSE_MS}}ms</span>
-    </div>
+    <div class="slider-row"><label data-i18n="lbl-click-speed">Click speed</label><input type="range" id="rngClick" min="200" max="5000" step="100" value="{{CLICK_MS}}" oninput="document.getElementById('valClick').textContent=this.value+'ms'"><span class="val" id="valClick">{{CLICK_MS}}ms</span></div>
+    <div class="slider-row"><label data-i18n="lbl-scroll-speed">Scroll speed</label><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="document.getElementById('valScroll').textContent=this.value+'ms'"><span class="val" id="valScroll">{{SCROLL_MS}}ms</span></div>
+    <div class="slider-row"><label data-i18n="lbl-pause">Scroll pause</label><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="document.getElementById('valPause').textContent=this.value+'ms'"><span class="val" id="valPause">{{PAUSE_MS}}ms</span></div>
 </div>
 
 <!-- BUTTONS -->
-<div class="panel" id="p-buttons">
-    <div class="btn-grid" id="btnGrid"></div>
-</div>
+<div class="panel" id="p-buttons"><div class="btn-grid" id="btnGrid"></div></div>
 
 <!-- STATS -->
 <div class="panel" id="p-stats">
@@ -170,28 +179,26 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
         <div class="stat-card"><div class="stat-num" id="statPatterns">0</div><div class="stat-label">Active Buttons</div></div>
     </div>
     <div id="statBars" style="margin-bottom:12px"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:0.85em;color:var(--text2)">Click Log</span>
-        <button onclick="clearClickLog()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--red);font-size:0.85em;padding:4px 12px;cursor:pointer">Clear</button>
+    <div class="log-header">
+        <span><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Click Log</span>
+        <button class="btn-sm" onclick="clearClickLog()"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear</button>
     </div>
     <div class="log-list" id="logList"><div style="color:var(--text3);padding:10px;font-size:0.9em">No clicks yet</div></div>
-    <button onclick="resetStats()" style="margin-top:12px;width:100%;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--red);cursor:pointer;font-size:0.9em">↺ Reset All Stats</button>
+    <button class="btn-reset" onclick="resetStats()"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Reset All Stats</button>
 </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- FOOTER -->
 <div class="footer">
     <select id="selLang" onchange="changeLang()">
-        <option value="vi" {{LANG_VI}}>🇻🇳 Tiếng Việt</option>
-        <option value="en" {{LANG_EN}}>🇬🇧 English</option>
-        <option value="zh" {{LANG_ZH}}>🇨🇳 中文</option>
+        <option value="vi" {{LANG_VI}}>Tiếng Việt</option>
+        <option value="en" {{LANG_EN}}>English</option>
+        <option value="zh" {{LANG_ZH}}>中文</option>
     </select>
     <div class="footer-btns">
-        <button class="btn-reload" onclick="vscode.postMessage({command:'reload'})">↻ Reload</button>
-        <button class="btn-save" onclick="saveSettings()">Save & Apply</button>
+        <button class="btn-reload" onclick="vscode.postMessage({command:'reload'})"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Reload</button>
+        <button class="btn-save" onclick="saveSettings()"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save & Apply</button>
     </div>
 </div>
 
@@ -212,42 +219,29 @@ var _i18n={
 function applyI18n(lang){var s=_i18n[lang]||_i18n['en'];document.querySelectorAll('[data-i18n]').forEach(function(el){var k=el.getAttribute('data-i18n');if(s[k])el.textContent=s[k];});}
 applyI18n('{{LANG}}');
 
-// --- Tabs ---
 function switchTab(name){
     document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
     document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
     document.getElementById('p-'+name).classList.add('active');
-    event.target.classList.add('active');
+    event.target.closest('.tab').classList.add('active');
 }
-
-// --- Toast ---
 var _toastTimer;
-function showToast(msg){
-    var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
-    clearTimeout(_toastTimer);_toastTimer=setTimeout(function(){t.classList.remove('show');},1500);
-}
+function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_toastTimer);_toastTimer=setTimeout(function(){t.classList.remove('show');},1500);}
 
-// --- Master toggle ---
 function updateMasterUI(){
     var on=document.getElementById('chkEnabled').checked;
     var el=document.getElementById('masterToggle');
     el.className='master-toggle '+(on?'on':'off');
-    document.getElementById('masterLabel').textContent=on?'● ON':'○ OFF';
+    document.getElementById('masterLabel').textContent=on?'ON':'OFF';
 }
-function toggleMaster(){
-    var chk=document.getElementById('chkEnabled');chk.checked=!chk.checked;
-    instantToggle();updateMasterUI();
-}
-
-// --- Feature toggles (instant) ---
+function toggleMaster(){var chk=document.getElementById('chkEnabled');chk.checked=!chk.checked;instantToggle();updateMasterUI();}
 function toggleFeat(id){var chk=document.getElementById(id);chk.checked=!chk.checked;chk.dispatchEvent(new Event('change'));}
-function instantToggle(){vscode.postMessage({command:'toggle',enabled:document.getElementById('chkEnabled').checked});updateMasterUI();showToast(document.getElementById('chkEnabled').checked?'✅ Enabled':'❌ Disabled');}
+function instantToggle(){vscode.postMessage({command:'toggle',enabled:document.getElementById('chkEnabled').checked});updateMasterUI();showToast(document.getElementById('chkEnabled').checked?'Enabled':'Disabled');}
 function scrollToggle(){vscode.postMessage({command:'scrollToggle',enabled:document.getElementById('chkScroll').checked});showToast('Scroll '+(document.getElementById('chkScroll').checked?'ON':'OFF'));}
 function routerToggle(){vscode.postMessage({command:'routerToggle',enabled:document.getElementById('chkRouter').checked});showToast('Router '+(document.getElementById('chkRouter').checked?'ON':'OFF'));}
 function quotaToggle(){vscode.postMessage({command:'quotaToggle',enabled:document.getElementById('chkQuota').checked});showToast('Quota Fallback '+(document.getElementById('chkQuota').checked?'ON':'OFF'));}
 function changeLang(){vscode.postMessage({command:'changeLang',lang:document.getElementById('selLang').value});applyI18n(document.getElementById('selLang').value);}
 
-// --- Button patterns (instant toggle) ---
 function dn(p){return DISPLAY_NAMES[p]||p;}
 function renderButtons(){
     var grid=document.getElementById('btnGrid');var all=[],seen={};
@@ -268,7 +262,6 @@ function togPat(v){
 }
 renderButtons();updateMasterUI();
 
-// --- Save ---
 function saveSettings(){
     vscode.postMessage({command:'save',data:{
         enabled:document.getElementById('chkEnabled').checked,
@@ -281,10 +274,9 @@ function saveSettings(){
         clickPatterns:patterns,disabledClickPatterns:disabledPatterns,
         language:document.getElementById('selLang').value
     }});
-    showToast('✅ Saved!');
+    showToast('Saved!');
 }
 
-// --- Stats ---
 var BAR_COLORS=['c1','c2','c3','c4','c5','c6'];
 function renderBars(stats){
     var el=document.getElementById('statBars');var max=0;
@@ -306,14 +298,9 @@ function renderLog(log){
 function resetStats(){vscode.postMessage({command:'resetStats'});document.getElementById('totalCount').textContent='0';document.getElementById('statTotal').textContent='0';renderBars({});showToast('Stats reset');}
 function clearClickLog(){vscode.postMessage({command:'clearClickLog'});renderLog([]);showToast('Log cleared');}
 
-// --- Listen for updates ---
 window.addEventListener('message',function(e){
     var m=e.data;
-    if(m.command==='statsUpdated'){
-        document.getElementById('totalCount').textContent=m.totalClicks||0;
-        document.getElementById('statTotal').textContent=m.totalClicks||0;
-        renderBars(m.clickStats||{});
-    }
+    if(m.command==='statsUpdated'){document.getElementById('totalCount').textContent=m.totalClicks||0;document.getElementById('statTotal').textContent=m.totalClicks||0;renderBars(m.clickStats||{});}
     if(m.command==='clickLogUpdate')renderLog(m.log);
 });
 vscode.postMessage({command:'getStats'});

@@ -391,7 +391,7 @@ function openSettingsPanel(context) {
             _httpScrollEnabled = msg.data.scrollEnabled !== false;
             _httpClickPatterns = msg.data.clickPatterns.filter(p => !msg.data.disabledClickPatterns.includes(p));
             writeConfigJson(context); updateStatusBarItem();
-            vscode.window.setStatusBarMessage('$(check) [AG Autopilot] ✅ Saved!', 3000);
+            vscode.window.setStatusBarMessage('$(check) [AG Autopilot] Saved!', 3000);
         }
         if (msg.command === 'reload') vscode.commands.executeCommand('workbench.action.reloadWindow');
         if (msg.command === 'resetStats') {
@@ -684,14 +684,14 @@ if($global:clicked){Write-Output 'CLICKED'}`.trim();
     context.subscriptions.push(vscode.commands.registerCommand('ag-auto.enable', async () => {
         if (installScript(context)) {
             updateStatusBarItem();
-            const choice = await vscode.window.showInformationMessage('[AG Autopilot] ✅ Injected! Reload to activate.', 'Reload Now');
+            const choice = await vscode.window.showInformationMessage('[AG Autopilot] Injected! Reload to activate.', 'Reload Now');
             if (choice === 'Reload Now') vscode.commands.executeCommand('workbench.action.reloadWindow');
         }
     }));
     context.subscriptions.push(vscode.commands.registerCommand('ag-auto.disable', async () => {
         if (uninstallScript()) {
             updateStatusBarItem();
-            const choice = await vscode.window.showInformationMessage('[AG Autopilot] 🗑️ Removed! Reload to finish.', 'Reload Now');
+            const choice = await vscode.window.showInformationMessage('[AG Autopilot] Removed! Reload to finish.', 'Reload Now');
             if (choice === 'Reload Now') vscode.commands.executeCommand('workbench.action.reloadWindow');
         }
     }));
