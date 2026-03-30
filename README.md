@@ -51,4 +51,4 @@ AG Autopilot will automatically clean up old inject tags from both extensions.
 AG Autopilot sẽ tự dọn dẹp các tag inject cũ từ cả hai extension.
 
 ## License
-MIT © DongThap360
+MIT © ANLE

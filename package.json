@@ -2,8 +2,8 @@
     "name": "ag-autopilot",
     "displayName": "AG Autopilot",
     "description": "Autopilot for Antigravity AI: Auto Click, Auto Scroll, Smart Model Router, Quota Fallback. | Tự lái mọi thứ cho Antigravity AI.",
-    "version": "4.0.1",
-    "publisher": "DongThap360",
+    "version": "4.0.2",
+    "publisher": "ANLE",
     "repository": {
         "type": "git",
         "url": "https://github.com/anlvdt/ag-smart-router"
