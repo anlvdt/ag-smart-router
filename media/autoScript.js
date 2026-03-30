@@ -284,8 +284,51 @@
     }
 
     function emulateSendEvent(el) {
-        var evt = new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true });
-        el.dispatchEvent(evt);
+        // Dispatch full keyboard event sequence (keydown + keypress + keyup)
+        // Some frameworks only listen to specific events
+        var opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+        el.dispatchEvent(new KeyboardEvent('keydown', opts));
+        el.dispatchEvent(new KeyboardEvent('keypress', opts));
+        el.dispatchEvent(new KeyboardEvent('keyup', opts));
+
+        // Fallback: find and click the Send button directly
+        setTimeout(function () {
+            var sendBtn = findSendButton();
+            if (sendBtn) {
+                console.log('[AG Autopilot] 📤 Clicking Send button as fallback');
+                sendBtn.click();
+            }
+        }, 200);
+    }
+
+    // --- Find Send/Submit button in chat panel ---
+    function findSendButton() {
+        var panel = document.querySelector('.antigravity-agent-side-panel');
+        var searchRoot = panel || document;
+        var btns = searchRoot.querySelectorAll(
+            'button, [role="button"], .monaco-button, [aria-label*="send" i], [aria-label*="submit" i], [title*="send" i]'
+        );
+        for (var i = 0; i < btns.length; i++) {
+            var text = (btns[i].innerText || btns[i].textContent || '').trim().toLowerCase();
+            var ariaLabel = (btns[i].getAttribute('aria-label') || '').toLowerCase();
+            var title = (btns[i].getAttribute('title') || '').toLowerCase();
+            // Match send/submit buttons
+            if (text === 'send' || text === 'submit' || text === '↵' || text === '⏎' ||
+                ariaLabel.indexOf('send') !== -1 || ariaLabel.indexOf('submit') !== -1 ||
+                title.indexOf('send') !== -1 || title.indexOf('submit') !== -1) {
+                // Make sure it's visible
+                if (btns[i].offsetParent !== null) return btns[i];
+            }
+            // Also match icon-only send buttons (SVG arrow icon near textarea)
+            if (btns[i].querySelector && btns[i].querySelector('svg, .codicon-send, [class*="send"], [class*="arrow"]')) {
+                // Check if it's near a textarea (within same parent container)
+                var parent = btns[i].parentElement;
+                if (parent && parent.querySelector('textarea') && btns[i].offsetParent !== null) {
+                    return btns[i];
+                }
+            }
+        }
+        return null;
     }
 
     // --- Find chat input textarea (robust) ---
@@ -353,10 +396,22 @@
     // QUOTA FALLBACK (from ag-auto-model-switch)
     // =================================================================
     function findDismissButton() {
+        // Strategy 1: Text-based search
         var btns = document.querySelectorAll('button, a.action-label, [role="button"], .monaco-button');
         for (var i = 0; i < btns.length; i++) {
-            var text = (btns[i].innerText || '').trim().toLowerCase();
-            if (text === 'dismiss' || text === 'ok' || text === 'close') return btns[i];
+            var text = (btns[i].innerText || btns[i].textContent || '').trim().toLowerCase();
+            if (text === 'dismiss' || text === 'ok' || text === 'close' || text === 'got it' || text === 'đóng') {
+                if (btns[i].offsetParent !== null) return btns[i];
+            }
+        }
+        // Strategy 2: Close icon buttons (codicon-close) near error/notification areas
+        var closeIcons = document.querySelectorAll(
+            '.codicon-close, .codicon-notifications-clear, ' +
+            '[aria-label="Close"], [aria-label="Dismiss"], [aria-label*="close" i], ' +
+            '.notification-toast .action-label, .dialog-button'
+        );
+        for (var i = 0; i < closeIcons.length; i++) {
+            if (closeIcons[i].offsetParent !== null) return closeIcons[i];
         }
         return null;
     }
@@ -414,23 +469,30 @@
             dismissBtn.click();
         }
 
-        // Step 2: Wait, then switch model
+        // Step 2: Wait for dismiss animation, then switch model
         setTimeout(function () {
-            var selectorBtn = findModelSelectorButton();
-            var currentModel = selectorBtn ? (selectorBtn.innerText || selectorBtn.textContent || '').trim() : '';
-            var targetModel = getNextFallbackModel(currentModel);
+            // Try dismiss again in case first attempt missed
+            var dismissBtn2 = findDismissButton();
+            if (dismissBtn2) dismissBtn2.click();
 
-            console.log('[AG Autopilot] 🔄 Quota fallback: "' + currentModel.substring(0, 30) + '" → ' + targetModel);
+            setTimeout(function () {
+                var selectorBtn = findModelSelectorButton();
+                var currentModel = selectorBtn ? (selectorBtn.innerText || selectorBtn.textContent || '').trim() : '';
+                var targetModel = getNextFallbackModel(currentModel);
 
-            selectModelInDropdown(targetModel, function (success) {
-                if (success) {
-                    console.log('[AG Autopilot] ✅ Model switched, sending Continue in 1.5s...');
-                    setTimeout(sendContinueMessage, 1500);
-                } else {
-                    console.log('[AG Autopilot] ❌ Failed to switch model');
-                }
-            });
-        }, 500);
+                console.log('[AG Autopilot] 🔄 Quota fallback: "' + currentModel.substring(0, 30) + '" → ' + targetModel);
+
+                selectModelInDropdown(targetModel, function (success) {
+                    if (success) {
+                        console.log('[AG Autopilot] ✅ Model switched, sending Continue in 2s...');
+                        setTimeout(sendContinueMessage, 2000);
+                    } else {
+                        console.log('[AG Autopilot] ❌ Failed to switch model, trying Continue anyway...');
+                        setTimeout(sendContinueMessage, 2000);
+                    }
+                });
+            }, 500);
+        }, 800);
     }
 
     function sendContinueMessage() {
@@ -440,7 +502,7 @@
             return;
         }
 
-        console.log('[AG Autopilot] 📤 Sending "Continue"...');
+        console.log('[AG Autopilot] 📤 Typing "Continue" into chat...');
         inputArea.focus();
 
         // Use native setter to bypass React controlled input
@@ -454,14 +516,29 @@
         // Trigger React's synthetic events
         inputArea.dispatchEvent(new Event('input', { bubbles: true }));
         inputArea.dispatchEvent(new Event('change', { bubbles: true }));
+        // Also trigger React 18+ compatible events
+        inputArea.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'Continue', inputType: 'insertText' }));
 
+        // Wait for React to process the input, then send
         setTimeout(function () {
             _isRoutingInProgress = true; // Bypass smart router for this send
-            inputArea.dispatchEvent(new KeyboardEvent('keydown', {
-                bubbles: true, cancelable: true, keyCode: 13, key: 'Enter'
-            }));
-            setTimeout(function () { _isRoutingInProgress = false; }, 500);
-        }, 500);
+
+            // Method 1: Keyboard Enter event
+            var opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+            inputArea.dispatchEvent(new KeyboardEvent('keydown', opts));
+            inputArea.dispatchEvent(new KeyboardEvent('keypress', opts));
+            inputArea.dispatchEvent(new KeyboardEvent('keyup', opts));
+
+            // Method 2: Click Send button (fallback, 300ms later)
+            setTimeout(function () {
+                var sendBtn = findSendButton();
+                if (sendBtn) {
+                    console.log('[AG Autopilot] 📤 Clicking Send button');
+                    sendBtn.click();
+                }
+                setTimeout(function () { _isRoutingInProgress = false; }, 300);
+            }, 300);
+        }, 600);
     }
 
     // Quota observer — watch for error messages appearing
