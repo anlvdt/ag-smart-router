@@ -149,14 +149,14 @@ svg.icon-lg{width:24px;height:24px}
     <div class="feat" onclick="toggleFeat('chkRouter')">
         <div class="feat-left">
             <div class="feat-icon ic-router"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
-            <div><div class="feat-name">Smart Router</div><div class="feat-desc" data-i18n="desc-router">Auto-select model by prompt</div></div>
+            <div><div class="feat-name">Smart Router <span style="font-size:0.7em;color:var(--yellow);font-weight:400">(experimental)</span></div><div class="feat-desc" data-i18n="desc-router">Auto-select model by prompt (requires AG agent panel access)</div></div>
         </div>
         <label class="sw"><input type="checkbox" id="chkRouter" {{ROUTER_CHK}} onchange="routerToggle()"><span></span></label>
     </div>
     <div class="feat" onclick="toggleFeat('chkQuota')">
         <div class="feat-left">
             <div class="feat-icon ic-quota"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
-            <div><div class="feat-name">Quota Fallback</div><div class="feat-desc" data-i18n="desc-quota">Switch model on quota limit</div></div>
+            <div><div class="feat-name">Quota Fallback <span style="font-size:0.7em;color:var(--yellow);font-weight:400">(experimental)</span></div><div class="feat-desc" data-i18n="desc-quota">Switch model on quota limit (requires AG agent panel access)</div></div>
         </div>
         <label class="sw"><input type="checkbox" id="chkQuota" {{QUOTA_CHK}} onchange="quotaToggle()"><span></span></label>
     </div>
@@ -212,9 +212,9 @@ var disabledPatterns={{DISABLED_JSON}};
 DEFAULT_PATTERNS.forEach(function(p){if(patterns.indexOf(p)===-1&&disabledPatterns.indexOf(p)===-1){DEFAULT_DISABLED.indexOf(p)!==-1?disabledPatterns.push(p):patterns.push(p);}});
 
 var _i18n={
-    vi:{'desc-click':'Tự nhấn Run, Allow, Accept','desc-scroll':'Cuộn chat xuống cuối','desc-router':'Tự chọn model theo prompt','desc-quota':'Đổi model khi hết quota','lbl-click-speed':'Tốc độ click','lbl-scroll-speed':'Tốc độ cuộn','lbl-pause':'Nghỉ cuộn'},
-    en:{'desc-click':'Auto-click Run, Allow, Accept buttons','desc-scroll':'Stick-to-bottom chat panel','desc-router':'Auto-select model by prompt','desc-quota':'Switch model on quota limit','lbl-click-speed':'Click speed','lbl-scroll-speed':'Scroll speed','lbl-pause':'Scroll pause'},
-    zh:{'desc-click':'自动点击 Run、Allow、Accept','desc-scroll':'聊天面板自动滚动','desc-router':'根据提示自动选择模型','desc-quota':'配额耗尽时切换模型','lbl-click-speed':'点击速度','lbl-scroll-speed':'滚动速度','lbl-pause':'滚动暂停'}
+    vi:{'desc-click':'Tự nhấn Run, Allow, Accept','desc-scroll':'Cuộn chat xuống cuối','desc-router':'Tự chọn model theo prompt (cần truy cập agent panel)','desc-quota':'Đổi model khi hết quota (cần truy cập agent panel)','lbl-click-speed':'Tốc độ click','lbl-scroll-speed':'Tốc độ cuộn','lbl-pause':'Nghỉ cuộn'},
+    en:{'desc-click':'Auto-click Run, Allow, Accept buttons','desc-scroll':'Stick-to-bottom chat panel','desc-router':'Auto-select model by prompt (requires agent panel access)','desc-quota':'Switch model on quota limit (requires agent panel access)','lbl-click-speed':'Click speed','lbl-scroll-speed':'Scroll speed','lbl-pause':'Scroll pause'},
+    zh:{'desc-click':'自动点击 Run、Allow、Accept','desc-scroll':'聊天面板自动滚动','desc-router':'根据提示自动选择模型（需要访问代理面板）','desc-quota':'配额耗尽时切换模型（需要访问代理面板）','lbl-click-speed':'点击速度','lbl-scroll-speed':'滚动速度','lbl-pause':'滚动暂停'}
 };
 function applyI18n(lang){var s=_i18n[lang]||_i18n['en'];document.querySelectorAll('[data-i18n]').forEach(function(el){var k=el.getAttribute('data-i18n');if(s[k])el.textContent=s[k];});}
 applyI18n('{{LANG}}');

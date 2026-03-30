@@ -180,7 +180,6 @@
             if (!text || text.length > 100) continue;
             for (var m = 0; m < FALLBACK_MODELS.length; m++) {
                 if (text.indexOf(FALLBACK_MODELS[m]) !== -1) {
-                    console.log('[AG Autopilot] 🔍 Found model selector (exact): "' + text.substring(0, 50) + '"');
                     return candidates[i];
                 }
             }
@@ -192,7 +191,6 @@
             if (!text || text.length > 100) continue;
             for (var k = 0; k < MODEL_KEYWORDS.length; k++) {
                 if (text.indexOf(MODEL_KEYWORDS[k]) !== -1) {
-                    console.log('[AG Autopilot] 🔍 Found model selector (keyword): "' + text.substring(0, 50) + '"');
                     return candidates[i];
                 }
             }
@@ -213,7 +211,7 @@
             }
         }
 
-        console.log('[AG Autopilot] ⚠️ Model selector not found');
+        console.log('[AG Autopilot] Model selector not found (may be in isolated webview)');
         return null;
     }
 
@@ -358,12 +356,14 @@
     }
 
     // Smart Router: intercept Enter on textarea
+    // NOTE: This only works if the chat textarea is in the workbench DOM (not in isolated webview).
+    // In Antigravity, the agent panel runs in an isolated Chromium process (OOPIF),
+    // so this may not be able to find the model selector. It will gracefully skip if not found.
     document.addEventListener('keydown', function (e) {
         if (!window._agAutoEnabled || !window._agSmartRouter) return;
         if (_isRoutingInProgress) return;
         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
             var el = e.target;
-            // Accept any textarea that looks like a chat input
             var isChatInput = el && el.tagName === 'TEXTAREA' && (
                 el.classList.contains('chat-input') ||
                 (el.closest && el.closest('.antigravity-agent-side-panel')) ||
@@ -377,27 +377,23 @@
 
             var targetModel = evaluateTargetModel(prompt);
             var currentBtn = findModelSelectorButton();
-            var currentModel = currentBtn ? (currentBtn.innerText || currentBtn.textContent || '').trim() : '';
+            if (!currentBtn) return; // Model selector not accessible from this context
 
-            if (!currentModel) {
-                console.log('[AG Autopilot] 🧠 Smart Router: no current model detected, skipping');
-                return;
-            }
+            var currentModel = (currentBtn.innerText || currentBtn.textContent || '').trim();
+            if (!currentModel || currentModel.indexOf(targetModel) !== -1) return; // Already on target model
 
-            if (currentModel.indexOf(targetModel) === -1) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                e.stopPropagation();
-                _isRoutingInProgress = true;
-                console.log('[AG Autopilot] 🧠 Smart Router: "' + currentModel.substring(0, 30) + '" → ' + targetModel);
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            e.stopPropagation();
+            _isRoutingInProgress = true;
+            console.log('[AG Autopilot] Smart Router: "' + currentModel.substring(0, 30) + '" -> ' + targetModel);
 
-                selectModelInDropdown(targetModel, function (success) {
-                    setTimeout(function () {
-                        _isRoutingInProgress = false;
-                        emulateSendEvent(el);
-                    }, success ? 400 : 100);
-                });
-            }
+            selectModelInDropdown(targetModel, function (success) {
+                setTimeout(function () {
+                    _isRoutingInProgress = false;
+                    emulateSendEvent(el);
+                }, success ? 400 : 100);
+            });
         }
     }, true);
 

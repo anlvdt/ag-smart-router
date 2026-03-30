@@ -2,7 +2,7 @@
     "name": "ag-autopilot",
     "displayName": "AG Autopilot",
     "description": "Autopilot for Antigravity AI: Auto Click, Auto Scroll, Smart Model Router, Quota Fallback. | Tự lái mọi thứ cho Antigravity AI.",
-    "version": "4.2.1",
+    "version": "5.0.0",
     "publisher": "ANLE",
     "repository": {
         "type": "git",
@@ -26,8 +26,8 @@
             "properties": {
                 "ag-auto.enabled": { "type": "boolean", "default": true, "description": "Enable/Disable Auto Click & Scroll | Bật/tắt Auto Click & Scroll" },
                 "ag-auto.scrollEnabled": { "type": "boolean", "default": true, "description": "Enable/Disable Auto Scroll | Bật/tắt Auto Scroll" },
-                "ag-auto.smartRouter": { "type": "boolean", "default": true, "description": "Enable/Disable Smart Model Router | Bật/tắt Smart Model Router" },
-                "ag-auto.quotaFallback": { "type": "boolean", "default": true, "description": "Enable/Disable Quota Fallback | Bật/tắt Quota Fallback" },
+                "ag-auto.smartRouter": { "type": "boolean", "default": false, "description": "Enable/Disable Smart Model Router (experimental, requires CDP) | Bật/tắt Smart Model Router (thử nghiệm, cần CDP)" },
+                "ag-auto.quotaFallback": { "type": "boolean", "default": false, "description": "Enable/Disable Quota Fallback (experimental, requires CDP) | Bật/tắt Quota Fallback (thử nghiệm, cần CDP)" },
                 "ag-auto.language": { "type": "string", "enum": ["vi", "en", "zh"], "default": "vi", "description": "UI language | Ngôn ngữ giao diện" },
                 "ag-auto.scrollPauseMs": { "type": "number", "default": 7000, "description": "Pause time when user scrolls manually (ms) | Thời gian nghỉ khi cuộn tay (ms)" },
                 "ag-auto.scrollIntervalMs": { "type": "number", "default": 500, "description": "Auto scroll scan speed (ms) | Tốc độ quét cuộn (ms)" },
