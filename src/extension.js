@@ -444,6 +444,10 @@ function getSettingsHtml(cfg) {
 let statusBarItem, statusBarScroll;
 
 function createStatusBarItem(context) {
+    // Dispose existing items to prevent duplicates on re-activation
+    if (statusBarItem) { statusBarItem.dispose(); statusBarItem = null; }
+    if (statusBarScroll) { statusBarScroll.dispose(); statusBarScroll = null; }
+
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
     statusBarItem.command = 'ag-auto.openSettings';
     context.subscriptions.push(statusBarItem);
@@ -699,7 +703,8 @@ if($global:clicked){Write-Output 'CLICKED'}`.trim();
 }
 
 function deactivate() {
-    if (statusBarItem) statusBarItem.dispose();
+    if (statusBarItem) { statusBarItem.dispose(); statusBarItem = null; }
+    if (statusBarScroll) { statusBarScroll.dispose(); statusBarScroll = null; }
     try {
         const wbPath = getWorkbenchPath();
         if (wbPath) {
