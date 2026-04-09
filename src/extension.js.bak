@@ -1,0 +1,860 @@
+// ===========================================================
+// AG Autopilot — Auto Click & Scroll + Smart Router + Quota Fallback
+// Smart Router & Quota Fallback: CDP + DOM hybrid approach
+// ===========================================================
+const vscode = require('vscode');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const crypto = require('crypto');
+const { execSync } = require('child_process');
+const http = require('http');
+
+const TAG_START = '<!-- AG-AUTOPILOT-START -->';
+const TAG_END = '<!-- AG-AUTOPILOT-END -->';
+const OLD_TAGS = [
+    ['<!-- AG-AUTO-CLICK-SCROLL-START -->', '<!-- AG-AUTO-CLICK-SCROLL-END -->'],
+    ['<!-- AG-MODEL-SWITCH-START -->', '<!-- AG-MODEL-SWITCH-END -->'],
+    ['<!-- AG-TOOLKIT-START -->', '<!-- AG-TOOLKIT-END -->']
+];
+
+// --- Shared state ---
+let statusBarItem, statusBarScroll, _settingsPanel = null;
+let _autoAcceptEnabled = true, _httpScrollEnabled = true, _httpClickPatterns = [];
+let _httpScrollConfig = { pauseScrollMs: 5000, scrollIntervalMs: 500, clickIntervalMs: 2000 };
+let _clickStats = {}, _clickLog = [], _totalClicks = 0, _resetStatsRequested = false;
+let _extensionContext = null, _httpServer = null, _actualPort = 0, _autoAcceptInterval = null;
+const AG_HTTP_PORT_START = 48787, AG_HTTP_PORT_END = 48850;
+const CHAT_ACCEPT_COMMANDS = ['antigravity.agent.acceptAgentStep','antigravity.prioritized.supercompleteAccept','antigravity.terminalCommand.accept','antigravity.acceptCompletion'];
+
+// --- CDP state ---
+// CDP vars removed — using Electron webContents API instead
+
+let _cdpQuotaSwitchInProgress = false, _cdpLastSwitchAt = 0;
+let _cdpExhaustedModels = {}; // { modelName: timestamp }
+let _cdpConsecutiveHits = 0;
+const EXHAUSTED_TTL = 30 * 60 * 1000; // 30 minutes
+
+const FALLBACK_MODELS = ["Claude Opus 4.6 (Thinking)","Claude Sonnet 4.5","Gemini 3.1 Pro (High)","Gemini 3 Flash","GPT-OSS 120B (Medium)"];
+const MODEL_KEYWORDS = ["Claude","Gemini","GPT"];
+const QUOTA_PHRASES = ['exhausted your capacity','quota will reset','baseline model quota reached','exhausted your capacity on this model'];
+
+// =============================================================
+// UTILITY FUNCTIONS
+// =============================================================
+function writeFileElevated(filePath, content) {
+    try { fs.writeFileSync(filePath, content, 'utf8'); } catch (err) {
+        if (err.code !== 'EACCES' && err.code !== 'EPERM') throw err;
+        const tmpPath = path.join(os.tmpdir(), 'ag-autopilot-' + Date.now() + '.tmp');
+        fs.writeFileSync(tmpPath, content, 'utf8');
+        try {
+            if (process.platform === 'linux') execSync('pkexec bash -c "cp \'' + tmpPath + '\' \'' + filePath + '\' && chmod 644 \'' + filePath + '\'"', { timeout: 30000 });
+            else if (process.platform === 'darwin') execSync('osascript -e \'do shell script "cp \'' + tmpPath + '\' \'' + filePath + '\' && chmod 644 \'' + filePath + '\'" with administrator privileges\'', { timeout: 30000 });
+            else throw err;
+        } catch (elevErr) { try { fs.unlinkSync(tmpPath); } catch (_) {} throw new Error('Permission denied. Restart as Admin.'); }
+        try { fs.unlinkSync(tmpPath); } catch (_) {}
+    }
+}
+
+function getWorkbenchPath() {
+    const appRoot = vscode.env.appRoot;
+    const candidates = [
+        path.join(appRoot,'out','vs','code','electron-browser','workbench','workbench.html'),
+        path.join(appRoot,'out','vs','code','electron-sandbox','workbench','workbench.html'),
+        path.join(appRoot,'out','vs','workbench','workbench.html'),
+        path.join(appRoot,'out','vs','code','browser','workbench','workbench.html'),
+        path.join(appRoot,'out','vs','code','electron-main','workbench','workbench.html'),
+    ];
+    for (const p of candidates) { if (fs.existsSync(p)) return p; }
+    return findFileRecursive(path.join(appRoot, 'out'), 'workbench.html', 6);
+}
+
+function findFileRecursive(dir, filename, maxDepth) {
+    if (maxDepth <= 0) return null;
+    try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isFile() && entry.name === filename) return fullPath;
+            if (entry.isDirectory()) { const r = findFileRecursive(fullPath, filename, maxDepth - 1); if (r) return r; }
+        }
+    } catch (_) {}
+    return null;
+}
+
+function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function _markExhausted(modelName) {
+    for (let i = 0; i < FALLBACK_MODELS.length; i++) {
+        if (modelName.indexOf(FALLBACK_MODELS[i]) !== -1) { _cdpExhaustedModels[FALLBACK_MODELS[i]] = Date.now(); return; }
+    }
+}
+function _isExhausted(m) {
+    const now = Date.now();
+    for (const k in _cdpExhaustedModels) { if (now - _cdpExhaustedModels[k] > EXHAUSTED_TTL) delete _cdpExhaustedModels[k]; }
+    return !!_cdpExhaustedModels[m];
+}
+function _countAvailable() {
+    let c = 0; for (let i = 0; i < FALLBACK_MODELS.length; i++) { if (!_isExhausted(FALLBACK_MODELS[i])) c++; } return c;
+}
+function _getCdpCooldownMs() {
+    if (_countAvailable() === 0 || _cdpConsecutiveHits >= FALLBACK_MODELS.length) return 60000;
+    return 5000;
+}
+function getNextFallbackModel(currentModel) {
+    _markExhausted(currentModel);
+    let idx = -1;
+    for (let i = 0; i < FALLBACK_MODELS.length; i++) { if (currentModel.indexOf(FALLBACK_MODELS[i]) !== -1) { idx = i; break; } }
+    for (let a = 1; a <= FALLBACK_MODELS.length; a++) {
+        const ni = (idx + a) % FALLBACK_MODELS.length;
+        if (!_isExhausted(FALLBACK_MODELS[ni])) return FALLBACK_MODELS[ni];
+    }
+    // All exhausted — pick oldest
+    let oldest = Infinity, pick = FALLBACK_MODELS[0];
+    for (const k in _cdpExhaustedModels) { if (_cdpExhaustedModels[k] < oldest) { oldest = _cdpExhaustedModels[k]; pick = k; } }
+    console.log('[AG Autopilot] CDP: All models exhausted! Retrying oldest: ' + pick);
+    return pick;
+}
+
+// =============================================================
+// SCRIPT BUILD & INJECT
+// =============================================================
+function buildScriptContent(context) {
+    const config = vscode.workspace.getConfiguration('ag-auto');
+    const pauseMs = config.get('scrollPauseMs', 7000), scrollMs = config.get('scrollIntervalMs', 500), clickMs = config.get('clickIntervalMs', 1000);
+    const allPatterns = config.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept all','Accept']);
+    const disabledPats = context.globalState.get('disabledClickPatterns', []);
+    const patterns = allPatterns.filter(p => !disabledPats.includes(p) && p !== 'Accept');
+    const enabled = config.get('enabled', true), smartRouter = config.get('smartRouter', true), quotaFallback = config.get('quotaFallback', true);
+    const templatePath = path.join(context.extensionPath, 'media', 'autoScript.js');
+    let script = fs.readFileSync(templatePath, 'utf8');
+    const wbPath = getWorkbenchPath();
+    const configFilePath = wbPath ? path.join(path.dirname(wbPath), 'ag-auto-config.json').replace(/\\/g, '/') : '';
+    script = script.replace(/\/\*\{\{PAUSE_SCROLL_MS\}\}\*\/\d+/, pauseMs.toString());
+    script = script.replace(/\/\*\{\{SCROLL_INTERVAL_MS\}\}\*\/\d+/, scrollMs.toString());
+    script = script.replace(/\/\*\{\{CLICK_INTERVAL_MS\}\}\*\/\d+/, clickMs.toString());
+    script = script.replace(/\/\*\{\{CLICK_PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(patterns));
+    script = script.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/, enabled.toString());
+    script = script.replace(/\/\*\{\{CONFIG_PATH\}\}\*\//, configFilePath);
+    script = script.replace(/\/\*\{\{SMART_ROUTER\}\}\*\/\w+/, smartRouter.toString());
+    script = script.replace(/\/\*\{\{QUOTA_FALLBACK\}\}\*\/\w+/, quotaFallback.toString());
+    return script;
+}
+
+function writeConfigJson(context) {
+    try {
+        const wbPath = getWorkbenchPath(); if (!wbPath) return;
+        const config = vscode.workspace.getConfiguration('ag-auto');
+        const allPatterns = config.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept']);
+        const disabledPats = context.globalState.get('disabledClickPatterns', []);
+        const activePatterns = allPatterns.filter(p => !disabledPats.includes(p) && p !== 'Accept');
+        const acceptEnabled = allPatterns.includes('Accept') && !disabledPats.includes('Accept');
+        writeFileElevated(path.join(path.dirname(wbPath), 'ag-auto-config.json'), JSON.stringify({
+            enabled: config.get('enabled', true), clickPatterns: activePatterns, acceptInChatOnly: acceptEnabled,
+            pauseScrollMs: config.get('scrollPauseMs', 7000), scrollIntervalMs: config.get('scrollIntervalMs', 500),
+            clickIntervalMs: config.get('clickIntervalMs', 1000), smartRouter: config.get('smartRouter', true), quotaFallback: config.get('quotaFallback', true)
+        }));
+    } catch (e) { console.error('[AG Autopilot] Config JSON error:', e.message); }
+}
+
+function installScript(context) {
+    const wbPath = getWorkbenchPath();
+    if (!wbPath) { vscode.window.showErrorMessage('[AG Autopilot] workbench.html not found!'); return false; }
+    const wbDir = path.dirname(wbPath), scriptContent = buildScriptContent(context);
+    const JS_S = '/* AG-AUTO-CLICK-SCROLL-JS-START */', JS_E = '/* AG-AUTO-CLICK-SCROLL-JS-END */';
+    try {
+        const htmlContent = fs.readFileSync(wbPath, 'utf8');
+        const scriptMatches = htmlContent.match(/src="([^"]*\.js)"/g) || [];
+        const jsFiles = new Set();
+        for (const match of scriptMatches) { const m = match.match(/src="([^"]*\.js)"/); if (m) { const n = path.basename(m[1].split('?')[0]); if (n === 'ag-auto-script.js' || n === 'ag-modelswitch-client.js') continue; const s = path.join(wbDir, n); if (fs.existsSync(s)) jsFiles.add(s); const p1 = path.join(wbDir, '..', n); if (fs.existsSync(p1)) jsFiles.add(path.resolve(p1)); } }
+        if (jsFiles.size === 0) { for (const n of ['workbench.desktop.main.js','workbench.js']) { const f = findFileRecursive(path.join(wbDir,'..'), n, 3); if (f) { jsFiles.add(f); break; } } }
+        for (const jp of jsFiles) { let jc = fs.readFileSync(jp, 'utf8'); const jr = new RegExp(escapeRegex(JS_S)+'[\\s\\S]*?'+escapeRegex(JS_E), 'g'); if (jr.test(jc)) { jc = jc.replace(jr, ''); writeFileElevated(jp, jc); } }
+    } catch (err) { console.error('[AG Autopilot] Cleanup error:', err.message); }
+    try {
+        let html = fs.readFileSync(wbPath, 'utf8');
+        for (const [s, e] of [[TAG_START, TAG_END], ...OLD_TAGS]) { html = html.replace(new RegExp(escapeRegex(s)+'[\\s\\S]*?'+escapeRegex(e), 'g'), ''); }
+        for (const f of ['ag-modelswitch-client.js','ag-auto-script.js']) { const p = path.join(wbDir, f); if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {} }
+        const ts = Date.now();
+        writeFileElevated(path.join(wbDir, 'ag-auto-script.js'), scriptContent);
+        html = html.replace('</html>', '\n'+TAG_START+'\n<script src="ag-auto-script.js?v='+ts+'"></script>\n'+TAG_END+'\n</html>');
+        writeFileElevated(wbPath, html);
+        console.log('[AG Autopilot] Injected successfully');
+    } catch (err) { console.error('[AG Autopilot] Inject error:', err.message); return false; }
+    return true;
+}
+
+function updateProductChecksums() {
+    try {
+        let pjp = null;
+        if (process.resourcesPath) { const c = path.join(process.resourcesPath,'app','product.json'); if (fs.existsSync(c)) pjp = c; }
+        if (!pjp) { const w = getWorkbenchPath(); if (!w) return; let d = path.dirname(w); for (let i = 0; i < 8; i++) { const c = path.join(d,'product.json'); if (fs.existsSync(c)) { pjp = c; break; } d = path.dirname(d); } }
+        if (!pjp) return;
+        const pj = JSON.parse(fs.readFileSync(pjp, 'utf8')); if (!pj.checksums) return;
+        const ar = path.dirname(pjp), od = path.join(ar, 'out'); let upd = false;
+        for (const rp in pj.checksums) { const np = rp.split('/').join(path.sep); let fp = path.join(od, np); if (!fs.existsSync(fp)) fp = path.join(ar, np); if (fs.existsSync(fp)) { const h = crypto.createHash('sha256').update(fs.readFileSync(fp)).digest('base64').replace(/=+$/, ''); if (pj.checksums[rp] !== h) { pj.checksums[rp] = h; upd = true; } } }
+        if (upd) writeFileElevated(pjp, JSON.stringify(pj, null, '\t'));
+    } catch (e) { console.error('[AG Autopilot] Checksum error:', e.message); }
+}
+
+function clearV8CodeCache() {
+    try {
+        let d;
+        if (process.platform === 'win32') d = path.join(process.env.APPDATA || path.join(os.homedir(),'AppData','Roaming'), 'Antigravity','Code Cache','js');
+        else if (process.platform === 'darwin') d = path.join(os.homedir(),'Library','Application Support','Antigravity','Code Cache','js');
+        else d = path.join(os.homedir(),'.config','Antigravity','Code Cache','js');
+        if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
+    } catch (e) {}
+}
+
+function uninstallScript() {
+    const wbPath = getWorkbenchPath(); if (!wbPath) return false;
+    const wbDir = path.dirname(wbPath), JS_S = '/* AG-AUTO-CLICK-SCROLL-JS-START */', JS_E = '/* AG-AUTO-CLICK-SCROLL-JS-END */';
+    try {
+        let html = fs.readFileSync(wbPath, 'utf8');
+        for (const [s, e] of [[TAG_START, TAG_END], ...OLD_TAGS]) { html = html.replace(new RegExp(escapeRegex(s)+'[\\s\\S]*?'+escapeRegex(e), 'g'), ''); }
+        writeFileElevated(wbPath, html);
+        for (const f of ['ag-auto-script.js','ag-modelswitch-client.js']) { const p = path.join(wbDir, f); if (fs.existsSync(p)) fs.unlinkSync(p); }
+        for (const n of ['workbench.desktop.main.js','workbench.js']) { const p = path.join(wbDir, n); if (fs.existsSync(p)) { let js = fs.readFileSync(p, 'utf8'); js = js.replace(new RegExp(escapeRegex(JS_S)+'[\\s\\S]*?'+escapeRegex(JS_E), 'g'), ''); writeFileElevated(p, js); } }
+        return true;
+    } catch (err) { vscode.window.showErrorMessage('[AG Autopilot] Uninstall failed: ' + err.message); return false; }
+}
+
+function isScriptInjected() { try { const w = getWorkbenchPath(); return w ? fs.readFileSync(w, 'utf8').includes(TAG_START) : false; } catch (e) { return false; } }
+
+// =============================================================
+// ELECTRON webContents API — Smart Router & Quota Fallback
+// Layer 0: direct access to ALL webviews via Electron internals
+// =============================================================
+let _electronReady = false;
+let _quotaPollTimer = null;
+
+function getElectron() {
+    try { return require('electron'); } catch (_) {}
+    try {
+        // In extension host, electron may be available via remote
+        const mod = require('module');
+        const orig = mod._resolveFilename;
+        mod._resolveFilename = function(request, parent) {
+            if (request === 'electron') return request;
+            return orig.apply(this, arguments);
+        };
+        const e = require('electron');
+        mod._resolveFilename = orig;
+        return e;
+    } catch (_) {}
+    return null;
+}
+
+// Execute JS in ALL webContents (every window, webview, iframe)
+function execInAllWebContents(js) {
+    const results = [];
+    try {
+        const electron = getElectron();
+        if (!electron) return Promise.resolve([]);
+        const { webContents } = electron;
+        if (!webContents || !webContents.getAllWebContents) return Promise.resolve([]);
+        const all = webContents.getAllWebContents();
+        const promises = all.map(wc => {
+            return wc.executeJavaScript(js, true).catch(() => null);
+        });
+        return Promise.allSettled(promises).then(results => 
+            results.map(r => r.status === 'fulfilled' ? r.value : null)
+        );
+    } catch (e) {
+        console.log('[AG Autopilot] execInAllWebContents error:', e.message);
+        return Promise.resolve([]);
+    }
+}
+
+// Find first truthy result from executing JS across all webContents
+async function execFindFirst(js) {
+    const results = await execInAllWebContents(js);
+    for (const r of results) {
+        if (r) return r;
+    }
+    return null;
+}
+
+// Check quota error across all webContents
+async function electronCheckQuotaError() {
+    const js = `(function(){
+        var phrases = ${JSON.stringify(QUOTA_PHRASES)};
+        var text = (document.body.innerText || '').toLowerCase();
+        for (var i = 0; i < phrases.length; i++) {
+            if (text.indexOf(phrases[i]) !== -1) return true;
+        }
+        return false;
+    })()`;
+    const results = await execInAllWebContents(js);
+    return results.some(r => r === true);
+}
+
+// Dismiss quota notification across all webContents
+async function electronDismissQuota() {
+    const js = `(function(){
+        var phrases = ${JSON.stringify(QUOTA_PHRASES)};
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+        while (walker.nextNode()) {
+            var val = (walker.currentNode.nodeValue || '').toLowerCase();
+            if (!val) continue;
+            for (var q = 0; q < phrases.length; q++) {
+                if (val.indexOf(phrases[q]) !== -1) {
+                    var el = walker.currentNode.parentElement;
+                    for (var lvl = 0; lvl < 10 && el; lvl++) {
+                        var bs = el.querySelectorAll('button, a.action-label, [role="button"]');
+                        for (var b = 0; b < bs.length; b++) {
+                            var bt = (bs[b].innerText || bs[b].textContent || '').trim().toLowerCase();
+                            if (bt === 'dismiss' || bt === 'close' || bt === 'ok') {
+                                bs[b].click(); return true;
+                            }
+                        }
+                        el = el.parentElement;
+                    }
+                }
+            }
+        }
+        return false;
+    })()`;
+    await execInAllWebContents(js);
+}
+
+// Get current model name from any webContents
+async function electronGetCurrentModel() {
+    const js = `(function(){
+        var M = ${JSON.stringify(FALLBACK_MODELS)};
+        var K = ${JSON.stringify(MODEL_KEYWORDS)};
+        var candidates = document.querySelectorAll(
+            'button, [role="button"], [role="combobox"], [role="listbox"], ' +
+            '.monaco-button, .monaco-dropdown, select, ' +
+            '[class*="model"], [class*="selector"], [class*="picker"], [class*="dropdown"]'
+        );
+        for (var i = 0; i < candidates.length; i++) {
+            var t = (candidates[i].innerText || candidates[i].textContent || '').trim();
+            if (!t || t.length > 100) continue;
+            for (var m = 0; m < M.length; m++) if (t.indexOf(M[m]) !== -1) return t;
+            for (var k = 0; k < K.length; k++) if (t.indexOf(K[k]) !== -1) return t;
+        }
+        return null;
+    })()`;
+    return await execFindFirst(js);
+}
+
+// Click model selector in any webContents
+async function electronClickModelSelector() {
+    const js = `(function(){
+        var M = ${JSON.stringify(FALLBACK_MODELS)};
+        var K = ${JSON.stringify(MODEL_KEYWORDS)};
+        var candidates = document.querySelectorAll(
+            'button, [role="button"], [role="combobox"], [role="listbox"], ' +
+            '.monaco-button, .monaco-dropdown, select, ' +
+            '[class*="model"], [class*="selector"], [class*="picker"], [class*="dropdown"]'
+        );
+        for (var i = 0; i < candidates.length; i++) {
+            var t = (candidates[i].innerText || candidates[i].textContent || '').trim();
+            if (!t || t.length > 100) continue;
+            for (var m = 0; m < M.length; m++) { if (t.indexOf(M[m]) !== -1) { candidates[i].click(); return true; } }
+            for (var k = 0; k < K.length; k++) { if (t.indexOf(K[k]) !== -1) { candidates[i].click(); return true; } }
+        }
+        return false;
+    })()`;
+    const results = await execInAllWebContents(js);
+    return results.some(r => r === true);
+}
+
+// Select target model from dropdown in any webContents
+async function electronSelectModelInDropdown(targetModel) {
+    const js = `(function(){
+        var target = ${JSON.stringify(targetModel)};
+        var shortName = target.split(' ').slice(0, 2).join(' ');
+        var items = document.querySelectorAll(
+            '[role="menuitem"], [role="option"], .monaco-list-row, ' +
+            '.action-item .action-label, .context-view .action-label, ' +
+            '.quick-input-list .monaco-list-row'
+        );
+        for (var i = 0; i < items.length; i++) {
+            var t = (items[i].innerText || items[i].textContent || '').trim();
+            if (t.indexOf(target) !== -1) { items[i].click(); return true; }
+        }
+        for (var i = 0; i < items.length; i++) {
+            var t = (items[i].innerText || items[i].textContent || '').trim();
+            if (shortName && t.indexOf(shortName) !== -1) { items[i].click(); return true; }
+        }
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+        return false;
+    })()`;
+    const results = await execInAllWebContents(js);
+    return results.some(r => r === true);
+}
+
+// Switch model: click selector, wait, then select from dropdown
+async function electronSwitchModel(targetModel) {
+    const clicked = await electronClickModelSelector();
+    if (!clicked) return false;
+    // Wait for dropdown to open, then try selecting multiple times
+    for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise(r => setTimeout(r, 300));
+        const selected = await electronSelectModelInDropdown(targetModel);
+        if (selected) return true;
+    }
+    return false;
+}
+
+// Send "Continue" message into chat
+async function electronSendContinue() {
+    const js = `(function(){
+        var ta = document.querySelector('textarea');
+        if (!ta) return false;
+        ta.focus();
+        var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+        if (setter && setter.set) setter.set.call(ta, 'Continue');
+        else ta.value = 'Continue';
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.dispatchEvent(new Event('change', { bubbles: true }));
+        setTimeout(function() {
+            var opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+            ta.dispatchEvent(new KeyboardEvent('keydown', opts));
+            ta.dispatchEvent(new KeyboardEvent('keypress', opts));
+            ta.dispatchEvent(new KeyboardEvent('keyup', opts));
+            setTimeout(function() {
+                var btns = document.querySelectorAll('button, [role="button"]');
+                for (var i = 0; i < btns.length; i++) {
+                    var t = (btns[i].innerText || '').trim().toLowerCase();
+                    var a = (btns[i].getAttribute('aria-label') || '').toLowerCase();
+                    if (t === 'send' || t === 'submit' || a.indexOf('send') !== -1) {
+                        if (btns[i].offsetParent !== null) { btns[i].click(); break; }
+                    }
+                }
+            }, 500);
+        }, 800);
+        return true;
+    })()`;
+    await execInAllWebContents(js);
+}
+
+// Initialize Electron API access
+function initElectronAccess() {
+    const electron = getElectron();
+    if (electron && electron.webContents) {
+        _electronReady = true;
+        const count = electron.webContents.getAllWebContents().length;
+        console.log('[AG Autopilot] Electron webContents API ready (' + count + ' webContents)');
+    } else {
+        console.log('[AG Autopilot] Electron webContents API not available');
+        _electronReady = false;
+    }
+}
+
+// Quota fallback polling via Electron webContents
+function startElectronQuotaFallback() {
+    if (_quotaPollTimer) clearInterval(_quotaPollTimer);
+    _quotaPollTimer = setInterval(async () => {
+        const cfg = vscode.workspace.getConfiguration('ag-auto');
+        if (!cfg.get('quotaFallback', true) || !cfg.get('enabled', true)) return;
+        if (_cdpQuotaSwitchInProgress) return;
+        const cooldown = _getCdpCooldownMs();
+        if (Date.now() - _cdpLastSwitchAt < cooldown) return;
+        if (!_electronReady) return;
+
+        try {
+            const hasQuota = await electronCheckQuotaError();
+            if (!hasQuota || _cdpQuotaSwitchInProgress) return;
+
+            _cdpQuotaSwitchInProgress = true;
+            _cdpLastSwitchAt = Date.now();
+            _cdpConsecutiveHits++;
+            console.log('[AG Autopilot] Electron: Quota error detected! (#' + _cdpConsecutiveHits + ')');
+
+            await electronDismissQuota();
+            await new Promise(r => setTimeout(r, 1000));
+            await electronDismissQuota(); // retry
+
+            const currentModel = await electronGetCurrentModel();
+            if (!currentModel) {
+                console.log('[AG Autopilot] Electron: Cannot find current model');
+                _cdpQuotaSwitchInProgress = false;
+                return;
+            }
+
+            const target = getNextFallbackModel(currentModel);
+            console.log('[AG Autopilot] Electron: Switching "' + currentModel.substring(0, 30) + '" -> ' + target);
+            vscode.window.setStatusBarMessage('$(sync~spin) Switching to ' + target + '...', 5000);
+
+            const switched = await electronSwitchModel(target);
+            if (switched) {
+                console.log('[AG Autopilot] Electron: Model switched OK');
+                vscode.window.setStatusBarMessage('$(check) Switched to ' + target, 3000);
+                _cdpConsecutiveHits = 0; // Reset on success
+                await new Promise(r => setTimeout(r, 2000));
+                await electronSendContinue();
+                await new Promise(r => setTimeout(r, 3000));
+            } else {
+                console.log('[AG Autopilot] Electron: Switch failed');
+            }
+            _cdpQuotaSwitchInProgress = false;
+        } catch (e) {
+            console.error('[AG Autopilot] Electron quota fallback error:', e.message);
+            _cdpQuotaSwitchInProgress = false;
+        }
+    }, 3000);
+}
+
+// SETTINGS PANEL
+// =============================================================
+function openSettingsPanel(context) {
+    if (_settingsPanel) { _settingsPanel.dispose(); _settingsPanel = null; return; }
+    const panel = vscode.window.createWebviewPanel('agAutoSettings', 'AG Autopilot - Settings', vscode.ViewColumn.One, { enableScripts: true });
+    _settingsPanel = panel;
+    panel.onDidDispose(() => { _settingsPanel = null; });
+    const config = vscode.workspace.getConfiguration('ag-auto');
+    panel.webview.html = getSettingsHtml({
+        enabled: config.get('enabled', true), scrollEnabled: config.get('scrollEnabled', true),
+        smartRouter: config.get('smartRouter', true), quotaFallback: config.get('quotaFallback', true),
+        scrollPauseMs: config.get('scrollPauseMs', 7000), scrollIntervalMs: config.get('scrollIntervalMs', 500),
+        clickIntervalMs: config.get('clickIntervalMs', 1000),
+        clickPatterns: config.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept']),
+        disabledClickPatterns: context.globalState.get('disabledClickPatterns', []),
+        language: config.get('language', 'vi'), clickStats: _clickStats, totalClicks: _totalClicks
+    });
+    panel.webview.onDidReceiveMessage(async (msg) => {
+        if (msg.command === 'changeLang') {
+            const cfg = vscode.workspace.getConfiguration('ag-auto');
+            await cfg.update('language', msg.lang, vscode.ConfigurationTarget.Global);
+            panel.webview.html = getSettingsHtml({ enabled: cfg.get('enabled', true), scrollEnabled: cfg.get('scrollEnabled', true), smartRouter: cfg.get('smartRouter', true), quotaFallback: cfg.get('quotaFallback', true), scrollPauseMs: cfg.get('scrollPauseMs', 7000), scrollIntervalMs: cfg.get('scrollIntervalMs', 500), clickIntervalMs: cfg.get('clickIntervalMs', 1000), clickPatterns: cfg.get('clickPatterns', ['Run','Allow','Always Allow','Keep Waiting','Accept']), disabledClickPatterns: context.globalState.get('disabledClickPatterns', []), language: msg.lang, clickStats: _clickStats, totalClicks: _totalClicks });
+            return;
+        }
+        if (msg.command === 'toggle') { _autoAcceptEnabled = msg.enabled; await vscode.workspace.getConfiguration('ag-auto').update('enabled', msg.enabled, vscode.ConfigurationTarget.Global); writeConfigJson(context); updateStatusBarItem(); return; }
+        if (msg.command === 'scrollToggle') { _httpScrollEnabled = msg.enabled; await vscode.workspace.getConfiguration('ag-auto').update('scrollEnabled', msg.enabled, vscode.ConfigurationTarget.Global); writeConfigJson(context); updateStatusBarItem(); return; }
+        if (msg.command === 'routerToggle') { await vscode.workspace.getConfiguration('ag-auto').update('smartRouter', msg.enabled, vscode.ConfigurationTarget.Global); writeConfigJson(context); return; }
+        if (msg.command === 'quotaToggle') { await vscode.workspace.getConfiguration('ag-auto').update('quotaFallback', msg.enabled, vscode.ConfigurationTarget.Global); writeConfigJson(context); return; }
+        if (msg.command === 'save') {
+            const cfg = vscode.workspace.getConfiguration('ag-auto');
+            await cfg.update('enabled', msg.data.enabled, vscode.ConfigurationTarget.Global);
+            await cfg.update('scrollEnabled', msg.data.scrollEnabled, vscode.ConfigurationTarget.Global);
+            await cfg.update('scrollPauseMs', msg.data.scrollPauseMs, vscode.ConfigurationTarget.Global);
+            await cfg.update('scrollIntervalMs', msg.data.scrollIntervalMs, vscode.ConfigurationTarget.Global);
+            await cfg.update('clickIntervalMs', msg.data.clickIntervalMs, vscode.ConfigurationTarget.Global);
+            await cfg.update('clickPatterns', msg.data.clickPatterns, vscode.ConfigurationTarget.Global);
+            await cfg.update('smartRouter', msg.data.smartRouter, vscode.ConfigurationTarget.Global);
+            await cfg.update('quotaFallback', msg.data.quotaFallback, vscode.ConfigurationTarget.Global);
+            await context.globalState.update('disabledClickPatterns', msg.data.disabledClickPatterns);
+            try { await cfg.update('language', msg.data.language, vscode.ConfigurationTarget.Global); } catch (e) {}
+            _autoAcceptEnabled = msg.data.enabled; _httpScrollEnabled = msg.data.scrollEnabled !== false;
+            _httpClickPatterns = msg.data.clickPatterns.filter(p => !msg.data.disabledClickPatterns.includes(p));
+            writeConfigJson(context); updateStatusBarItem();
+            vscode.window.setStatusBarMessage('$(check) [AG Autopilot] Saved!', 3000);
+        }
+        if (msg.command === 'reload') vscode.commands.executeCommand('workbench.action.reloadWindow');
+        if (msg.command === 'resetStats') { _clickStats = {}; _totalClicks = 0; context.globalState.update('clickStats', {}); context.globalState.update('totalClicks', 0); panel.webview.postMessage({ command: 'statsUpdated', clickStats: {}, totalClicks: 0 }); }
+        if (msg.command === 'clearClickLog') { _clickLog = []; if (_extensionContext) _extensionContext.globalState.update('clickLog', []); panel.webview.postMessage({ command: 'clickLogUpdate', log: [] }); }
+        if (msg.command === 'getClickLog') panel.webview.postMessage({ command: 'clickLogUpdate', log: _clickLog });
+        if (msg.command === 'getStats') panel.webview.postMessage({ command: 'statsUpdated', clickStats: _clickStats, totalClicks: _totalClicks });
+    }, undefined, context.subscriptions);
+    const statsTimer = setInterval(() => { try { panel.webview.postMessage({ command: 'statsUpdated', clickStats: _clickStats, totalClicks: _totalClicks }); } catch (e) { clearInterval(statsTimer); } }, 2000);
+    panel.onDidDispose(() => clearInterval(statsTimer));
+}
+
+function getSettingsHtml(cfg) {
+    const lang = cfg.language || 'vi';
+    let html = fs.readFileSync(path.join(__dirname, '..', 'media', 'settings.html'), 'utf8');
+    html = html.replace(/\{\{LANG\}\}/g, lang);
+    html = html.replace('{{TOTAL_CLICKS}}', String(cfg.totalClicks || 0));
+    html = html.replace('{{ENABLED_CHK}}', cfg.enabled ? 'checked' : '');
+    html = html.replace('{{SCROLL_CHK}}', cfg.scrollEnabled !== false ? 'checked' : '');
+    html = html.replace('{{ROUTER_CHK}}', cfg.smartRouter ? 'checked' : '');
+    html = html.replace('{{QUOTA_CHK}}', cfg.quotaFallback ? 'checked' : '');
+    html = html.replace(/\{\{CLICK_MS\}\}/g, String(cfg.clickIntervalMs || 1000));
+    html = html.replace(/\{\{SCROLL_MS\}\}/g, String(cfg.scrollIntervalMs || 500));
+    html = html.replace(/\{\{PAUSE_MS\}\}/g, String(cfg.scrollPauseMs || 7000));
+    html = html.replace('{{LANG_VI}}', lang === 'vi' ? 'selected' : '');
+    html = html.replace('{{LANG_EN}}', lang === 'en' ? 'selected' : '');
+    html = html.replace('{{LANG_ZH}}', lang === 'zh' ? 'selected' : '');
+    html = html.replace('{{PATTERNS_JSON}}', JSON.stringify(cfg.clickPatterns));
+    html = html.replace('{{DISABLED_JSON}}', JSON.stringify(cfg.disabledClickPatterns));
+    html = html.replace('{{STATS_JSON}}', JSON.stringify(cfg.clickStats || {}));
+    return html;
+}
+
+// =============================================================
+// STATUS BAR
+// =============================================================
+let statusBarQuota;
+function createStatusBarItem(context) {
+    if (statusBarItem) { statusBarItem.dispose(); statusBarItem = null; }
+    if (statusBarScroll) { statusBarScroll.dispose(); statusBarScroll = null; }
+    if (statusBarQuota) { statusBarQuota.dispose(); statusBarQuota = null; }
+    if (statusBarQuota) { statusBarQuota.dispose(); statusBarQuota = null; }
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
+    statusBarItem.command = 'ag-auto.openSettings'; context.subscriptions.push(statusBarItem);
+    statusBarScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
+    statusBarScroll.command = 'ag-auto.openSettings'; context.subscriptions.push(statusBarScroll);
+    // Quota switch button — always visible when quota fallback is enabled
+    statusBarQuota = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
+    statusBarQuota.command = 'ag-auto.switchModel';
+    statusBarQuota.text = '$(arrow-swap) Switch Model';
+    statusBarQuota.tooltip = 'AG Autopilot: Switch model (quota fallback) — Cmd+Shift+Q';
+    statusBarQuota.color = '#f9e2af';
+    context.subscriptions.push(statusBarQuota);
+    updateStatusBarItem(); statusBarItem.show(); statusBarScroll.show();
+    if (vscode.workspace.getConfiguration("ag-auto").get("quotaFallback", true)) statusBarQuota.show();
+}
+function updateStatusBarItem() {
+    statusBarItem.text = _autoAcceptEnabled ? '$(check) Accept ON' : '$(circle-slash) Accept OFF';
+    statusBarItem.color = _autoAcceptEnabled ? '#4EC9B0' : '#F44747';
+    statusBarItem.backgroundColor = _autoAcceptEnabled ? undefined : new vscode.ThemeColor('statusBarItem.errorBackground');
+    statusBarScroll.text = _httpScrollEnabled ? '$(check) Scroll ON' : '$(circle-slash) Scroll OFF';
+    statusBarScroll.color = _httpScrollEnabled ? '#4EC9B0' : '#F44747';
+    statusBarScroll.backgroundColor = _httpScrollEnabled ? undefined : new vscode.ThemeColor('statusBarItem.errorBackground');
+}
+
+// =============================================================
+// HTTP SERVER for IPC
+// =============================================================
+// Unified quota switch handler — called from HTTP endpoint, CDP polling, or manual command
+// Works with CDP, DOM, or falls back to Quick Pick for manual selection
+let _quotaSwitchInProgress = false;
+async function handleQuotaSwitch() {
+    const cfg = vscode.workspace.getConfiguration('ag-auto');
+    if (!cfg.get('enabled', true)) return;
+    if (_quotaSwitchInProgress) { console.log('[AG Autopilot] Switch already in progress'); return; }
+    const cooldown = _getCdpCooldownMs();
+    if (Date.now() - _cdpLastSwitchAt < cooldown) { console.log('[AG Autopilot] Cooldown active'); return; }
+    
+    _quotaSwitchInProgress = true;
+    _cdpLastSwitchAt = Date.now();
+    _cdpConsecutiveHits++;
+    console.log('[AG Autopilot] Quota switch #' + _cdpConsecutiveHits + ', available: ' + _countAvailable() + '/' + FALLBACK_MODELS.length);
+    
+    // Use Electron webContents API (layer 0)
+    if (_electronReady) {
+        try {
+            await electronDismissQuota();
+            const cur = await electronGetCurrentModel();
+            if (!cur) { _quotaSwitchInProgress = false; showQuotaQuickPick(); return; }
+            const target = getNextFallbackModel(cur);
+            vscode.window.setStatusBarMessage('$(sync~spin) Switching to ' + target + '...', 5000);
+            const ok = await electronSwitchModel(target);
+            if (ok) {
+                vscode.window.setStatusBarMessage('$(check) Switched to ' + target, 3000);
+                _cdpConsecutiveHits = 0;
+                await new Promise(r => setTimeout(r, 2000));
+                await electronSendContinue();
+                await new Promise(r => setTimeout(r, 3000));
+                _quotaSwitchInProgress = false;
+            } else { _quotaSwitchInProgress = false; showQuotaQuickPick(); }
+        } catch (e) {
+            console.error('[AG Autopilot] Electron switch error:', e.message);
+            _quotaSwitchInProgress = false;
+            showQuotaQuickPick();
+        }
+        return;
+    }
+    
+    // Electron not available — use Quick Pick
+    _quotaSwitchInProgress = false;
+    showQuotaQuickPick();
+}
+
+async function showQuotaQuickPick() {
+    // Build list: available models first, then exhausted ones
+    const items = FALLBACK_MODELS.map(m => ({
+        label: _isExhausted(m) ? '$(circle-slash) ' + m : '$(check) ' + m,
+        description: _isExhausted(m) ? 'quota exhausted' : 'available',
+        model: m,
+        exhausted: _isExhausted(m)
+    }));
+    items.sort((a, b) => a.exhausted - b.exhausted);
+    
+    const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a model to switch to (quota fallback)',
+        title: 'AG Autopilot — Switch Model'
+    });
+    if (!pick) return;
+    
+    const target = pick.model;
+    vscode.window.setStatusBarMessage('$(sync~spin) Please switch to: ' + target, 10000);
+    
+    // Try Electron API
+    if (_electronReady) {
+        const ok = await electronSwitchModel(target);
+        if (ok) { vscode.window.setStatusBarMessage('$(check) Switched to ' + target, 3000); return; }
+    }
+    {
+        // Copy "Continue" to clipboard for convenience
+        await vscode.env.clipboard.writeText('Continue');
+        vscode.window.showInformationMessage(
+            'Switch to ' + target + ' in the model dropdown, then paste "Continue" (already copied to clipboard)',
+            'OK'
+        );
+    }
+}
+
+function startHttpServer() {
+    if (_httpServer) return;
+    const cfg = vscode.workspace.getConfiguration('ag-auto');
+    _httpClickPatterns = cfg.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept']);
+    const _DP = ['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Allow This Con','Accept all'];
+    const _DO = ['Accept all'];
+    _DP.forEach(p => { if (!_httpClickPatterns.includes(p) && !_DO.includes(p)) _httpClickPatterns.push(p); });
+    _httpScrollEnabled = cfg.get('scrollEnabled', true);
+    _httpScrollConfig = { pauseScrollMs: cfg.get('scrollPauseMs', 5000), scrollIntervalMs: cfg.get('scrollIntervalMs', 500), clickIntervalMs: cfg.get('clickIntervalMs', 2000) };
+    try {
+        const url = require('url');
+        _httpServer = http.createServer((req, res) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+            const parsed = url.parse(req.url, true);
+            // Stats from injected script
+            if (parsed.query && parsed.query.stats) {
+                try { const inc = JSON.parse(decodeURIComponent(parsed.query.stats)); for (const k in inc) { if (!_clickStats[k]) _clickStats[k] = 0; _clickStats[k] += inc[k]; } let t = 0; for (const k in _clickStats) t += _clickStats[k]; _totalClicks = t; if (_extensionContext) { _extensionContext.globalState.update('clickStats', _clickStats); _extensionContext.globalState.update('totalClicks', _totalClicks); } } catch (e) {}
+            }
+            if (parsed.pathname === '/ag-reset-stats') { _clickStats = {}; _totalClicks = 0; res.writeHead(200); res.end(JSON.stringify({ reset: true })); return; }
+            if (parsed.pathname === '/api/click-log' && req.method === 'POST') {
+                let body = ''; req.on('data', c => { body += c; });
+                req.on('end', () => {
+                    try { const d = JSON.parse(body); const ts = (function(){ var d=new Date(),p=function(n){return n<10?'0'+n:n}; return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+' '+p(d.getDate())+'/'+p(d.getMonth()+1); })(); const entry = { time: ts, pattern: d.pattern || 'click', button: (d.button || '').substring(0, 80) }; _clickLog.unshift(entry); if (_clickLog.length > 50) _clickLog.pop(); if (_extensionContext) _extensionContext.globalState.update('clickLog', _clickLog); if (_settingsPanel) _settingsPanel.webview.postMessage({ command: 'clickLogUpdate', log: _clickLog }); res.writeHead(200); res.end(JSON.stringify({ logged: true })); } catch (e) { res.writeHead(200); res.end(JSON.stringify({ error: e.message })); }
+                }); return;
+            }
+            // CDP switch model endpoint (called by injected script when DOM fails)
+            if (parsed.pathname === '/api/cdp-switch-model' && req.method === 'POST') {
+                let body = ''; req.on('data', c => { body += c; });
+                req.on('end', () => {
+                    try { const d = JSON.parse(body); if (d.targetModel && _electronReady) { electronSwitchModel(d.targetModel).then(ok => { res.writeHead(200); res.end(JSON.stringify({ success: ok, electron: true })); }).catch(() => { res.writeHead(200); res.end(JSON.stringify({ success: false })); }); return; } res.writeHead(200); res.end(JSON.stringify({ success: false, electron: _electronReady })); } catch (e) { res.writeHead(200); res.end(JSON.stringify({ error: e.message })); }
+                }); return;
+            }
+            // CDP status
+            if (parsed.pathname === '/api/cdp-status') { res.writeHead(200); res.end(JSON.stringify({ connected: _electronReady })); return; }
+            // Quota detected endpoint — injected script or any source can trigger this
+            if (parsed.pathname === '/api/quota-detected' && req.method === 'POST') {
+                let body = ''; req.on('data', c => { body += c; });
+                req.on('end', () => {
+                    console.log('[AG Autopilot] Quota error reported via HTTP');
+                    handleQuotaSwitch();
+                    res.writeHead(200); res.end(JSON.stringify({ triggered: true }));
+                }); return;
+            }
+            if (parsed.pathname === '/api/quota-detected' && req.method === 'GET') {
+                console.log('[AG Autopilot] Quota error reported via HTTP GET');
+                handleQuotaSwitch();
+                res.writeHead(200); res.end(JSON.stringify({ triggered: true })); return;
+            }
+            // Default: return config
+            res.writeHead(200);
+            const agCfg = vscode.workspace.getConfiguration('ag-auto');
+            const response = { enabled: _autoAcceptEnabled, scrollEnabled: _httpScrollEnabled, clickPatterns: _httpClickPatterns.filter(p => p !== 'Accept'), acceptInChatOnly: _httpClickPatterns.includes('Accept'), pauseScrollMs: _httpScrollConfig.pauseScrollMs, scrollIntervalMs: _httpScrollConfig.scrollIntervalMs, clickIntervalMs: _httpScrollConfig.clickIntervalMs, smartRouter: agCfg.get('smartRouter', true), quotaFallback: agCfg.get('quotaFallback', true), electronReady: _electronReady, clickStats: _clickStats, totalClicks: _totalClicks };
+            if (_resetStatsRequested) { response.resetStats = true; _resetStatsRequested = false; }
+            res.end(JSON.stringify(response));
+        });
+        function tryListenPort(port) {
+            if (port > AG_HTTP_PORT_END) return;
+            _httpServer.removeAllListeners('error');
+            _httpServer.once('error', (e) => { if (e.code === 'EADDRINUSE') tryListenPort(port + 1); });
+            _httpServer.listen(port, '127.0.0.1', () => {
+                _actualPort = port; console.log('[AG Autopilot] HTTP server on port ' + port);
+                try { const w = getWorkbenchPath(); if (w) { const d = path.dirname(w); fs.writeFileSync(path.join(d, 'ag-auto-port-' + process.pid + '.txt'), String(port), 'utf8'); const lf = path.join(d, 'ag-auto-ports.json'); let pl = []; try { pl = JSON.parse(fs.readFileSync(lf, 'utf8')); } catch (_) {} pl = pl.filter(e => e.pid !== process.pid); pl.push({ pid: process.pid, port: port, time: Date.now() }); fs.writeFileSync(lf, JSON.stringify(pl), 'utf8'); } } catch (pe) {}
+            });
+        }
+        tryListenPort(AG_HTTP_PORT_START);
+    } catch (e) { console.log('[AG Autopilot] HTTP server failed:', e.message); }
+}
+
+function startCommandsLoop() {
+    const config = vscode.workspace.getConfiguration('ag-auto');
+    _autoAcceptEnabled = config.get('enabled', true);
+    const clickMs = config.get('clickIntervalMs', 2000);
+    if (_autoAcceptInterval) clearInterval(_autoAcceptInterval);
+    _autoAcceptInterval = setInterval(() => {
+        if (!_autoAcceptEnabled) return;
+        if (!_httpClickPatterns.some(p => p.toLowerCase().includes('accept'))) return;
+        Promise.allSettled(CHAT_ACCEPT_COMMANDS.map(cmd => vscode.commands.executeCommand(cmd))).catch(() => {});
+    }, clickMs);
+}
+
+
+// =============================================================
+// ACTIVATION
+// =============================================================
+function activate(context) {
+    console.log('[AG Autopilot] Activating v' + (context.extension && context.extension.packageJSON ? context.extension.packageJSON.version : '5.x') + '...');
+    _extensionContext = context;
+    _clickStats = context.globalState.get('clickStats', {});
+    _totalClicks = context.globalState.get('totalClicks', 0);
+    const storedLog = context.globalState.get('clickLog', []);
+    if (storedLog && storedLog.length > 0) _clickLog = storedLog;
+
+    // Win32 Keep Waiting native dialog
+    if (process.platform === 'win32') {
+        const { execFile } = require('child_process');
+        const keepWaitingScript = 'Add-Type @"\nusing System;using System.Text;using System.Runtime.InteropServices;\npublic class AgWin32{\npublic delegate bool EnumWindowsProc(IntPtr hWnd,IntPtr lParam);\n[DllImport("user32.dll")]public static extern bool EnumWindows(EnumWindowsProc cb,IntPtr lParam);\n[DllImport("user32.dll")]public static extern bool EnumChildWindows(IntPtr hwnd,EnumWindowsProc cb,IntPtr lParam);\n[DllImport("user32.dll")]public static extern int GetWindowText(IntPtr hWnd,StringBuilder s,int n);\n[DllImport("user32.dll")]public static extern int GetClassName(IntPtr hWnd,StringBuilder s,int n);\n[DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hWnd);\n[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr hWnd,uint Msg,IntPtr w,IntPtr l);\n}\n"@\n$global:clicked=$false\n[AgWin32]::EnumWindows({param($hWnd,$lp)\nif(-not [AgWin32]::IsWindowVisible($hWnd)){return $true}\nif($global:clicked){return $false}\n[AgWin32]::EnumChildWindows($hWnd,{param($ch,$lp2)\n$cls=New-Object System.Text.StringBuilder 64\n[AgWin32]::GetClassName($ch,$cls,64)|Out-Null\nif($cls.ToString() -eq \'Button\'){$txt=New-Object System.Text.StringBuilder 256\n[AgWin32]::GetWindowText($ch,$txt,256)|Out-Null\nif($txt.ToString() -match \'Keep Waiting\'){[AgWin32]::PostMessage($ch,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero);$global:clicked=$true}}\nreturn $true},[IntPtr]::Zero)|Out-Null\nif($global:clicked){return $false}\nreturn $true},[IntPtr]::Zero)|Out-Null\nif($global:clicked){Write-Output \'CLICKED\'}';
+        const keepWaitingInterval = setInterval(() => {
+            if (!_autoAcceptEnabled || !_httpClickPatterns.includes('Keep Waiting')) return;
+            execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', keepWaitingScript], { timeout: 5000 }, (err, stdout) => {
+                if (stdout && stdout.trim() === 'CLICKED') { _totalClicks++; if (!_clickStats['Keep Waiting']) _clickStats['Keep Waiting'] = 0; _clickStats['Keep Waiting']++; if (_extensionContext) { _extensionContext.globalState.update('clickStats', _clickStats); _extensionContext.globalState.update('totalClicks', _totalClicks); } }
+            });
+        }, 3000);
+        context.subscriptions.push({ dispose: () => clearInterval(keepWaitingInterval) });
+    }
+
+    // Inject logic
+    const needsInject = !isScriptInjected();
+    const currentVersion = (context.extension && context.extension.packageJSON) ? context.extension.packageJSON.version : '0';
+    const lastVersion = context.globalState.get('ag-injected-version', '0');
+    if (needsInject || currentVersion !== lastVersion) {
+        try { installScript(context); context.globalState.update('ag-injected-version', currentVersion); clearV8CodeCache(); updateProductChecksums(); setTimeout(() => { vscode.commands.executeCommand('workbench.action.reloadWindow'); }, 1000); } catch (e) { console.error('[AG Autopilot] Inject error:', e.message); }
+    } else {
+        try { const wbPath = getWorkbenchPath(); if (wbPath) writeFileElevated(path.join(path.dirname(wbPath), 'ag-auto-script.js'), buildScriptContent(context)); } catch (e) {}
+        updateProductChecksums();
+    }
+    startHttpServer(); startCommandsLoop(); writeConfigJson(context);
+
+    // Initialize CDP for Smart Router & Quota Fallback
+    const cfg = vscode.workspace.getConfiguration('ag-auto');
+    if (cfg.get('smartRouter', true) || cfg.get('quotaFallback', true)) {
+        setTimeout(() => { initElectronAccess(); startElectronQuotaFallback(); }, 5000);
+    }
+
+    // Re-init CDP when settings change
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('ag-auto.smartRouter') || e.affectsConfiguration('ag-auto.quotaFallback')) {
+            const nc = vscode.workspace.getConfiguration('ag-auto');
+            if (nc.get('smartRouter', true) || nc.get('quotaFallback', true)) { if (!_electronReady) initElectronAccess(); startElectronQuotaFallback(); }
+        }
+    }));
+
+    createStatusBarItem(context);
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('ag-auto')) updateStatusBarItem(); }));
+    context.subscriptions.push(vscode.commands.registerCommand('ag-auto.enable', async () => {
+        if (installScript(context)) { updateStatusBarItem(); const c = await vscode.window.showInformationMessage('[AG Autopilot] Injected! Reload to activate.', 'Reload Now'); if (c === 'Reload Now') vscode.commands.executeCommand('workbench.action.reloadWindow'); }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('ag-auto.disable', async () => {
+        if (uninstallScript()) { updateStatusBarItem(); const c = await vscode.window.showInformationMessage('[AG Autopilot] Removed! Reload to finish.', 'Reload Now'); if (c === 'Reload Now') vscode.commands.executeCommand('workbench.action.reloadWindow'); }
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('ag-auto.openSettings', () => openSettingsPanel(context)));
+    context.subscriptions.push(vscode.commands.registerCommand('ag-auto.switchModel', () => {
+        console.log('[AG Autopilot] Manual switch model triggered');
+        handleQuotaSwitch();
+    }));
+}
+
+function deactivate() {
+    if (statusBarItem) { statusBarItem.dispose(); statusBarItem = null; }
+    if (statusBarScroll) { statusBarScroll.dispose(); statusBarScroll = null; }
+    if (statusBarQuota) { statusBarQuota.dispose(); statusBarQuota = null; }
+    
+    
+    if (_quotaPollTimer) { clearInterval(_quotaPollTimer); _quotaPollTimer = null; }
+    try {
+        const w = getWorkbenchPath();
+        if (w) {
+            const d = path.dirname(w);
+            const pf = path.join(d, 'ag-auto-port-' + process.pid + '.txt');
+            if (fs.existsSync(pf)) fs.unlinkSync(pf);
+            const lf = path.join(d, 'ag-auto-ports.json');
+            try { let pl = JSON.parse(fs.readFileSync(lf, 'utf8')); pl = pl.filter(e => e.pid !== process.pid); fs.writeFileSync(lf, JSON.stringify(pl), 'utf8'); } catch (_) {}
+        }
+    } catch (_) {}
+}
+
+module.exports = { activate, deactivate };

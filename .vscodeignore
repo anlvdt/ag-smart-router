@@ -1,0 +1,13 @@
+.git/**
+.vscode/**
+.gitignore
+._*
+**/._*
+*.vsix
+.vscodeignore
+package-lock.json
+**/*.bak
+**/*.bak2
+**/*.bak3
+test_*.py
+node_modules/**

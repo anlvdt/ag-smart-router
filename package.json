@@ -1,0 +1,48 @@
+{
+    "name": "ag-autopilot",
+    "displayName": "AG Autopilot",
+    "description": "Autopilot for Antigravity AI: Auto Click, Auto Scroll, Smart Model Router, Quota Fallback. | Tự lái mọi thứ cho Antigravity AI. v6.0.0 - Quota-aware Smart Router, Tier-aware Fallback, Adaptive Cooldown, Routing History",
+    "version": "6.0.0",
+    "publisher": "ANLE",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/anlvdt/ag-smart-router"
+    },
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "extensionKind": ["ui"],
+    "categories": ["Other"],
+    "activationEvents": ["onStartupFinished"],
+    "main": "./src/extension.js",
+    "contributes": {
+        "commands": [
+            { "command": "ag-auto.enable", "title": "AG Autopilot: Enable (Inject Script)" },
+            { "command": "ag-auto.disable", "title": "AG Autopilot: Disable (Remove Script)" },
+            { "command": "ag-auto.openSettings", "title": "AG Autopilot: Open Settings" },
+            { "command": "ag-auto.switchModel", "title": "AG Autopilot: Switch Model (Quota Fallback)" },
+            { "command": "ag-auto.debugCdp", "title": "AG Autopilot: Debug CDP (dump DOM)" }
+        ],
+        "keybindings": [
+            { "command": "ag-auto.switchModel", "key": "ctrl+shift+q", "mac": "cmd+shift+q" }
+        ],
+        "configuration": {
+            "title": "AG Autopilot",
+            "properties": {
+                "ag-auto.enabled": { "type": "boolean", "default": true, "description": "Enable/Disable Auto Click & Scroll | Bật/tắt Auto Click & Scroll" },
+                "ag-auto.scrollEnabled": { "type": "boolean", "default": true, "description": "Enable/Disable Auto Scroll | Bật/tắt Auto Scroll" },
+                "ag-auto.smartRouter": { "type": "boolean", "default": true, "description": "Enable/Disable Smart Model Router (CDP + DOM hybrid) | Bật/tắt Smart Model Router" },
+                "ag-auto.quotaFallback": { "type": "boolean", "default": true, "description": "Enable/Disable Quota Fallback (CDP + DOM hybrid) | Bật/tắt Quota Fallback" },
+                "ag-auto.language": { "type": "string", "enum": ["vi", "en", "zh"], "default": "vi", "description": "UI language | Ngôn ngữ giao diện" },
+                "ag-auto.scrollPauseMs": { "type": "number", "default": 7000, "description": "Pause time when user scrolls manually (ms) | Thời gian nghỉ khi cuộn tay (ms)" },
+                "ag-auto.scrollIntervalMs": { "type": "number", "default": 500, "description": "Auto scroll scan speed (ms) | Tốc độ quét cuộn (ms)" },
+                "ag-auto.clickIntervalMs": { "type": "number", "default": 1000, "description": "Auto click scan speed (ms) | Tốc độ quét click (ms)" },
+                "ag-auto.clickPatterns": { "type": "array", "items": { "type": "string" }, "default": ["Allow", "Always Allow", "Run", "Keep Waiting", "Accept"], "description": "Button texts to auto-click | Danh sách text nút tự động click" }
+            }
+        }
+    },
+    "dependencies": {
+        "ws": "^8.18.0"
+    },
+    "scripts": { "vscode:prepublish": "echo ok" }
+}
