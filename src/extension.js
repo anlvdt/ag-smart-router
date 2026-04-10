@@ -811,50 +811,99 @@ async function switchModelViaAPI(targetDisplayName) {
     const meta = MODEL_API_MAP[targetDisplayName];
     if (!meta) {
         console.log('[AG] No API metadata for: ' + targetDisplayName);
-        return false;
     }
 
-    // Strategy 1: Focus chat panel first, then call changeModel
-    // Commands only work when chat widget is focused/loaded
+    // Strategy 1: OS-level mouse simulation via cliclick (macOS only)
+    if (process.platform === 'darwin') {
+        try {
+            const result = switchModelViaCLIClick(targetDisplayName);
+            if (result) {
+                console.log('[AG] Model switched via cliclick: ' + targetDisplayName);
+                return true;
+            }
+        } catch (e) {
+            console.log('[AG] cliclick failed:', e.message);
+        }
+    }
+
+    // Strategy 2: VS Code commands (usually fails but try anyway)
     try {
-        // Focus the chat panel to ensure commands are registered
         await vscode.commands.executeCommand('workbench.action.chat.open');
         await new Promise(r => setTimeout(r, 500));
-        
-        await vscode.commands.executeCommand('workbench.action.chat.changeModel', {
-            vendor: meta.vendor,
-            id: meta.id || meta.family,
-            family: meta.family
-        });
-        console.log('[AG] changeModel executed: ' + targetDisplayName);
-        return true;
+        if (meta) {
+            await vscode.commands.executeCommand('workbench.action.chat.changeModel', {
+                vendor: meta.vendor, id: meta.id || meta.family, family: meta.family
+            });
+            console.log('[AG] changeModel executed: ' + targetDisplayName);
+            return true;
+        }
     } catch (e) {
         console.log('[AG] changeModel failed:', e.message);
     }
 
-    // Strategy 2: switchToNextModel (cycles through models)
-    try {
-        await vscode.commands.executeCommand('workbench.action.chat.open');
-        await new Promise(r => setTimeout(r, 300));
-        await vscode.commands.executeCommand('workbench.action.chat.switchToNextModel');
-        console.log('[AG] switchToNextModel executed');
-        return true;
-    } catch (e) {
-        console.log('[AG] switchToNextModel failed:', e.message);
-    }
-
-    // Strategy 3: Open model picker (user sees picker but it's better than nothing)
-    try {
-        await vscode.commands.executeCommand('workbench.action.chat.open');
-        await new Promise(r => setTimeout(r, 300));
-        await vscode.commands.executeCommand('workbench.action.chat.openModelPicker');
-        console.log('[AG] openModelPicker executed — user needs to select');
-        return true;
-    } catch (e) {
-        console.log('[AG] openModelPicker failed:', e.message);
-    }
-
     return false;
+}
+
+/** Switch model using OS-level mouse click simulation (macOS) */
+function switchModelViaCLIClick(targetDisplayName) {
+    try {
+        // Check if cliclick is available
+        execSync('which cliclick', { timeout: 2000 });
+    } catch (_) {
+        console.log('[AG] cliclick not installed');
+        return false;
+    }
+
+    try {
+        // Get Antigravity window position
+        const winInfo = execSync(`osascript -e '
+            tell application "System Events"
+                tell process "Electron"
+                    set w to front window
+                    set p to position of w
+                    set s to size of w
+                    return (item 1 of p) & "," & (item 2 of p) & "," & (item 1 of s) & "," & (item 2 of s)
+                end tell
+            end tell
+        '`, { timeout: 5000 }).toString().trim();
+
+        const parts = winInfo.split(',').map(s => parseInt(s.trim()));
+        if (parts.length < 4) { console.log('[AG] Invalid window info'); return false; }
+        const [wx, wy, ww, wh] = parts;
+        console.log('[AG] Window: ' + wx + ',' + wy + ' ' + ww + 'x' + wh);
+
+        // Model selector position: near bottom-left of chat panel
+        // ~15% from left, ~95% from top (near textarea)
+        const modelX = wx + Math.round(ww * 0.15);
+        const modelY = wy + Math.round(wh * 0.95);
+
+        // Focus Antigravity
+        execSync('osascript -e \'tell application "Antigravity" to activate\'', { timeout: 3000 });
+        
+        // Click model selector
+        console.log('[AG] Clicking model selector at (' + modelX + ',' + modelY + ')');
+        execSync('cliclick c:' + modelX + ',' + modelY, { timeout: 3000 });
+
+        // Wait for dropdown
+        const sleep = ms => execSync('sleep ' + (ms / 1000));
+        sleep(800);
+
+        // Type model name to filter dropdown
+        const search = targetDisplayName.substring(0, 12);
+        console.log('[AG] Typing: ' + search);
+        execSync('cliclick t:"' + search + '"', { timeout: 3000 });
+        sleep(500);
+
+        // Press Enter to select
+        execSync('cliclick kp:return', { timeout: 3000 });
+        sleep(300);
+
+        console.log('[AG] cliclick model switch completed');
+        return true;
+    } catch (e) {
+        console.log('[AG] cliclick switch error:', e.message);
+        return false;
+    }
 }
 
 // =============================================================
