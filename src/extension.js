@@ -211,15 +211,31 @@ function switchModelViaKeyboard(targetDisplayName) {
 
 function switchModelKeyboard_mac(target) {
     try {
+        // Focus Antigravity
         execSync('osascript -e \'tell application "Antigravity" to activate\'', { timeout: 3000 });
-        execSync('sleep 0.3');
+        execSync('sleep 0.5');
+        
+        // Cmd+L to focus chat input
         execSync('osascript -e \'tell application "System Events" to keystroke "l" using {command down}\'', { timeout: 3000 });
-        execSync('sleep 0.5');
+        execSync('sleep 1');
+        
+        // Cmd+Shift+, to open model picker
         execSync('osascript -e \'tell application "System Events" to keystroke "," using {command down, shift down}\'', { timeout: 3000 });
+        execSync('sleep 1.5');
+        
+        // Type model name SLOWLY (character by character with delay)
+        const chars = target.split('');
+        for (const ch of chars) {
+            const escaped = ch.replace(/"/g, '\\"').replace(/'/g, "'\\''");
+            execSync("osascript -e 'tell application \"System Events\" to keystroke \"" + escaped + "\"'", { timeout: 2000 });
+            execSync('sleep 0.05');
+        }
         execSync('sleep 0.8');
-        execSync('osascript -e \'tell application "System Events" to keystroke "' + target.replace(/"/g, '\\"') + '"\'', { timeout: 3000 });
-        execSync('sleep 0.5');
+        
+        // Enter to select
         execSync('osascript -e \'tell application "System Events" to key code 36\'', { timeout: 3000 });
+        execSync('sleep 0.3');
+        
         console.log('[AG] Model switched via keyboard: ' + target);
         return true;
     } catch (e) {
@@ -522,10 +538,16 @@ function startHttpServer() {
                     try {
                         const d = JSON.parse(body);
                         const curModel = d.currentModel || '';
+                        // Cooldown: don't switch more than once per 30 seconds
+                        if (Date.now() - _lastModelSwitch < 30000) {
+                            res.writeHead(200);
+                            res.end(JSON.stringify({ switchTo: null, reason: 'cooldown' }));
+                            return;
+                        }
+                        _lastModelSwitch = Date.now();
                         console.log('[AG] Quota detected: ' + d.phrase + ' | model: ' + curModel);
                         const tgt = getNextFallbackModel(curModel);
                         console.log('[AG] Switching to: ' + tgt);
-                        // Switch via keyboard
                         const ok = switchModelViaKeyboard(tgt);
                         res.writeHead(200);
                         res.end(JSON.stringify({ switchTo: tgt, success: ok }));
