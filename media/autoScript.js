@@ -81,6 +81,8 @@
     var CLICK_INTERVAL_MS = /*{{CLICK_INTERVAL_MS}}*/1000;
     var SCROLL_INTERVAL_MS = /*{{SCROLL_INTERVAL_MS}}*/500;
     var CLICK_PATTERNS = /*{{CLICK_PATTERNS}}*/["Allow", "Always Allow", "Run", "Keep Waiting", "Accept all"];
+    // Always include Dismiss for quota handling
+    if (CLICK_PATTERNS.indexOf('Dismiss') === -1) CLICK_PATTERNS.push('Dismiss');
     window._agAcceptChatOnly = false;
     window._agAutoEnabled = /*{{ENABLED}}*/true;
     window._agScrollEnabled = true;
@@ -166,9 +168,33 @@
     var _lastQuotaSwitch = 0;
 
     function _agDetectQuota() {
+        // Check main document
         var text = (document.body && document.body.innerText || '').toLowerCase();
         for (var i = 0; i < QUOTA_PHRASES.length; i++) {
             if (text.indexOf(QUOTA_PHRASES[i]) !== -1) return QUOTA_PHRASES[i];
+        }
+        // Check all accessible iframes
+        try {
+            var iframes = document.querySelectorAll('iframe, webview');
+            for (var f = 0; f < iframes.length; f++) {
+                try {
+                    var doc = iframes[f].contentDocument || (iframes[f].contentWindow && iframes[f].contentWindow.document);
+                    if (doc && doc.body) {
+                        var ft = (doc.body.innerText || '').toLowerCase();
+                        for (var i = 0; i < QUOTA_PHRASES.length; i++) {
+                            if (ft.indexOf(QUOTA_PHRASES[i]) !== -1) return QUOTA_PHRASES[i];
+                        }
+                    }
+                } catch (_) {} // cross-origin iframe — can't access
+            }
+        } catch (_) {}
+        // Check notification toasts (these ARE in main DOM)
+        var toasts = document.querySelectorAll('.notifications-toasts .notification-toast, .notification-list-item, [class*=notification]');
+        for (var t = 0; t < toasts.length; t++) {
+            var tt = (toasts[t].textContent || '').toLowerCase();
+            for (var i = 0; i < QUOTA_PHRASES.length; i++) {
+                if (tt.indexOf(QUOTA_PHRASES[i]) !== -1) return QUOTA_PHRASES[i];
+            }
         }
         return null;
     }
@@ -199,13 +225,42 @@
     }
 
     function _agClickDismiss() {
+        // Check main document
         var btns = Q('button, vscode-button, [role=button], a.action-label', document);
         for (var i = 0; i < btns.length; i++) {
             var t = (btns[i].innerText || btns[i].textContent || '').trim().toLowerCase();
             if ((t === 'dismiss' || t === 'close' || t === 'ok') && btns[i].offsetParent !== null) {
                 btns[i].click();
-                console.log('[AG] Clicked Dismiss');
+                console.log('[AG] Clicked Dismiss in main DOM');
                 return true;
+            }
+        }
+        // Check accessible iframes
+        try {
+            var iframes = document.querySelectorAll('iframe, webview');
+            for (var f = 0; f < iframes.length; f++) {
+                try {
+                    var doc = iframes[f].contentDocument || (iframes[f].contentWindow && iframes[f].contentWindow.document);
+                    if (!doc) continue;
+                    var fbtns = doc.querySelectorAll('button, [role=button], a');
+                    for (var i = 0; i < fbtns.length; i++) {
+                        var t = (fbtns[i].innerText || fbtns[i].textContent || '').trim().toLowerCase();
+                        if ((t === 'dismiss' || t === 'close' || t === 'ok') && fbtns[i].offsetParent !== null) {
+                            fbtns[i].click();
+                            console.log('[AG] Clicked Dismiss in iframe');
+                            return true;
+                        }
+                    }
+                } catch (_) {} // cross-origin
+            }
+        } catch (_) {}
+        // Check notification toasts dismiss buttons
+        var toasts = document.querySelectorAll('.notifications-toasts .notification-toast, .notification-list-item');
+        for (var t = 0; t < toasts.length; t++) {
+            var tt = (toasts[t].textContent || '').toLowerCase();
+            if (tt.indexOf('quota') !== -1 || tt.indexOf('limit') !== -1 || tt.indexOf('exhausted') !== -1) {
+                var cb = toasts[t].querySelector('.codicon-notifications-clear, .codicon-close, button');
+                if (cb) { cb.click(); console.log('[AG] Clicked toast dismiss'); return true; }
             }
         }
         return false;
@@ -257,37 +312,36 @@
     }
 
     function _agDoModelSwitch(targetModel) {
-        if (_quotaSwitchInProgress) return;
+        if (_quotaSwitchInProgress && !targetModel) return;
         _quotaSwitchInProgress = true;
-        console.log('[AG] Model switch requested: ' + targetModel);
+        console.log('[AG] Model switch: ' + targetModel);
 
-        // Step 1: Dismiss quota banner
-        _agClickDismiss();
-
-        // Step 2: Click model selector (after dismiss settles)
+        // Step 1: Click model selector
         setTimeout(function () {
             if (!_agClickModelSelector()) {
-                console.log('[AG] Failed to click model selector');
+                console.log('[AG] Model selector not found — cannot switch');
                 _quotaSwitchInProgress = false;
                 return;
             }
-            // Step 3: Select target model in dropdown (wait for dropdown to render)
+            // Step 2: Select target in dropdown
             var attempts = 0;
             var trySelect = setInterval(function () {
                 attempts++;
                 if (_agSelectModelInDropdown(targetModel)) {
                     clearInterval(trySelect);
                     console.log('[AG] Model switched to: ' + targetModel);
-                    // Step 4: Send Continue
+                    // Step 3: Send Continue ONLY after successful switch
                     setTimeout(function () {
                         _agSendContinue();
+                        console.log('[AG] Continue sent after model switch');
                         _quotaSwitchInProgress = false;
-                    }, 1500);
+                    }, 2000);
                 } else if (attempts > 15) {
                     clearInterval(trySelect);
                     console.log('[AG] Model selection failed after 15 attempts');
                     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
                     _quotaSwitchInProgress = false;
+                    // Do NOT send Continue — model didn't change, would hit quota again
                 }
             }, 300);
         }, 800);
@@ -312,7 +366,7 @@
     // Quota polling — runs every 3s
     // Layer 0 runs in workbench.html — it CAN see quota banners (they render as notifications/overlays in main DOM)
     // But model selector is inside webview iframe — DOM click may not work
-    // Strategy: dismiss quota → ask extension for target model → try DOM switch → always send Continue
+    // Strategy: dismiss → try DOM model switch → send Continue only after switch
     var _quotaPoll = setInterval(function () {
         if (!window._agAutoEnabled || !window._agQuotaFallback || _quotaSwitchInProgress) return;
         if (Date.now() - _lastQuotaSwitch < 10000) return; // cooldown
@@ -323,11 +377,11 @@
         var curModel = _agGetCurrentModel();
         console.log('[AG] Quota detected: "' + phrase + '" | Current: ' + curModel);
 
-        // Step 1: Dismiss quota banner immediately
+        // Step 1: Dismiss quota banner
         _agClickDismiss();
         setTimeout(function () { _agClickDismiss(); }, 500);
 
-        // Step 2: Ask extension host for target model + try API switch
+        // Step 2: Ask extension for target model
         if (AG_HTTP_PORT > 0) {
             try {
                 var x = new XMLHttpRequest();
@@ -337,46 +391,25 @@
                 x.onload = function () {
                     try {
                         var resp = JSON.parse(x.responseText);
+                        var target = resp.switchTo;
                         if (resp.success) {
-                            // Extension switched model via API — just send Continue
-                            console.log('[AG] Model switched via API: ' + resp.switchTo);
-                            setTimeout(function () {
-                                _agSendContinue();
-                                _quotaSwitchInProgress = false;
-                            }, 1500);
-                        } else if (resp.switchTo) {
-                            // API failed — try DOM switch, then send Continue regardless
-                            console.log('[AG] API switch failed, trying DOM for: ' + resp.switchTo);
-                            _agDoModelSwitch(resp.switchTo);
-                            // Send Continue after delay regardless of DOM switch result
-                            setTimeout(function () {
-                                _agSendContinue();
-                                setTimeout(function () { _quotaSwitchInProgress = false; }, 2000);
-                            }, 4000);
+                            // Extension switched model via API
+                            console.log('[AG] Model switched via API: ' + target);
+                            setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 2000);
+                        } else if (target) {
+                            // API failed — do full DOM switch sequence: click selector → pick model → Continue
+                            console.log('[AG] Doing DOM model switch to: ' + target);
+                            _agDoModelSwitch(target);
+                            // _agDoModelSwitch handles Continue internally after successful switch
                         } else {
-                            // No target — just send Continue on current model
-                            setTimeout(function () {
-                                _agSendContinue();
-                                _quotaSwitchInProgress = false;
-                            }, 1000);
+                            _quotaSwitchInProgress = false;
                         }
-                    } catch (_) {
-                        setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
-                    }
+                    } catch (_) { _quotaSwitchInProgress = false; }
                 };
-                x.onerror = x.ontimeout = function () {
-                    // Extension unreachable — just dismiss and send Continue
-                    console.log('[AG] Extension unreachable, sending Continue');
-                    setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
-                };
+                x.onerror = x.ontimeout = function () { _quotaSwitchInProgress = false; };
                 x.send(JSON.stringify({ phrase: phrase, currentModel: curModel || 'unknown' }));
-            } catch (_) {
-                setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
-            }
-        } else {
-            // No HTTP port — just dismiss and Continue
-            setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
-        }
+            } catch (_) { _quotaSwitchInProgress = false; }
+        } else { _quotaSwitchInProgress = false; }
     }, 3000);
     window._agToolIntervals.push(_quotaPoll);
 
@@ -480,8 +513,8 @@
             }
             if (!matched) continue;
 
-            // Allow/Run/Always Allow: click directly (critical patterns)
-            if (matched === 'Allow' || matched === 'Run' || matched === 'Always Allow' || matched === 'Accept all') { target = b; break; }
+            // Allow/Run/Always Allow/Dismiss: click directly (critical patterns)
+            if (matched === 'Allow' || matched === 'Run' || matched === 'Always Allow' || matched === 'Accept all' || matched === 'Dismiss') { target = b; break; }
             if (hasRejectSibling(b)) { target = b; break; }
         }
 
