@@ -1,12 +1,12 @@
 {
-    "name": "ag-autopilot",
-    "displayName": "AG Autopilot",
-    "description": "Autopilot for Antigravity AI: Auto Click, Auto Scroll, Smart Model Router, Quota Fallback. | Tự lái mọi thứ cho Antigravity AI. v6.0.0 - Quota-aware Smart Router, Tier-aware Fallback, Adaptive Cooldown, Routing History",
-    "version": "7.1.0",
+    "name": "grav",
+    "displayName": "Grav — Autopilot for Antigravity",
+    "description": "Autopilot cho Antigravity AI. Auto-approve, auto-scroll, quota radar, AI learning engine.",
+    "version": "1.0.0",
     "publisher": "ANLE",
     "repository": {
         "type": "git",
-        "url": "https://github.com/anlvdt/ag-smart-router"
+        "url": "https://github.com/anlvdt/grav"
     },
     "engines": {
         "vscode": "^1.60.0"
@@ -17,32 +17,84 @@
     "main": "./src/extension.js",
     "contributes": {
         "commands": [
-            { "command": "ag-auto.enable", "title": "AG Autopilot: Enable (Inject Script)" },
-            { "command": "ag-auto.disable", "title": "AG Autopilot: Disable (Remove Script)" },
-            { "command": "ag-auto.openSettings", "title": "AG Autopilot: Open Settings" },
-            { "command": "ag-auto.switchModel", "title": "AG Autopilot: Switch Model (Quota Fallback)" },
-            { "command": "ag-auto.debugCdp", "title": "AG Autopilot: Debug CDP (dump DOM)" }
+            { "command": "grav.inject", "title": "Grav: Inject Runtime" },
+            { "command": "grav.eject", "title": "Grav: Eject Runtime" },
+            { "command": "grav.dashboard", "title": "Grav: Dashboard" },
+            { "command": "grav.diagnostics", "title": "Grav: Diagnostics" },
+            { "command": "grav.manageTerminal", "title": "Grav: Manage Terminal Commands (Whitelist/Blacklist)" },
+            { "command": "grav.learnStats", "title": "Grav: View Learning Stats" }
         ],
         "keybindings": [
-            { "command": "ag-auto.switchModel", "key": "ctrl+shift+q", "mac": "cmd+shift+q" }
+            { "command": "grav.dashboard", "key": "ctrl+shift+d", "mac": "cmd+shift+d" }
         ],
         "configuration": {
-            "title": "AG Autopilot",
+            "title": "Grav",
             "properties": {
-                "ag-auto.enabled": { "type": "boolean", "default": true, "description": "Enable/Disable Auto Click & Scroll | Bật/tắt Auto Click & Scroll" },
-                "ag-auto.scrollEnabled": { "type": "boolean", "default": true, "description": "Enable/Disable Auto Scroll | Bật/tắt Auto Scroll" },
-                "ag-auto.smartRouter": { "type": "boolean", "default": true, "description": "Enable/Disable Smart Model Router (CDP + DOM hybrid) | Bật/tắt Smart Model Router" },
-                "ag-auto.quotaFallback": { "type": "boolean", "default": true, "description": "Enable/Disable Quota Fallback (CDP + DOM hybrid) | Bật/tắt Quota Fallback" },
-                "ag-auto.language": { "type": "string", "enum": ["vi", "en", "zh"], "default": "vi", "description": "UI language | Ngôn ngữ giao diện" },
-                "ag-auto.scrollPauseMs": { "type": "number", "default": 7000, "description": "Pause time when user scrolls manually (ms) | Thời gian nghỉ khi cuộn tay (ms)" },
-                "ag-auto.scrollIntervalMs": { "type": "number", "default": 500, "description": "Auto scroll scan speed (ms) | Tốc độ quét cuộn (ms)" },
-                "ag-auto.clickIntervalMs": { "type": "number", "default": 1000, "description": "Auto click scan speed (ms) | Tốc độ quét click (ms)" },
-                "ag-auto.clickPatterns": { "type": "array", "items": { "type": "string" }, "default": ["Allow", "Always Allow", "Run", "Keep Waiting", "Accept"], "description": "Button texts to auto-click | Danh sách text nút tự động click" }
+                "grav.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Bật/tắt Grav | Enable/disable Grav"
+                },
+                "grav.autoScroll": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Tự cuộn chat xuống cuối | Stick-to-bottom"
+                },
+                "grav.approvePatterns": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": ["Run", "Allow", "Always Allow", "Keep Waiting", "Continue", "Retry"],
+                    "description": "Danh sách nút tự bấm | Button labels to auto-approve"
+                },
+                "grav.scrollPauseMs": {
+                    "type": "number",
+                    "default": 7000,
+                    "description": "Nghỉ cuộn khi user kéo lên (ms)"
+                },
+                "grav.scrollIntervalMs": {
+                    "type": "number",
+                    "default": 500,
+                    "description": "Tốc độ quét cuộn (ms)"
+                },
+                "grav.approveIntervalMs": {
+                    "type": "number",
+                    "default": 1000,
+                    "description": "Tốc độ quét nút (ms)"
+                },
+                "grav.language": {
+                    "type": "string",
+                    "enum": ["vi", "en", "zh"],
+                    "default": "vi",
+                    "description": "Ngôn ngữ | Language"
+                },
+                "grav.terminalWhitelist": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": [],
+                    "description": "Lệnh terminal thêm vào whitelist | Additional whitelisted terminal commands"
+                },
+                "grav.terminalBlacklist": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": [],
+                    "description": "Lệnh terminal bị chặn | Blocked terminal commands (supports substring & /regex/)"
+                },
+                "grav.learnEnabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Tự học thói quen approve/reject | Adaptive learning from user behavior"
+                },
+                "grav.learnThreshold": {
+                    "type": "number",
+                    "default": 3,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "Số lần approve để suggest whitelist | Approvals needed to suggest whitelisting"
+                }
             }
         }
     },
-    "dependencies": {
-        "ws": "^8.18.0"
-    },
-    "scripts": { "vscode:prepublish": "echo ok" }
+    "scripts": {
+        "vscode:prepublish": "echo ok"
+    }
 }

@@ -10,4 +10,9 @@ package-lock.json
 **/*.bak2
 **/*.bak3
 test_*.py
+test-*.js
 node_modules/**
+scripts/**
+launch-antigravity.sh
+KARPATHY-AI-LEARNING-GUIDE.md
+README.md

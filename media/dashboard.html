@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Grav</title>
+<style>
+:root {
+    --bg: #0f0f17; --surface: #13131d; --surface2: #1a1a28; --surface3: #222234;
+    --border: #2a2a3e; --border2: #363650; --text: #e0e0f0; --text2: #9090b0; --text3: #606080;
+    --accent: #7aa2f7; --green: #9ece6a; --red: #f7768e;
+    --yellow: #e0af68; --purple: #bb9af7; --teal: #73daca; --peach: #ff9e64;
+    --cyan: #89ddff; --pink: #f78cc6;
+}
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; background: var(--bg); color: var(--text); font-size: 12px; line-height: 1.5 }
+::-webkit-scrollbar { width: 4px }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px }
+
+.shell { max-width: 720px; margin: 0 auto; padding: 14px 18px 24px }
+
+/* ── Header ── */
+.hdr { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px }
+.brand { display: flex; align-items: baseline; gap: 8px }
+.brand h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent }
+.brand .v { font-size: 10px; color: var(--text3) }
+.hdr-right { display: flex; align-items: center; gap: 6px }
+.chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; background: var(--surface2); border: 1px solid var(--border) }
+.chip.on { color: var(--green); border-color: var(--green) }
+.chip.off { color: var(--red); border-color: var(--red) }
+.chip-count { color: var(--yellow) }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 2px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 0 }
+.tab { padding: 7px 14px; font-size: 11px; font-weight: 700; color: var(--text3); cursor: pointer; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0; transition: 0.15s; user-select: none; letter-spacing: 0.3px }
+.tab:hover { color: var(--text2); background: var(--surface) }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--surface) }
+.tab-panel { display: none }
+.tab-panel.active { display: block }
+
+/* ── Cards ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; margin-bottom: 6px }
+.card-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); margin-bottom: 6px }
+
+/* ── Grid layouts ── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px }
+.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px }
+.g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px }
+.g6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px }
+
+/* ── Metric boxes ── */
+.metric { padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; text-align: center }
+.metric-lg .metric-num { font-size: 24px }
+.metric-num { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2 }
+.metric-lbl { font-size: 8px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px }
+
+/* ── Feature rows ── */
+.row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 3px }
+.row-left { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1 }
+.row-name { font-size: 12px; font-weight: 700 }
+.row-hint { font-size: 10px; color: var(--text3) }
+
+/* ── Toggle ── */
+.sw { position: relative; width: 32px; height: 18px; flex-shrink: 0 }
+.sw input { display: none }
+.sw span { position: absolute; inset: 0; background: var(--border); border-radius: 9px; transition: 0.2s; cursor: pointer }
+.sw span::before { content: ''; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; background: var(--text3); border-radius: 50%; transition: 0.2s }
+.sw input:checked + span { background: var(--green) }
+.sw input:checked + span::before { transform: translateX(14px); background: #fff }
+
+/* ── Sliders ── */
+.slider { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 3px }
+.slider label { font-size: 11px; color: var(--text2); min-width: 60px }
+.slider input[type=range] { flex: 1; accent-color: var(--accent); height: 2px }
+.slider .val { font-size: 11px; color: var(--accent); font-weight: 700; min-width: 44px; text-align: right; font-variant-numeric: tabular-nums }
+
+/* ── Pattern chips ── */
+.pat-grid { display: flex; flex-wrap: wrap; gap: 3px }
+.pat { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; user-select: none; font-size: 11px; font-weight: 600; transition: 0.15s }
+.pat:hover { border-color: var(--text3) }
+.pat.on { border-color: var(--green); color: var(--green) }
+.pat.off { opacity: 0.3 }
+.pat .dot { width: 5px; height: 5px; border-radius: 50% }
+.pat.on .dot { background: var(--green) }
+.pat.off .dot { background: var(--text3) }
+
+/* ── Bars ── */
+.bar-row { display: flex; align-items: center; gap: 5px; margin-bottom: 2px }
+.bar-lbl { font-size: 10px; color: var(--text2); min-width: 70px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.bar-bg { flex: 1; height: 10px; background: var(--bg); border-radius: 2px; overflow: hidden }
+.bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s }
+.bar-cnt { font-size: 10px; color: var(--text3); min-width: 24px; font-variant-numeric: tabular-nums }
+
+/* ── Concept cards ── */
+.concept-card { padding: 7px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 3px }
+.concept-name { font-size: 11px; font-weight: 700; color: var(--teal) }
+.concept-bar { height: 3px; border-radius: 2px; margin-top: 4px; background: var(--bg); overflow: hidden }
+.concept-fill { height: 100%; border-radius: 2px; transition: width 0.3s }
+.concept-meta { font-size: 9px; color: var(--text3); margin-top: 2px; display: flex; justify-content: space-between }
+
+/* ── Risk badge ── */
+.risk { display: inline-block; padding: 1px 5px; border-radius: 2px; font-size: 9px; font-weight: 700; text-transform: uppercase }
+.risk-safe { background: rgba(158,206,106,0.15); color: var(--green) }
+.risk-caution { background: rgba(224,175,104,0.15); color: var(--yellow) }
+.risk-danger { background: rgba(247,118,142,0.15); color: var(--red) }
+.risk-unknown { background: rgba(96,96,128,0.15); color: var(--text3) }
+
+/* ── Log ── */
+.log-box { max-height: 140px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px }
+.log-item { display: flex; justify-content: space-between; padding: 3px 7px; font-size: 10px; border-bottom: 1px solid var(--bg) }
+.log-item:last-child { border: none }
+.log-empty { color: var(--text3); padding: 8px; font-size: 10px; text-align: center }
+
+/* ── Wiki log ── */
+.wiki-log { max-height: 180px; overflow-y: auto }
+.wiki-log-item { padding: 4px 8px; font-size: 10px; border-bottom: 1px solid var(--bg); display: flex; gap: 6px }
+.wiki-log-item .op { font-weight: 700; min-width: 40px }
+.wiki-log-item .op-ingest { color: var(--green) }
+.wiki-log-item .op-lint { color: var(--yellow) }
+.wiki-log-item .ts { color: var(--text3); min-width: 50px }
+
+/* ── Buttons ── */
+.btn-row { display: flex; gap: 4px; justify-content: flex-end }
+.btn { padding: 4px 12px; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 700; background: var(--surface); color: var(--text2); transition: 0.15s; font-family: inherit }
+.btn:hover { border-color: var(--text3); color: var(--text) }
+.btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent) }
+.btn-primary:hover { filter: brightness(1.1); color: var(--bg) }
+.btn-danger { color: var(--red); border-color: var(--red) }
+.btn-sm { font-size: 9px; padding: 2px 6px }
+
+/* ── Footer ── */
+.ftr { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border) }
+.ftr select { background: var(--surface); color: var(--text2); border: 1px solid var(--border); border-radius: 3px; padding: 3px 6px; font-size: 10px; font-family: inherit }
+
+/* ── Toast ── */
+.toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%) translateY(50px); background: var(--surface3); color: var(--text); padding: 5px 14px; border-radius: 3px; font-size: 11px; font-weight: 700; border: 1px solid var(--border2); opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 999 }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1 }
+
+.c1{background:var(--accent)}.c2{background:var(--green)}.c3{background:var(--yellow)}.c4{background:var(--red)}.c5{background:var(--purple)}.c6{background:var(--teal)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ═══ HEADER ═══ -->
+<div class="hdr">
+    <div class="brand"><h1>Grav</h1><span class="v">v1.0.0 — Autopilot + AI Learning</span></div>
+    <div class="hdr-right">
+        <span class="chip chip-count" id="totalCount">{{TOTAL}}</span>
+        <span class="chip on" id="masterChip" onclick="toggleMaster()" style="cursor:pointer"><span id="masterLabel">ON</span></span>
+    </div>
+</div>
+
+<!-- ═══ TABS ═══ -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('autopilot')">Autopilot</div>
+    <div class="tab" onclick="switchTab('brain')">Second Brain</div>
+    <div class="tab" onclick="switchTab('stats')">Stats</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 1: AUTOPILOT — controls, timing, patterns
+     ═══════════════════════════════════════════════════════════ -->
+<div id="tab-autopilot" class="tab-panel active">
+
+    <div class="card">
+        <div class="card-title" data-i18n="sec-features">modules</div>
+        <div class="row">
+            <div class="row-left" onclick="toggleFeat('chkEnabled')"><div><span class="row-name">Auto-Approve</span><div class="row-hint" data-i18n="desc-approve">Click Run, Allow, Accept automatically</div></div></div>
+            <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()"><span></span></label>
+        </div>
+        <div class="row">
+            <div class="row-left" onclick="toggleFeat('chkScroll')"><div><span class="row-name">Stick-to-Bottom</span><div class="row-hint" data-i18n="desc-scroll">Keep chat scrolled down</div></div></div>
+            <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()"><span></span></label>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title" data-i18n="sec-timing">timing</div>
+        <div class="slider"><label data-i18n="lbl-approve">Approve</label><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="document.getElementById('valApprove').textContent=this.value+'ms'"><span class="val" id="valApprove">{{APPROVE_MS}}ms</span></div>
+        <div class="slider"><label data-i18n="lbl-scroll">Scroll</label><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="document.getElementById('valScroll').textContent=this.value+'ms'"><span class="val" id="valScroll">{{SCROLL_MS}}ms</span></div>
+        <div class="slider"><label data-i18n="lbl-pause">Pause</label><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="document.getElementById('valPause').textContent=this.value+'ms'"><span class="val" id="valPause">{{PAUSE_MS}}ms</span></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title" data-i18n="sec-patterns">patterns</div>
+        <div class="pat-grid" id="patGrid"></div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 2: SECOND BRAIN — wiki, learning, concepts
+     ═══════════════════════════════════════════════════════════ -->
+<div id="tab-brain" class="tab-panel">
+
+    <!-- Hero metrics -->
+    <div class="g6" style="margin-bottom:8px">
+        <div class="metric"><div class="metric-num" style="color:var(--accent)" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="metric-lbl">Epoch</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--teal)" id="brainTracking">{{LEARN_TRACKING}}</div><div class="metric-lbl">Tracking</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--green)" id="brainWhite">{{WHITE_COUNT}}</div><div class="metric-lbl">Whitelist</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--red)" id="brainBlack">{{BLACK_COUNT}}</div><div class="metric-lbl">Blacklist</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--purple)" id="brainPromoted">{{LEARN_COUNT}}</div><div class="metric-lbl">Promoted</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--peach)" id="brainPatterns">{{LEARN_PATTERNS}}</div><div class="metric-lbl">Patterns</div></div>
+    </div>
+
+    <!-- Wiki overview -->
+    <div class="card">
+        <div class="card-title">Knowledge Wiki</div>
+        <div class="g3" style="margin-bottom:8px">
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--cyan)" id="wikiPages">{{WIKI_PAGES}}</div><div class="metric-lbl">Wiki Pages</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--teal)" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="metric-lbl">Concepts</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--yellow)" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</div><div class="metric-lbl">Contradictions</div></div>
+        </div>
+        <div style="display:flex;gap:4px">
+            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Manage Commands</button>
+            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">View Full Wiki</button>
+            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Lint Wiki</button>
+        </div>
+    </div>
+
+    <!-- Concept map -->
+    <div class="card">
+        <div class="card-title">Concept Map</div>
+        <div id="conceptMap">
+            <div class="log-empty">Concepts will appear as commands are learned</div>
+        </div>
+    </div>
+
+    <!-- Wiki activity log -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div class="card-title" style="margin-bottom:0">Activity Log</div>
+        </div>
+        <div class="log-box wiki-log" id="wikiLog">
+            <div class="log-empty">—</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 3: STATS — click stats, bars, log
+     ═══════════════════════════════════════════════════════════ -->
+<div id="tab-stats" class="tab-panel">
+
+    <div class="card">
+        <div class="card-title" data-i18n="sec-stats">stats</div>
+        <div class="g2" style="margin-bottom:8px">
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--accent)" id="statTotal">{{TOTAL}}</div><div class="metric-lbl">Total Clicks</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--green)" id="statActive">0</div><div class="metric-lbl">Active Patterns</div></div>
+        </div>
+        <div id="statBars" style="margin-bottom:6px"></div>
+    </div>
+
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div class="card-title" style="margin-bottom:0" data-i18n="lbl-log">log</div>
+            <button class="btn btn-sm btn-danger" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="log-box" id="logList"><div class="log-empty">—</div></div>
+    </div>
+
+    <div style="margin-top:4px"><button class="btn btn-danger btn-sm" onclick="resetStats()" style="width:100%">Reset All Stats</button></div>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<div class="ftr">
+    <select id="selLang" onchange="changeLang()">
+        <option value="vi" {{LANG_VI}}>Tiếng Việt</option>
+        <option value="en" {{LANG_EN}}>English</option>
+        <option value="zh" {{LANG_ZH}}>中文</option>
+    </select>
+    <div class="btn-row">
+        <button class="btn" onclick="vscode.postMessage({command:'reload'})">Reload</button>
+        <button class="btn btn-primary" onclick="saveAll()">Save</button>
+    </div>
+</div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var vscode = acquireVsCodeApi();
+var ALL_PATTERNS = ['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Accept all'];
+var patterns = {{PATTERNS_JSON}};
+var disabledPatterns = {{DISABLED_JSON}};
+ALL_PATTERNS.forEach(function(p) { if (patterns.indexOf(p) === -1 && disabledPatterns.indexOf(p) === -1) disabledPatterns.push(p); });
+
+var CONCEPTS_DATA = {{CONCEPTS_JSON}};
+var WIKI_LOG_DATA = {{WIKI_LOG_JSON}};
+
+var _i18n = {
+    vi: {'sec-features':'Mô-đun','sec-timing':'Thời gian','sec-patterns':'Nút bấm','sec-stats':'Thống kê','lbl-log':'Nhật ký','desc-approve':'Tự nhấn Run, Allow, Accept','desc-scroll':'Giữ chat cuộn xuống cuối','lbl-approve':'Approve','lbl-scroll':'Scroll','lbl-pause':'Pause'},
+    en: {'sec-features':'Modules','sec-timing':'Timing','sec-patterns':'Patterns','sec-stats':'Stats','lbl-log':'Log','desc-approve':'Click Run, Allow, Accept automatically','desc-scroll':'Keep chat scrolled down','lbl-approve':'Approve','lbl-scroll':'Scroll','lbl-pause':'Pause'},
+    zh: {'sec-features':'模块','sec-timing':'时间','sec-patterns':'按钮','sec-stats':'统计','lbl-log':'日志','desc-approve':'自动点击 Run、Allow、Accept','desc-scroll':'聊天面板自动滚动','lbl-approve':'审批','lbl-scroll':'滚动','lbl-pause':'暂停'}
+};
+function applyI18n(lang) { var s = _i18n[lang] || _i18n['en']; document.querySelectorAll('[data-i18n]').forEach(function(el) { var k = el.getAttribute('data-i18n'); if (s[k]) el.textContent = s[k]; }); }
+applyI18n('{{LANG}}');
+
+/* ── Tab switching ── */
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(function(t,i) { t.classList.toggle('active', ['autopilot','brain','stats'][i] === name); });
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    var el = document.getElementById('tab-' + name);
+    if (el) el.classList.add('active');
+}
+
+/* ── Toast ── */
+var _toastTimer;
+function toast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(_toastTimer); _toastTimer = setTimeout(function() { t.classList.remove('show'); }, 1000); }
+
+/* ── Master toggle ── */
+function updateMasterUI() {
+    var on = document.getElementById('chkEnabled').checked;
+    var el = document.getElementById('masterChip');
+    el.className = 'chip ' + (on ? 'on' : 'off');
+    document.getElementById('masterLabel').textContent = on ? 'ON' : 'OFF';
+}
+function toggleMaster() { var c = document.getElementById('chkEnabled'); c.checked = !c.checked; instantToggle(); }
+function toggleFeat(id) { var c = document.getElementById(id); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
+function instantToggle() { vscode.postMessage({ command: 'toggle', enabled: document.getElementById('chkEnabled').checked }); updateMasterUI(); toast(document.getElementById('chkEnabled').checked ? 'ON' : 'OFF'); }
+function scrollToggle() { vscode.postMessage({ command: 'scrollToggle', enabled: document.getElementById('chkScroll').checked }); toast('Scroll ' + (document.getElementById('chkScroll').checked ? 'ON' : 'OFF')); }
+function changeLang() { vscode.postMessage({ command: 'changeLang', lang: document.getElementById('selLang').value }); applyI18n(document.getElementById('selLang').value); }
+
+/* ── Patterns ── */
+function renderPatterns() {
+    var grid = document.getElementById('patGrid');
+    var all = [], seen = {};
+    ALL_PATTERNS.concat(patterns).concat(disabledPatterns).forEach(function(p) { if (!seen[p]) { seen[p] = true; all.push(p); } });
+    var h = '', active = 0;
+    all.forEach(function(p) {
+        var on = patterns.indexOf(p) !== -1; if (on) active++;
+        h += '<div class="pat ' + (on ? 'on' : 'off') + '" onclick="togPat(\'' + p.replace(/'/g, "\\'") + '\')">';
+        h += '<span class="dot"></span>' + p + '</div>';
+    });
+    grid.innerHTML = h;
+    document.getElementById('statActive').textContent = active;
+}
+function togPat(v) {
+    if (patterns.indexOf(v) !== -1) { patterns = patterns.filter(function(x) { return x !== v; }); if (disabledPatterns.indexOf(v) === -1) disabledPatterns.push(v); }
+    else { disabledPatterns = disabledPatterns.filter(function(x) { return x !== v; }); if (patterns.indexOf(v) === -1) patterns.push(v); }
+    renderPatterns(); toast(v + ' ' + (patterns.indexOf(v) !== -1 ? 'ON' : 'OFF'));
+}
+renderPatterns(); updateMasterUI();
+
+/* ── Save ── */
+function saveAll() {
+    vscode.postMessage({ command: 'save', data: {
+        enabled: document.getElementById('chkEnabled').checked,
+        scrollOn: document.getElementById('chkScroll').checked,
+        pauseMs: parseInt(document.getElementById('rngPause').value) || 7000,
+        scrollMs: parseInt(document.getElementById('rngScroll').value) || 500,
+        approveMs: parseInt(document.getElementById('rngApprove').value) || 1000,
+        patterns: patterns, disabledPatterns: disabledPatterns,
+        language: document.getElementById('selLang').value
+    }}); toast('Saved');
+}
+
+/* ── Stats bars ── */
+var BAR_COLORS = ['c1','c2','c3','c4','c5','c6'];
+function renderBars(stats) {
+    var el = document.getElementById('statBars'); var max = 0;
+    ALL_PATTERNS.forEach(function(p) { var c = stats[p] || 0; if (c > max) max = c; });
+    if (el.children.length === 0) {
+        var h = '';
+        ALL_PATTERNS.forEach(function(p, i) { h += '<div class="bar-row"><span class="bar-lbl">' + p + '</span><div class="bar-bg"><div class="bar-fill ' + BAR_COLORS[i % 6] + '" id="fill-' + i + '" style="width:0%"></div></div><span class="bar-cnt" id="cnt-' + i + '">0</span></div>'; });
+        el.innerHTML = h;
+    }
+    ALL_PATTERNS.forEach(function(p, i) {
+        var c = stats[p] || 0; var pct = max > 0 ? Math.round(c / max * 100) : 0;
+        var f = document.getElementById('fill-' + i); var t = document.getElementById('cnt-' + i);
+        if (f) f.style.width = pct + '%';
+        if (t && t.textContent !== String(c)) t.textContent = c;
+    });
+}
+
+/* ── Click log ── */
+var _lastLogHtml = null;
+function renderLog(log) {
+    var el = document.getElementById('logList');
+    if (!log || !log.length) { var e = '<div class="log-empty">—</div>'; if (_lastLogHtml !== e) { _lastLogHtml = e; el.innerHTML = e; } return; }
+    var colors = { Run: 'var(--green)', Allow: 'var(--accent)', Accept: 'var(--peach)', 'Always Allow': 'var(--teal)', Retry: 'var(--purple)', 'Keep Waiting': 'var(--teal)', Continue: 'var(--accent)' };
+    var h = '';
+    log.forEach(function(c) { h += '<div class="log-item"><span style="color:' + (colors[c.pattern] || 'var(--text2)') + ';font-weight:700">' + c.pattern + '</span><span style="color:var(--text3)">' + c.time + '</span></div>'; });
+    if (_lastLogHtml !== h) { _lastLogHtml = h; el.innerHTML = h; }
+}
+function resetStats() { vscode.postMessage({ command: 'resetStats' }); document.getElementById('totalCount').textContent = '0'; document.getElementById('statTotal').textContent = '0'; renderBars({}); toast('Reset'); }
+function clearLog() { vscode.postMessage({ command: 'clearLog' }); renderLog([]); toast('Cleared'); }
+
+/* ── Concept map rendering ── */
+function renderConcepts(data) {
+    var el = document.getElementById('conceptMap');
+    if (!data || Object.keys(data).length === 0) { el.innerHTML = '<div class="log-empty">Concepts will appear as commands are learned</div>'; return; }
+    var entries = Object.entries(data).sort(function(a,b) { return b[1].commands.length - a[1].commands.length; });
+    var h = '';
+    var riskClass = { safe: 'risk-safe', caution: 'risk-caution', danger: 'risk-danger', unknown: 'risk-unknown' };
+    entries.forEach(function(e) {
+        var name = e[0], c = e[1];
+        var pct = Math.max(0, Math.min(100, Math.round((c.avgConfidence + 1) / 2 * 100)));
+        var barColor = c.avgConfidence >= 0.5 ? 'var(--green)' : c.avgConfidence >= 0 ? 'var(--yellow)' : 'var(--red)';
+        h += '<div class="concept-card">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+        h += '<span class="concept-name">' + name + '</span>';
+        h += '<span class="risk ' + (riskClass[c.riskLevel] || 'risk-unknown') + '">' + (c.riskLevel || 'unknown') + '</span>';
+        h += '</div>';
+        h += '<div class="concept-bar"><div class="concept-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
+        h += '<div class="concept-meta"><span>' + c.commands.length + ' commands</span><span>conf: ' + Math.round(c.avgConfidence * 100) + '%</span></div>';
+        h += '</div>';
+    });
+    el.innerHTML = h;
+}
+
+/* ── Wiki log rendering ── */
+function renderWikiLog(log) {
+    var el = document.getElementById('wikiLog');
+    if (!log || !log.length) { el.innerHTML = '<div class="log-empty">—</div>'; return; }
+    var h = '';
+    var opColors = { ingest: 'op-ingest', lint: 'op-lint' };
+    log.slice().reverse().slice(0, 30).forEach(function(l) {
+        h += '<div class="wiki-log-item">';
+        h += '<span class="ts">' + (l.time || '').slice(11, 19) + '</span>';
+        h += '<span class="op ' + (opColors[l.op] || '') + '">' + (l.op || '') + '</span>';
+        h += '<span style="color:var(--text2)">' + (l.cmd || l.detail || '') + '</span>';
+        if (l.action) h += '<span style="color:' + (l.action === 'approve' ? 'var(--green)' : 'var(--red)') + '">' + l.action + '</span>';
+        if (l.conf !== undefined) h += '<span style="color:var(--text3)">' + l.conf + '</span>';
+        h += '</div>';
+    });
+    el.innerHTML = h;
+}
+
+/* ── Message handler ── */
+window.addEventListener('message', function(e) {
+    var m = e.data;
+    if (m.command === 'statsUpdated') { document.getElementById('totalCount').textContent = m.totalClicks || 0; document.getElementById('statTotal').textContent = m.totalClicks || 0; renderBars(m.stats || {}); }
+    if (m.command === 'logUpdated') renderLog(m.log);
+});
+vscode.postMessage({ command: 'getStats' });
+vscode.postMessage({ command: 'getLog' });
+renderBars({{STATS_JSON}});
+renderConcepts(CONCEPTS_DATA);
+renderWikiLog(WIKI_LOG_DATA);
+</script>
+</body>
+</html>

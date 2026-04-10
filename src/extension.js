@@ -1,475 +1,1839 @@
-// ===========================================================
-// AG Autopilot v7.1.0 — Lean & Reliable
+// ═══════════════════════════════════════════════════════════════
+//  Grav v1.0.0 — Autopilot for Antigravity
 //
-// WHAT IT DOES:
-//   1. Auto-click Allow/Run/Accept via Layer 0 (workbench main frame)
-//   2. Auto-accept agent steps via VS Code commands (webview buttons)
-//   3. Auto-scroll chat to bottom
-//   4. Auto-approve ALL terminal commands (including curl/wget)
-//   5. Notify user when quota exhausted (no auto-switch)
-//   6. Monitor quota via Language Server API
+//  Architecture:
+//    Runtime (injected into workbench.html)
+//      → Auto-approve buttons in main DOM
+//      → Stick-to-bottom scroll
+//      → Quota radar (detect exhaustion banners)
+//      → Corrupt-banner suppression
 //
-// WHAT IT DOESN'T DO (by design):
-//   - Auto-switch model (no reliable method exists)
-// ===========================================================
+//    Host (this file, runs in extension process)
+//      → Accept loop via VS Code command API
+//      → HTTP bridge for runtime ↔ host sync
+//      → Safe terminal auto-approve (whitelist/blacklist)
+//      → Dashboard (webview)
+//      → AI Learning Engine (Karpathy-inspired)
+//      → Language Server quota monitoring
+//      → Win32 native button handler
+// ═══════════════════════════════════════════════════════════════
 const vscode = require('vscode');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const fs     = require('fs');
+const path   = require('path');
+const os     = require('os');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
-const http = require('http');
+const http   = require('http');
+const { execSync, execFile } = require('child_process');
 
-const TAG_START = '<!-- AG-AUTOPILOT-START -->';
-const TAG_END = '<!-- AG-AUTOPILOT-END -->';
-const OLD_TAGS = [
-    ['<!-- AG-AUTO-CLICK-SCROLL-START -->', '<!-- AG-AUTO-CLICK-SCROLL-END -->'],
-    ['<!-- AG-MODEL-SWITCH-START -->', '<!-- AG-MODEL-SWITCH-END -->'],
-    ['<!-- AG-TOOLKIT-START -->', '<!-- AG-TOOLKIT-END -->']
+// ── Constants ────────────────────────────────────────────────
+const TAG = { open: '<!-- GRAV-RUNTIME-START -->', close: '<!-- GRAV-RUNTIME-END -->' };
+const LEGACY_TAGS = [
+    ['<!-- AG-AUTOPILOT-START -->',          '<!-- AG-AUTOPILOT-END -->'],
+    ['<!-- AG-AUTO-CLICK-SCROLL-START -->',  '<!-- AG-AUTO-CLICK-SCROLL-END -->'],
+    ['<!-- AG-MODEL-SWITCH-START -->',       '<!-- AG-MODEL-SWITCH-END -->'],
+    ['<!-- AG-TOOLKIT-START -->',            '<!-- AG-TOOLKIT-END -->'],
 ];
+const LEGACY_SCRIPTS = ['ag-auto-script.js', 'ag-modelswitch-client.js'];
+const RUNTIME_FILE   = 'grav-runtime.js';
+const CONFIG_FILE    = 'grav-config.json';
+const PORT_START     = 48787;
+const PORT_END       = 48850;
 
-let statusBarItem, statusBarScroll, statusBarClicks, _settingsPanel = null;
-let _autoAcceptEnabled = true, _httpScrollEnabled = true, _httpClickPatterns = [];
-let _httpScrollConfig = { pauseScrollMs: 5000, scrollIntervalMs: 500, clickIntervalMs: 2000 };
-let _clickStats = {}, _clickLog = [], _totalClicks = 0, _resetStatsRequested = false;
-let _extensionContext = null, _httpServer = null, _actualPort = 0, _autoAcceptInterval = null;
-const AG_HTTP_PORT_START = 48787, AG_HTTP_PORT_END = 48850;
-
-const ACCEPT_COMMANDS = [
+const ACCEPT_CMDS = [
     'antigravity.agent.acceptAgentStep',
     'antigravity.prioritized.supercompleteAccept',
     'antigravity.terminalCommand.accept',
-    'antigravity.acceptCompletion'
+    'antigravity.acceptCompletion',
 ];
 
-let _lsPort = 0, _lsCsrf = '', _lsConnected = false;
-let _lastQuotaNotify = 0;
+const SAFE_TERMINAL_CMDS = [
+    'ls','dir','cat','echo','pwd','cd','mkdir','cp','mv','touch',
+    'npm','npx','yarn','pnpm','bun','deno','node','python','python3','pip','pip3',
+    'git','which','where','type','file','stat','readlink',
+    'head','tail','wc','sort','uniq','diff','grep','find','xargs',
+    'sed','awk','tr','cut','tee','date','whoami','id',
+    'env','printenv','uname','hostname','df','du','free',
+    'ps','top','htop','lsof','netstat','ss','ping','dig','nslookup','host',
+    'cargo','rustc','go','java','javac','mvn','gradle',
+    'docker','docker-compose','podman','kubectl','helm','terraform','ansible',
+    'make','cmake','gcc','g++','clang',
+    'jq','yq','base64','md5','sha256sum','openssl',
+    'tar','zip','unzip','gzip','gunzip','bzip2','xz',
+    'curl','wget','http','httpie',
+    'brew','apt','apt-get','yum','dnf','pacman','snap',
+    'sqlite3','psql','mysql','mongosh','redis-cli',
+    'tsc','eslint','prettier','jest','vitest','mocha','playwright',
+    'sass','postcss','webpack','vite','esbuild','rollup','turbo',
+    'uvx','uv','pipx','poetry','pdm','ruff','black','mypy',
+    'code','antigravity',
+];
 
-// =============================================================
-// UTILITIES
-// =============================================================
-function writeFileElevated(fp, content) {
-    try { fs.writeFileSync(fp, content, 'utf8'); } catch (err) {
-        if (err.code !== 'EACCES' && err.code !== 'EPERM') throw err;
-        const tmp = path.join(os.tmpdir(), 'ag-autopilot-' + Date.now() + '.tmp');
-        fs.writeFileSync(tmp, content, 'utf8');
-        try {
-            if (process.platform === 'linux') execSync('pkexec bash -c "cp \'' + tmp + '\' \'' + fp + '\' && chmod 644 \'' + fp + '\'"', { timeout: 30000 });
-            else if (process.platform === 'darwin') execSync('osascript -e \'do shell script "cp \'' + tmp + '\' \'' + fp + '\' && chmod 644 \'' + fp + '\'" with administrator privileges\'', { timeout: 30000 });
-            else throw err;
-        } catch (_) { try { fs.unlinkSync(tmp); } catch (__) {} throw new Error('Permission denied. Restart as Admin.'); }
-        try { fs.unlinkSync(tmp); } catch (_) {}
+const DEFAULT_BLACKLIST = [
+    'rm -rf /',
+    'rm -rf ~',
+    'rm -rf *',
+    'mkfs',
+    'dd if=',
+    ':(){:|:&};:',
+    'chmod -R 777 /',
+    'wget|sh',
+    'curl|sh',
+    'curl|bash',
+    'wget|bash',
+    '> /dev/sda',
+    'shutdown',
+    'reboot',
+    'init 0',
+    'init 6',
+    'kill -9 -1',
+    'killall',
+    'format c:',
+];
+
+// ── Adaptive Learning Constants (Karpathy-inspired) ─────────
+// Inspired by Andrej Karpathy's principles:
+//   1. RLVR: Verifiable rewards — command exit code = ground truth
+//   2. Gradient descent: confidence updated via learning rate
+//   3. Overfit→Regularize: memorize exact commands, then generalize patterns
+//   4. "Become one with the data": rich context per observation
+//   5. Decay + momentum: temporal awareness, recent data matters more
+//   6. Loss visualization: track confidence trajectory over time
+const LEARN = {
+    ALPHA:           0.15,   // learning rate — how fast confidence moves per event
+    MOMENTUM:        0.9,    // exponential moving average factor for smoothing
+    GAMMA:           0.97,   // daily decay factor (like weight decay / regularization)
+    PROMOTE_THRESH:  0.75,   // confidence threshold to auto-suggest whitelist
+    DEMOTE_THRESH:  -0.50,   // confidence threshold to auto-suggest blacklist
+    OBSERVE_MIN:     5,      // minimum observations before any suggestion (avoid overfitting)
+    MAX_ENTRIES:     1000,   // max tracked commands
+    MAX_HISTORY:     50,     // confidence history length per command (for visualization)
+    CONTEXT_WEIGHT:  0.1,    // bonus/penalty weight for contextual signals
+    GENERALIZE_MIN:  3,      // min commands in a cluster to generalize a pattern
+    BATCH_SIZE:      10,     // process learning updates in mini-batches
+};
+
+// ── State ────────────────────────────────────────────────────
+let _ctx          = null;
+let _enabled      = true;
+let _scrollOn     = true;
+let _patterns     = [];
+let _stats        = {};
+let _log          = [];
+let _totalClicks  = 0;
+let _httpServer   = null;
+let _httpPort     = 0;
+let _acceptTimer  = null;
+let _dashboard    = null;
+let _lsPort       = 0;
+let _lsCsrf       = '';
+let _lsOk         = false;
+let _lastQuotaMs  = 0;
+
+// Adaptive learning state (Karpathy-inspired neural model)
+let _learnData    = {};  // { cmdName: { conf, velocity, obs, rewards, history[], contexts{} } }
+let _learnEpoch   = 0;   // global training step counter
+let _userWhitelist = [];
+let _userBlacklist = [];
+let _patternCache  = []; // generalized patterns discovered from data
+
+// ── Second Brain state (Karpathy LLM Wiki pattern) ──────────
+// 3-layer architecture:
+//   Layer 1: Raw events (_learnData) — immutable observations
+//   Layer 2: Wiki (_wiki) — compiled, cross-referenced knowledge
+//   Layer 3: Schema (LEARN constants) — rules for the system
+let _wiki = {
+    index: {},       // { cmdName: { page, links[], sources, confidence } }
+    concepts: {},    // { conceptName: { description, commands[], evidence[], contradictions[] } }
+    log: [],         // chronological activity log
+    synthesis: {},   // high-level patterns: { patternName: { description, members[], strength } }
+    contradictions: [], // detected contradictions between observations
+    lastLint: 0,     // timestamp of last lint pass
+};
+
+// status bar items
+let _sbMain, _sbClicks, _sbScroll;
+
+// ═════════════════════════════════════════════════════════════
+//  Utilities
+// ═════════════════════════════════════════════════════════════
+function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function elevatedWrite(fp, content) {
+    try { fs.writeFileSync(fp, content, 'utf8'); return; } catch (e) {
+        if (e.code !== 'EACCES' && e.code !== 'EPERM') throw e;
     }
+    const tmp = path.join(os.tmpdir(), 'grav-' + Date.now() + '.tmp');
+    fs.writeFileSync(tmp, content, 'utf8');
+    try {
+        if (process.platform === 'darwin')
+            execSync(`osascript -e 'do shell script "cp \\"${tmp}\\" \\"${fp}\\" && chmod 644 \\"${fp}\\"" with administrator privileges'`, { timeout: 30000 });
+        else if (process.platform === 'linux')
+            execSync(`pkexec bash -c "cp '${tmp}' '${fp}' && chmod 644 '${fp}'"`, { timeout: 30000 });
+        else throw new Error('Permission denied — restart as admin');
+    } finally { try { fs.unlinkSync(tmp); } catch (_) {} }
 }
-function getWorkbenchPath() {
-    const r = vscode.env.appRoot;
-    for (const p of [
-        path.join(r,'out','vs','code','electron-browser','workbench','workbench.html'),
-        path.join(r,'out','vs','code','electron-sandbox','workbench','workbench.html'),
-        path.join(r,'out','vs','workbench','workbench.html'),
-        path.join(r,'out','vs','code','browser','workbench','workbench.html'),
-        path.join(r,'out','vs','code','electron-main','workbench','workbench.html'),
-    ]) { if (fs.existsSync(p)) return p; }
-    return findRec(path.join(r, 'out'), 'workbench.html', 6);
-}
-function findRec(dir, name, depth) {
-    if (depth <= 0) return null;
-    try { for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const f = path.join(dir, e.name);
-        if (e.isFile() && e.name === name) return f;
-        if (e.isDirectory()) { const r = findRec(f, name, depth - 1); if (r) return r; }
-    }} catch (_) {} return null;
-}
-function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-// =============================================================
-// LANGUAGE SERVER API — quota monitoring
-// =============================================================
-function discoverLanguageServer() {
+function workbenchPath() {
+    const root = vscode.env.appRoot;
+    const candidates = [
+        'out/vs/code/electron-sandbox/workbench/workbench.html',
+        'out/vs/code/electron-browser/workbench/workbench.html',
+        'out/vs/workbench/workbench.html',
+        'out/vs/code/browser/workbench/workbench.html',
+        'out/vs/code/electron-main/workbench/workbench.html',
+    ];
+    for (const c of candidates) {
+        const p = path.join(root, c);
+        if (fs.existsSync(p)) return p;
+    }
+    return deepFind(path.join(root, 'out'), 'workbench.html', 6);
+}
+
+function deepFind(dir, name, depth) {
+    if (depth <= 0) return null;
+    try {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fp = path.join(dir, e.name);
+            if (e.isFile() && e.name === name) return fp;
+            if (e.isDirectory()) { const r = deepFind(fp, name, depth - 1); if (r) return r; }
+        }
+    } catch (_) {}
+    return null;
+}
+
+function cfg(key, fallback) {
+    return vscode.workspace.getConfiguration('grav').get(key, fallback);
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Runtime injection (Layer 0)
+// ═════════════════════════════════════════════════════════════
+function buildRuntime() {
+    const dp = _ctx.globalState.get('disabledPatterns', []);
+    const pats = cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry'])
+        .filter(p => !dp.includes(p) && p !== 'Accept');
+    let src = fs.readFileSync(path.join(_ctx.extensionPath, 'media', 'runtime.js'), 'utf8');
+    src = src.replace(/\/\*\{\{PAUSE_MS\}\}\*\/\d+/,    String(cfg('scrollPauseMs', 7000)));
+    src = src.replace(/\/\*\{\{SCROLL_MS\}\}\*\/\d+/,   String(cfg('scrollIntervalMs', 500)));
+    src = src.replace(/\/\*\{\{APPROVE_MS\}\}\*\/\d+/,  String(cfg('approveIntervalMs', 1000)));
+    src = src.replace(/\/\*\{\{PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(pats));
+    src = src.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/,     String(cfg('enabled', true)));
+    return src;
+}
+
+function inject() {
+    const wb = workbenchPath();
+    if (!wb) { vscode.window.showErrorMessage('[Grav] workbench.html not found'); return false; }
+    const dir = path.dirname(wb);
+    try {
+        let html = fs.readFileSync(wb, 'utf8');
+        // strip legacy + own tags
+        for (const [s, e] of [[TAG.open, TAG.close], ...LEGACY_TAGS])
+            html = html.replace(new RegExp(esc(s) + '[\\s\\S]*?' + esc(e), 'g'), '');
+        // remove legacy script files
+        for (const f of [...LEGACY_SCRIPTS, RUNTIME_FILE]) {
+            const p = path.join(dir, f);
+            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {}
+        }
+        // write runtime
+        elevatedWrite(path.join(dir, RUNTIME_FILE), buildRuntime());
+        html = html.replace('</html>',
+            `\n${TAG.open}\n<script src="${RUNTIME_FILE}?v=${Date.now()}"></script>\n${TAG.close}\n</html>`);
+        elevatedWrite(wb, html);
+    } catch (e) { console.error('[Grav] inject:', e.message); return false; }
+    return true;
+}
+
+function eject() {
+    const wb = workbenchPath();
+    if (!wb) return false;
+    const dir = path.dirname(wb);
+    try {
+        let html = fs.readFileSync(wb, 'utf8');
+        for (const [s, e] of [[TAG.open, TAG.close], ...LEGACY_TAGS])
+            html = html.replace(new RegExp(esc(s) + '[\\s\\S]*?' + esc(e), 'g'), '');
+        elevatedWrite(wb, html);
+        for (const f of [...LEGACY_SCRIPTS, RUNTIME_FILE]) {
+            const p = path.join(dir, f);
+            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {}
+        }
+        return true;
+    } catch (e) { vscode.window.showErrorMessage('[Grav] eject failed: ' + e.message); return false; }
+}
+
+function isInjected() {
+    try { const wb = workbenchPath(); return wb ? fs.readFileSync(wb, 'utf8').includes(TAG.open) : false; }
+    catch (_) { return false; }
+}
+
+function patchChecksums() {
+    try {
+        let pjp = null;
+        if (process.resourcesPath) {
+            const c = path.join(process.resourcesPath, 'app', 'product.json');
+            if (fs.existsSync(c)) pjp = c;
+        }
+        if (!pjp) {
+            const wb = workbenchPath(); if (!wb) return;
+            let d = path.dirname(wb);
+            for (let i = 0; i < 8; i++) {
+                const c = path.join(d, 'product.json');
+                if (fs.existsSync(c)) { pjp = c; break; }
+                d = path.dirname(d);
+            }
+        }
+        if (!pjp) return;
+        const pj = JSON.parse(fs.readFileSync(pjp, 'utf8'));
+        if (!pj.checksums) return;
+        const root = path.dirname(pjp), outDir = path.join(root, 'out');
+        let dirty = false;
+        for (const rp in pj.checksums) {
+            const rel = rp.split('/').join(path.sep);
+            let fp = path.join(outDir, rel);
+            if (!fs.existsSync(fp)) fp = path.join(root, rel);
+            if (!fs.existsSync(fp)) continue;
+            const h = crypto.createHash('sha256').update(fs.readFileSync(fp)).digest('base64').replace(/=+$/, '');
+            if (pj.checksums[rp] !== h) { pj.checksums[rp] = h; dirty = true; }
+        }
+        if (dirty) elevatedWrite(pjp, JSON.stringify(pj, null, '\t'));
+    } catch (_) {}
+}
+
+function clearCodeCache() {
+    try {
+        const base = process.platform === 'win32'
+            ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Antigravity')
+            : process.platform === 'darwin'
+                ? path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity')
+                : path.join(os.homedir(), '.config', 'Antigravity');
+        const d = path.join(base, 'Code Cache', 'js');
+        if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
+    } catch (_) {}
+}
+
+function writeRuntimeConfig() {
+    try {
+        const wb = workbenchPath(); if (!wb) return;
+        const dp = _ctx.globalState.get('disabledPatterns', []);
+        const pats = cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry'])
+            .filter(p => !dp.includes(p) && p !== 'Accept');
+        elevatedWrite(path.join(path.dirname(wb), CONFIG_FILE), JSON.stringify({
+            enabled: cfg('enabled', true),
+            patterns: pats,
+            acceptInChatOnly: cfg('approvePatterns', []).includes('Accept') && !dp.includes('Accept'),
+            pauseMs: cfg('scrollPauseMs', 7000),
+            scrollMs: cfg('scrollIntervalMs', 500),
+            approveMs: cfg('approveIntervalMs', 1000),
+        }));
+    } catch (_) {}
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Language Server — quota monitoring
+// ═════════════════════════════════════════════════════════════
+function discoverLS() {
     try {
         const cmd = process.platform === 'win32'
             ? 'wmic process where "name like \'%language_server%\'" get CommandLine /format:list 2>nul'
             : 'ps aux | grep language_server_macos | grep -v grep | grep -v enable_lsp';
-        const stdout = execSync(cmd, { timeout: 5000 }).toString();
-        if (!stdout) return false;
-        const csrfMatch = stdout.match(/--csrf_token\s+([a-f0-9-]+)/);
-        if (!csrfMatch) return false;
-        _lsCsrf = csrfMatch[1];
-        const pidMatch = stdout.match(/^\S+\s+(\d+)/m);
-        if (!pidMatch) return false;
+        const out = execSync(cmd, { timeout: 5000 }).toString();
+        if (!out) return false;
+        const csrf = out.match(/--csrf_token\s+([a-f0-9-]+)/);
+        if (!csrf) return false;
+        _lsCsrf = csrf[1];
+        const pid = out.match(/^\S+\s+(\d+)/m);
+        if (!pid) return false;
         const portsCmd = process.platform === 'win32'
-            ? 'netstat -ano | findstr ' + pidMatch[1] + ' | findstr LISTENING'
-            : 'lsof -p ' + pidMatch[1] + ' -iTCP -sTCP:LISTEN -P -n 2>/dev/null';
+            ? 'netstat -ano | findstr ' + pid[1] + ' | findstr LISTENING'
+            : 'lsof -p ' + pid[1] + ' -iTCP -sTCP:LISTEN -P -n 2>/dev/null';
         const portsOut = execSync(portsCmd, { timeout: 5000 }).toString();
         const ports = [...portsOut.matchAll(/127\.0\.0\.1:(\d+)/g)].map(m => parseInt(m[1]));
         for (const port of ports) {
             try {
                 const ok = execSync(
-                    'curl -sk --connect-timeout 2 -X POST -H "Content-Type: application/json" -H "X-Codeium-Csrf-Token: ' + _lsCsrf + '" -H "Connect-Protocol-Version: 1" "https://127.0.0.1:' + port + '/exa.language_server_pb.LanguageServerService/GetUnleashData" -d \'{"wrapper_data":{}}\'',
+                    `curl -sk --connect-timeout 2 -X POST -H "Content-Type: application/json" -H "X-Codeium-Csrf-Token: ${_lsCsrf}" -H "Connect-Protocol-Version: 1" "https://127.0.0.1:${port}/exa.language_server_pb.LanguageServerService/GetUnleashData" -d '{"wrapper_data":{}}'`,
                     { timeout: 5000 }
                 ).toString();
-                if (ok && ok.startsWith('{')) { _lsPort = port; _lsConnected = true; console.log('[AG] LS connected: port=' + port); return true; }
+                if (ok && ok.startsWith('{')) { _lsPort = port; _lsOk = true; return true; }
             } catch (_) {}
         }
-        return false;
-    } catch (e) { console.log('[AG] LS discovery failed:', e.message); return false; }
+    } catch (_) {}
+    return false;
 }
 
-function fetchQuotaFromLS() {
-    if (!_lsConnected) return Promise.resolve(null);
-    return new Promise(resolve => {
-        try {
-            const result = execSync(
-                'curl -sk --connect-timeout 3 -X POST -H "Content-Type: application/json" -H "X-Codeium-Csrf-Token: ' + _lsCsrf + '" -H "Connect-Protocol-Version: 1" "https://127.0.0.1:' + _lsPort + '/exa.language_server_pb.LanguageServerService/GetUserStatus" -d \'{"metadata":{"ideName":"antigravity"}}\'',
-                { timeout: 8000 }
-            ).toString();
-            const d = JSON.parse(result);
-            const credits = d.userStatus?.planStatus?.availablePromptCredits || 0;
-            resolve({ credits });
-        } catch (_) { _lsConnected = false; resolve(null); }
-    });
-}
-
-// =============================================================
-// ACCEPT LOOP
-// =============================================================
+// ═════════════════════════════════════════════════════════════
+//  Accept loop — fires VS Code commands
+// ═════════════════════════════════════════════════════════════
 function startAcceptLoop() {
-    const c = vscode.workspace.getConfiguration('ag-auto');
-    _autoAcceptEnabled = c.get('enabled', true);
-    const ms = c.get('clickIntervalMs', 2000);
-    if (_autoAcceptInterval) clearInterval(_autoAcceptInterval);
-    _autoAcceptInterval = setInterval(() => {
-        if (!_autoAcceptEnabled) return;
-        // Fire all accept commands silently
-        for (const cmd of ACCEPT_COMMANDS) {
-            vscode.commands.executeCommand(cmd).catch(() => {});
-        }
+    if (_acceptTimer) clearInterval(_acceptTimer);
+    const ms = cfg('approveIntervalMs', 2000);
+    _acceptTimer = setInterval(() => {
+        if (!_enabled) return;
+        for (const cmd of ACCEPT_CMDS) vscode.commands.executeCommand(cmd).catch(() => {});
     }, ms);
 }
 
-// =============================================================
-// SCRIPT BUILD & INJECT
-// =============================================================
-function buildScriptContent(ctx) {
-    const c = vscode.workspace.getConfiguration('ag-auto');
-    const dp = ctx.globalState.get('disabledClickPatterns', []);
-    const pats = c.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept all','Accept']).filter(p => !dp.includes(p) && p !== 'Accept');
-    const tpl = fs.readFileSync(path.join(ctx.extensionPath, 'media', 'autoScript.js'), 'utf8');
-    const wb = getWorkbenchPath();
-    const cfgPath = wb ? path.join(path.dirname(wb), 'ag-auto-config.json').replace(/\\/g, '/') : '';
-    let s = tpl;
-    s = s.replace(/\/\*\{\{PAUSE_SCROLL_MS\}\}\*\/\d+/, String(c.get('scrollPauseMs', 7000)));
-    s = s.replace(/\/\*\{\{SCROLL_INTERVAL_MS\}\}\*\/\d+/, String(c.get('scrollIntervalMs', 500)));
-    s = s.replace(/\/\*\{\{CLICK_INTERVAL_MS\}\}\*\/\d+/, String(c.get('clickIntervalMs', 1000)));
-    s = s.replace(/\/\*\{\{CLICK_PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(pats));
-    s = s.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/, String(c.get('enabled', true)));
-    s = s.replace(/\/\*\{\{CONFIG_PATH\}\}\*\//, cfgPath);
-    s = s.replace(/\/\*\{\{SMART_ROUTER\}\}\*\/\w+/, 'false');
-    s = s.replace(/\/\*\{\{QUOTA_FALLBACK\}\}\*\/\w+/, 'false');
-    return s;
-}
-function writeConfigJson(ctx) {
-    try {
-        const wb = getWorkbenchPath(); if (!wb) return;
-        const c = vscode.workspace.getConfiguration('ag-auto');
-        const dp = ctx.globalState.get('disabledClickPatterns', []);
-        const ap = c.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept']).filter(p => !dp.includes(p) && p !== 'Accept');
-        writeFileElevated(path.join(path.dirname(wb), 'ag-auto-config.json'), JSON.stringify({
-            enabled: c.get('enabled', true), clickPatterns: ap,
-            acceptInChatOnly: c.get('clickPatterns', []).includes('Accept') && !dp.includes('Accept'),
-            pauseScrollMs: c.get('scrollPauseMs', 7000), scrollIntervalMs: c.get('scrollIntervalMs', 500),
-            clickIntervalMs: c.get('clickIntervalMs', 1000)
-        }));
-    } catch (e) { console.error('[AG] Config JSON error:', e.message); }
-}
-function installScript(ctx) {
-    const wb = getWorkbenchPath();
-    if (!wb) { vscode.window.showErrorMessage('[AG Autopilot] workbench.html not found!'); return false; }
-    const dir = path.dirname(wb), sc = buildScriptContent(ctx);
-    const JS_S = '/* AG-AUTO-CLICK-SCROLL-JS-START */', JS_E = '/* AG-AUTO-CLICK-SCROLL-JS-END */';
-    try {
-        const html = fs.readFileSync(wb, 'utf8');
-        const sm = html.match(/src="([^"]*\.js)"/g) || [];
-        const jsf = new Set();
-        for (const m of sm) { const mm = m.match(/src="([^"]*\.js)"/); if (mm) { const n = path.basename(mm[1].split('?')[0]); if (n === 'ag-auto-script.js' || n === 'ag-modelswitch-client.js') continue; const s = path.join(dir, n); if (fs.existsSync(s)) jsf.add(s); } }
-        for (const jp of jsf) { let jc = fs.readFileSync(jp, 'utf8'); const jr = new RegExp(escapeRegex(JS_S)+'[\\s\\S]*?'+escapeRegex(JS_E), 'g'); if (jr.test(jc)) { jc = jc.replace(jr, ''); writeFileElevated(jp, jc); } }
-    } catch (e) { console.error('[AG] Cleanup error:', e.message); }
-    try {
-        let h = fs.readFileSync(wb, 'utf8');
-        for (const [s, e] of [[TAG_START, TAG_END], ...OLD_TAGS]) h = h.replace(new RegExp(escapeRegex(s)+'[\\s\\S]*?'+escapeRegex(e), 'g'), '');
-        for (const f of ['ag-modelswitch-client.js','ag-auto-script.js']) { const p = path.join(dir, f); if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {} }
-        writeFileElevated(path.join(dir, 'ag-auto-script.js'), sc);
-        h = h.replace('</html>', '\n'+TAG_START+'\n<script src="ag-auto-script.js?v='+Date.now()+'"></script>\n'+TAG_END+'\n</html>');
-        writeFileElevated(wb, h);
-    } catch (e) { console.error('[AG] Inject error:', e.message); return false; }
-    return true;
-}
-function updateChecksums() {
-    try {
-        let pjp = null;
-        if (process.resourcesPath) { const c = path.join(process.resourcesPath,'app','product.json'); if (fs.existsSync(c)) pjp = c; }
-        if (!pjp) { const w = getWorkbenchPath(); if (!w) return; let d = path.dirname(w); for (let i = 0; i < 8; i++) { const c = path.join(d,'product.json'); if (fs.existsSync(c)) { pjp = c; break; } d = path.dirname(d); } }
-        if (!pjp) return;
-        const pj = JSON.parse(fs.readFileSync(pjp, 'utf8')); if (!pj.checksums) return;
-        const ar = path.dirname(pjp), od = path.join(ar, 'out'); let upd = false;
-        for (const rp in pj.checksums) { const np = rp.split('/').join(path.sep); let fp = path.join(od, np); if (!fs.existsSync(fp)) fp = path.join(ar, np); if (fs.existsSync(fp)) { const h = crypto.createHash('sha256').update(fs.readFileSync(fp)).digest('base64').replace(/=+$/, ''); if (pj.checksums[rp] !== h) { pj.checksums[rp] = h; upd = true; } } }
-        if (upd) writeFileElevated(pjp, JSON.stringify(pj, null, '\t'));
-    } catch (_) {}
-}
-function clearCache() {
-    try {
-        let d;
-        if (process.platform === 'win32') d = path.join(process.env.APPDATA || path.join(os.homedir(),'AppData','Roaming'), 'Antigravity','Code Cache','js');
-        else if (process.platform === 'darwin') d = path.join(os.homedir(),'Library','Application Support','Antigravity','Code Cache','js');
-        else d = path.join(os.homedir(),'.config','Antigravity','Code Cache','js');
-        if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
-    } catch (_) {}
-}
-function uninstallScript() {
-    const wb = getWorkbenchPath(); if (!wb) return false;
-    const dir = path.dirname(wb);
-    try {
-        let h = fs.readFileSync(wb, 'utf8');
-        for (const [s, e] of [[TAG_START, TAG_END], ...OLD_TAGS]) h = h.replace(new RegExp(escapeRegex(s)+'[\\s\\S]*?'+escapeRegex(e), 'g'), '');
-        writeFileElevated(wb, h);
-        for (const f of ['ag-auto-script.js','ag-modelswitch-client.js']) { const p = path.join(dir, f); if (fs.existsSync(p)) fs.unlinkSync(p); }
-        return true;
-    } catch (e) { vscode.window.showErrorMessage('[AG] Uninstall failed: ' + e.message); return false; }
-}
-function isInjected() { try { const w = getWorkbenchPath(); return w ? fs.readFileSync(w, 'utf8').includes(TAG_START) : false; } catch (_) { return false; } }
+// ═════════════════════════════════════════════════════════════
+//  Command analysis — parse compound commands
+// ═════════════════════════════════════════════════════════════
 
-// =============================================================
-// SETTINGS PANEL
-// =============================================================
-function openSettingsPanel(ctx) {
-    if (_settingsPanel) { _settingsPanel.dispose(); _settingsPanel = null; return; }
-    const panel = vscode.window.createWebviewPanel('agAutoSettings', 'AG Autopilot - Settings', vscode.ViewColumn.One, { enableScripts: true });
-    _settingsPanel = panel;
-    panel.onDidDispose(() => { _settingsPanel = null; });
-    const c = vscode.workspace.getConfiguration('ag-auto');
-    panel.webview.html = getSettingsHtml({
-        enabled: c.get('enabled', true), scrollEnabled: c.get('scrollEnabled', true),
-        smartRouter: false, quotaFallback: false,
-        scrollPauseMs: c.get('scrollPauseMs', 7000), scrollIntervalMs: c.get('scrollIntervalMs', 500),
-        clickIntervalMs: c.get('clickIntervalMs', 1000),
-        clickPatterns: c.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept']),
-        disabledClickPatterns: ctx.globalState.get('disabledClickPatterns', []),
-        language: c.get('language', 'vi'), clickStats: _clickStats, totalClicks: _totalClicks
-    });
-    panel.webview.onDidReceiveMessage(async (msg) => {
-        const cfg = vscode.workspace.getConfiguration('ag-auto');
-        if (msg.command === 'changeLang') { await cfg.update('language', msg.lang, vscode.ConfigurationTarget.Global); panel.webview.html = getSettingsHtml({ enabled: cfg.get('enabled', true), scrollEnabled: cfg.get('scrollEnabled', true), smartRouter: false, quotaFallback: false, scrollPauseMs: cfg.get('scrollPauseMs', 7000), scrollIntervalMs: cfg.get('scrollIntervalMs', 500), clickIntervalMs: cfg.get('clickIntervalMs', 1000), clickPatterns: cfg.get('clickPatterns', ['Run','Allow','Always Allow','Keep Waiting','Accept']), disabledClickPatterns: ctx.globalState.get('disabledClickPatterns', []), language: msg.lang, clickStats: _clickStats, totalClicks: _totalClicks }); }
-        if (msg.command === 'toggle') { _autoAcceptEnabled = msg.enabled; await cfg.update('enabled', msg.enabled, vscode.ConfigurationTarget.Global); writeConfigJson(ctx); updateStatusBar(); }
-        if (msg.command === 'scrollToggle') { _httpScrollEnabled = msg.enabled; await cfg.update('scrollEnabled', msg.enabled, vscode.ConfigurationTarget.Global); writeConfigJson(ctx); updateStatusBar(); }
-        if (msg.command === 'save') {
-            const d = msg.data;
-            await cfg.update('enabled', d.enabled, vscode.ConfigurationTarget.Global);
-            await cfg.update('scrollEnabled', d.scrollEnabled, vscode.ConfigurationTarget.Global);
-            await cfg.update('scrollPauseMs', d.scrollPauseMs, vscode.ConfigurationTarget.Global);
-            await cfg.update('scrollIntervalMs', d.scrollIntervalMs, vscode.ConfigurationTarget.Global);
-            await cfg.update('clickIntervalMs', d.clickIntervalMs, vscode.ConfigurationTarget.Global);
-            await cfg.update('clickPatterns', d.clickPatterns, vscode.ConfigurationTarget.Global);
-            await ctx.globalState.update('disabledClickPatterns', d.disabledClickPatterns);
-            _autoAcceptEnabled = d.enabled; _httpScrollEnabled = d.scrollEnabled !== false;
-            _httpClickPatterns = d.clickPatterns.filter(p => !d.disabledClickPatterns.includes(p));
-            writeConfigJson(ctx); updateStatusBar();
+/**
+ * Extract individual command names from a compound command string.
+ * Handles: pipes (|), chains (&&, ||, ;), subshells ($(...)), xargs, etc.
+ */
+function extractCommands(cmdLine) {
+    if (!cmdLine || typeof cmdLine !== 'string') return [];
+    // Split on shell operators: |, &&, ||, ;, &
+    const parts = cmdLine.split(/\s*(?:\|\||&&|[|;&])\s*/);
+    const cmds = [];
+    for (const part of parts) {
+        let p = part.trim();
+        if (!p) continue;
+        // Strip leading env vars (FOO=bar cmd), sudo, nohup, time, nice, etc.
+        p = p.replace(/^(?:(?:sudo|nohup|time|nice|ionice|strace|ltrace|env)\s+)+/gi, '');
+        p = p.replace(/^(?:\w+=\S+\s+)+/, '');
+        // Strip subshell wrappers
+        p = p.replace(/^\$\(\s*/, '').replace(/^\(\s*/, '').replace(/\)\s*$/, '');
+        // Get the first word (the command name)
+        const match = p.match(/^([^\s]+)/);
+        if (match) {
+            let cmd = match[1];
+            // Strip path prefix: /usr/bin/git → git
+            cmd = cmd.replace(/^.*[/\\]/, '');
+            if (cmd) cmds.push(cmd.toLowerCase());
         }
-        if (msg.command === 'reload') vscode.commands.executeCommand('workbench.action.reloadWindow');
-        if (msg.command === 'resetStats') { _clickStats = {}; _totalClicks = 0; ctx.globalState.update('clickStats', {}); ctx.globalState.update('totalClicks', 0); panel.webview.postMessage({ command: 'statsUpdated', clickStats: {}, totalClicks: 0 }); }
-        if (msg.command === 'clearClickLog') { _clickLog = []; if (_extensionContext) _extensionContext.globalState.update('clickLog', []); panel.webview.postMessage({ command: 'clickLogUpdate', log: [] }); }
-        if (msg.command === 'getClickLog') panel.webview.postMessage({ command: 'clickLogUpdate', log: _clickLog });
-        if (msg.command === 'getStats') panel.webview.postMessage({ command: 'statsUpdated', clickStats: _clickStats, totalClicks: _totalClicks });
-    }, undefined, ctx.subscriptions);
-    const st = setInterval(() => { try { panel.webview.postMessage({ command: 'statsUpdated', clickStats: _clickStats, totalClicks: _totalClicks }); } catch (_) { clearInterval(st); } }, 2000);
-    panel.onDidDispose(() => clearInterval(st));
+    }
+    return [...new Set(cmds)];
 }
-function getSettingsHtml(cfg) {
-    const lang = cfg.language || 'vi';
-    let h = fs.readFileSync(path.join(__dirname, '..', 'media', 'settings.html'), 'utf8');
-    h = h.replace(/\{\{LANG\}\}/g, lang); h = h.replace('{{TOTAL_CLICKS}}', String(cfg.totalClicks || 0));
-    h = h.replace('{{ENABLED_CHK}}', cfg.enabled ? 'checked' : ''); h = h.replace('{{SCROLL_CHK}}', cfg.scrollEnabled !== false ? 'checked' : '');
-    h = h.replace('{{ROUTER_CHK}}', ''); h = h.replace('{{QUOTA_CHK}}', '');
-    h = h.replace(/\{\{CLICK_MS\}\}/g, String(cfg.clickIntervalMs || 1000)); h = h.replace(/\{\{SCROLL_MS\}\}/g, String(cfg.scrollIntervalMs || 500));
-    h = h.replace(/\{\{PAUSE_MS\}\}/g, String(cfg.scrollPauseMs || 7000));
-    h = h.replace('{{LANG_VI}}', lang === 'vi' ? 'selected' : ''); h = h.replace('{{LANG_EN}}', lang === 'en' ? 'selected' : ''); h = h.replace('{{LANG_ZH}}', lang === 'zh' ? 'selected' : '');
-    h = h.replace('{{PATTERNS_JSON}}', JSON.stringify(cfg.clickPatterns)); h = h.replace('{{DISABLED_JSON}}', JSON.stringify(cfg.disabledClickPatterns));
-    h = h.replace('{{STATS_JSON}}', JSON.stringify(cfg.clickStats || {}));
+
+/**
+ * Check if a full command line matches any blacklist pattern.
+ */
+function matchesBlacklist(cmdLine, blacklist) {
+    const lower = cmdLine.toLowerCase().trim();
+    for (const pattern of blacklist) {
+        const p = pattern.toLowerCase().trim();
+        if (!p) continue;
+        // Exact substring match
+        if (lower.includes(p)) return pattern;
+        // Regex pattern (starts with /)
+        if (p.startsWith('/') && p.endsWith('/')) {
+            try {
+                if (new RegExp(p.slice(1, -1), 'i').test(cmdLine)) return pattern;
+            } catch (_) {}
+        }
+    }
+    return null;
+}
+
+/**
+ * Evaluate a command line against whitelist + blacklist + learned data.
+ * Returns: { allowed: bool, reason: string, commands: string[], confidence: number }
+ */
+function evaluateCommand(cmdLine) {
+    const blacklist = [...DEFAULT_BLACKLIST, ..._userBlacklist];
+    const whitelist = [...SAFE_TERMINAL_CMDS, ..._userWhitelist];
+
+    // 1. Blacklist = hard constraint (highest priority, like gradient clipping)
+    const blocked = matchesBlacklist(cmdLine, blacklist);
+    if (blocked) return { allowed: false, reason: `Blocked by blacklist: "${blocked}"`, commands: [], confidence: -1, wiki: null };
+
+    // 2. Extract all commands from compound line
+    const cmds = extractCommands(cmdLine);
+    if (cmds.length === 0) return { allowed: false, reason: 'Could not parse command', commands: [], confidence: 0, wiki: null };
+
+    // 3. Query the Second Brain wiki for compiled knowledge (not raw data)
+    //    Like Karpathy's: "The LLM reads the index first to find relevant pages"
+    const promotedCmds = getPromotedCommands();
+    const fullWhitelist = [...whitelist, ...promotedCmds, ..._patternCache];
+    const unknown = [];
+    let minConf = 1.0;
+    const wikiInsights = [];
+
+    for (const cmd of cmds) {
+        if (fullWhitelist.includes(cmd)) continue;
+
+        // Query wiki for compiled knowledge about this command
+        const wikiPage = wikiQuery(cmd);
+        if (wikiPage) {
+            wikiInsights.push({ cmd, riskLevel: wikiPage.riskLevel, summary: wikiPage.summary });
+            // Wiki says it's safe and has enough evidence
+            if (wikiPage.riskLevel === 'safe' && wikiPage.totalEvents >= LEARN.OBSERVE_MIN) {
+                minConf = Math.min(minConf, wikiPage.confidence);
+                continue;
+            }
+            // Wiki says caution — allow but with low confidence
+            if (wikiPage.riskLevel === 'caution' && wikiPage.confidence > 0) {
+                minConf = Math.min(minConf, wikiPage.confidence * 0.5);
+                continue;
+            }
+        }
+
+        // Fallback: check raw learnData
+        const entry = _learnData[cmd];
+        if (entry && entry.conf > 0) {
+            minConf = Math.min(minConf, entry.conf);
+            continue;
+        }
+        unknown.push(cmd);
+    }
+
+    if (unknown.length > 0) {
+        return { allowed: false, reason: `Unknown commands: ${unknown.join(', ')}`, commands: cmds, confidence: 0, wiki: wikiInsights };
+    }
+
+    return { allowed: true, reason: 'All commands whitelisted', commands: cmds, confidence: minConf, wiki: wikiInsights };
+}
+
+/** Get commands that have been promoted by the learning system (confidence >= threshold) */
+function getPromotedCommands() {
+    return Object.entries(_learnData)
+        .filter(([, d]) => d.conf >= LEARN.PROMOTE_THRESH && d.obs >= LEARN.OBSERVE_MIN)
+        .map(([k]) => k);
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Karpathy-inspired Adaptive Learning Engine
+//
+//  Architecture mirrors neural network training:
+//    - Each command = a "neuron" with a confidence weight
+//    - User approve/reject = reward signal (RLVR: verifiable reward)
+//    - Confidence update = gradient step with momentum
+//    - Time decay = weight decay / regularization
+//    - Context features = input features (time-of-day, project, exit code)
+//    - Pattern generalization = learned representations
+//    - Confidence history = loss curve for visualization
+//
+//  Training loop per event:
+//    1. Observe (collect data point with context)
+//    2. Compute reward (approve=+1, reject=-1, exit_code=0 → bonus)
+//    3. Gradient step: conf += α * reward (with momentum)
+//    4. Regularize: daily decay, prune low-confidence stale entries
+//    5. Generalize: cluster similar commands into patterns
+//    6. Suggest: promote/demote when confidence crosses threshold
+// ═════════════════════════════════════════════════════════════
+
+function loadLearnData() {
+    if (!_ctx) return;
+    const raw = _ctx.globalState.get('learnData', {});
+    _learnEpoch   = _ctx.globalState.get('learnEpoch', 0);
+    _userWhitelist = cfg('terminalWhitelist', []);
+    _userBlacklist = cfg('terminalBlacklist', []);
+
+    // Migrate old format (approves/rejects) → new format (conf/velocity/obs)
+    _learnData = {};
+    for (const [k, v] of Object.entries(raw)) {
+        if (typeof v.conf === 'number') {
+            _learnData[k] = v; // already new format
+        } else if (typeof v.approves === 'number') {
+            // Migration: convert old approve/reject counts to confidence
+            const total = (v.approves || 0) + (v.rejects || 0);
+            const ratio = total > 0 ? (v.approves || 0) / total : 0.5;
+            _learnData[k] = {
+                conf: (ratio - 0.5) * 2,  // map [0,1] → [-1,1]
+                velocity: 0,
+                obs: total,
+                rewards: [],
+                history: [{ t: v.lastSeen || Date.now(), c: (ratio - 0.5) * 2 }],
+                contexts: {},
+                lastSeen: v.lastSeen || Date.now(),
+                promoted: false,
+                demoted: false,
+            };
+        }
+    }
+
+    // Step 4: Regularize — time-based weight decay (like Karpathy's weight decay)
+    applyDecay();
+
+    // Step 5: Generalize — discover patterns from data
+    generalizePatterns();
+
+    // Prune to max entries (keep highest-observed, like keeping best checkpoints)
+    pruneEntries();
+
+    // Load Second Brain wiki
+    loadWiki();
+
+    saveLearnData();
+}
+
+/** Apply temporal decay — recent observations matter more (exponential decay) */
+function applyDecay() {
+    const now = Date.now();
+    let changed = false;
+    for (const [k, d] of Object.entries(_learnData)) {
+        const daysSince = (now - d.lastSeen) / 86400000;
+        if (daysSince > 1) {
+            // Decay confidence toward 0 (neutral) — like weight decay toward origin
+            const decayFactor = Math.pow(LEARN.GAMMA, daysSince);
+            const oldConf = d.conf;
+            d.conf *= decayFactor;
+            d.velocity *= decayFactor;
+            // If decayed to near-zero and few observations, prune
+            if (Math.abs(d.conf) < 0.01 && d.obs < LEARN.OBSERVE_MIN && daysSince > 60) {
+                delete _learnData[k];
+            }
+            if (d.conf !== oldConf) changed = true;
+        }
+    }
+    return changed;
+}
+
+/** Prune to max entries — keep most valuable (highest |conf| × obs) */
+function pruneEntries() {
+    const keys = Object.keys(_learnData);
+    if (keys.length <= LEARN.MAX_ENTRIES) return;
+    // Score = |confidence| × log(observations+1) — like importance sampling
+    const scored = keys.map(k => ({
+        key: k,
+        score: Math.abs(_learnData[k].conf) * Math.log(_learnData[k].obs + 1),
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    for (let i = LEARN.MAX_ENTRIES; i < scored.length; i++) {
+        delete _learnData[scored[i].key];
+    }
+}
+
+/**
+ * Step 5: Generalize — discover command patterns from data.
+ * Like learning representations: group similar commands into abstract patterns.
+ * e.g., if user approves "npm run build", "npm run test", "npm run lint"
+ *        → generalize pattern "npm" (the base command is already whitelisted,
+ *          but we also learn that npm subcommands are safe)
+ */
+function generalizePatterns() {
+    _patternCache = [];
+    // Group by prefix (first token before space/dash)
+    const groups = {};
+    for (const [cmd, d] of Object.entries(_learnData)) {
+        if (d.conf < 0.3 || d.obs < 2) continue;
+        const prefix = cmd.replace(/[-_].*$/, '').replace(/\d+$/, '');
+        if (prefix && prefix.length >= 2) {
+            if (!groups[prefix]) groups[prefix] = [];
+            groups[prefix].push(cmd);
+        }
+    }
+    // If a prefix group has enough members, the prefix itself becomes a pattern
+    for (const [prefix, members] of Object.entries(groups)) {
+        if (members.length >= LEARN.GENERALIZE_MIN && !SAFE_TERMINAL_CMDS.includes(prefix)) {
+            _patternCache.push(prefix);
+        }
+    }
+}
+
+/**
+ * Core learning function — process a single training example.
+ *
+ * Mirrors Karpathy's training loop:
+ *   reward = verifiable signal (approve/reject + exit code)
+ *   gradient = α * reward
+ *   velocity = momentum * velocity + gradient  (SGD with momentum)
+ *   confidence += velocity
+ *   confidence = clamp(confidence, -1, 1)
+ *
+ * @param {string} cmdLine - full command line
+ * @param {string} action - 'approve' | 'reject'
+ * @param {object} context - { exitCode, project, timeOfDay, duration }
+ */
+function recordCommandAction(cmdLine, action, context = {}) {
+    if (!cfg('learnEnabled', true)) return;
+
+    const cmds = extractCommands(cmdLine);
+    const now = Date.now();
+    _learnEpoch++;
+
+    for (const cmd of cmds) {
+        // Initialize new entry (like weight initialization — start at 0, neutral)
+        if (!_learnData[cmd]) {
+            _learnData[cmd] = {
+                conf: 0,          // confidence weight ∈ [-1, 1]
+                velocity: 0,      // momentum term
+                obs: 0,           // total observations
+                rewards: [],      // recent reward history (mini-batch)
+                history: [],      // confidence trajectory (for loss curve visualization)
+                contexts: {},     // contextual features
+                lastSeen: now,
+                promoted: false,  // already suggested for whitelist?
+                demoted: false,   // already suggested for blacklist?
+            };
+        }
+
+        const d = _learnData[cmd];
+        d.obs++;
+        d.lastSeen = now;
+
+        // Step 1: Compute reward (RLVR — verifiable reward signal)
+        let reward = action === 'approve' ? 1.0 : -1.0;
+
+        // Contextual reward modifiers (like input features)
+        if (context.exitCode !== undefined) {
+            if (context.exitCode === 0 && action === 'approve') {
+                reward += LEARN.CONTEXT_WEIGHT;  // verified success = bonus reward
+            } else if (context.exitCode !== 0 && action === 'approve') {
+                reward -= LEARN.CONTEXT_WEIGHT;  // approved but failed = slight penalty
+            }
+        }
+
+        // Time-of-day context (track when user uses this command)
+        const hour = new Date().getHours();
+        const timeSlot = hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+        d.contexts[timeSlot] = (d.contexts[timeSlot] || 0) + 1;
+
+        // Project context
+        if (context.project) {
+            const projKey = 'proj:' + context.project;
+            d.contexts[projKey] = (d.contexts[projKey] || 0) + 1;
+        }
+
+        // Step 2: Store reward in mini-batch
+        d.rewards.push(reward);
+        if (d.rewards.length > LEARN.BATCH_SIZE) d.rewards.shift();
+
+        // Step 3: Gradient step with momentum (SGD + momentum)
+        // Average reward over mini-batch (reduces variance, like mini-batch SGD)
+        const batchReward = d.rewards.reduce((a, b) => a + b, 0) / d.rewards.length;
+        const gradient = LEARN.ALPHA * batchReward;
+        d.velocity = LEARN.MOMENTUM * d.velocity + gradient;
+        d.conf = Math.max(-1, Math.min(1, d.conf + d.velocity * (1 - LEARN.MOMENTUM)));
+
+        // Step 4: Record confidence history (loss curve)
+        d.history.push({ t: now, c: d.conf, r: reward, e: _learnEpoch });
+        if (d.history.length > LEARN.MAX_HISTORY) d.history.shift();
+
+        // Step 6: Suggest promotion/demotion when crossing threshold
+        if (d.obs >= LEARN.OBSERVE_MIN) {
+            if (d.conf >= LEARN.PROMOTE_THRESH && !d.promoted
+                && !SAFE_TERMINAL_CMDS.includes(cmd) && !_userWhitelist.includes(cmd)) {
+                d.promoted = true;
+                suggestPromotion(cmd, d);
+            }
+            if (d.conf <= LEARN.DEMOTE_THRESH && !d.demoted
+                && !_userBlacklist.includes(cmd)) {
+                d.demoted = true;
+                suggestDemotion(cmd, d);
+            }
+        }
+    }
+
+    // Periodically re-generalize patterns (every 20 epochs)
+    if (_learnEpoch % 20 === 0) generalizePatterns();
+
+    // Second Brain: ingest each command event into the wiki
+    for (const cmd of cmds) {
+        wikiIngest(cmd, action, _learnData[cmd], context);
+    }
+
+    saveLearnData();
+}
+
+function saveLearnData() {
+    if (_ctx) {
+        _ctx.globalState.update('learnData', _learnData);
+        _ctx.globalState.update('learnEpoch', _learnEpoch);
+        _ctx.globalState.update('wiki', _wiki);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Second Brain — Karpathy LLM Wiki Pattern
+//
+//  "Instead of re-deriving knowledge on every query, the LLM
+//   incrementally builds and maintains a persistent wiki."
+//
+//  Architecture:
+//    Layer 1 (Raw): _learnData — individual command observations
+//    Layer 2 (Wiki): _wiki — compiled knowledge pages
+//    Layer 3 (Schema): LEARN constants — system rules
+//
+//  Operations:
+//    Ingest: new event → update wiki pages, cross-references
+//    Query: evaluateCommand reads wiki, not raw data
+//    Lint: periodic health check, find contradictions/orphans
+// ═════════════════════════════════════════════════════════════
+
+function loadWiki() {
+    if (!_ctx) return;
+    const saved = _ctx.globalState.get('wiki', null);
+    if (saved && saved.index) {
+        _wiki = saved;
+    } else {
+        // Initialize empty wiki
+        _wiki = {
+            index: {},
+            concepts: {},
+            log: [],
+            synthesis: {},
+            contradictions: [],
+            lastLint: 0,
+        };
+    }
+}
+
+/**
+ * INGEST — Core wiki operation.
+ * When a new command event arrives, compile it into the wiki.
+ * Like Karpathy's ingest: "A single source might touch 10-15 wiki pages."
+ *
+ * @param {string} cmd - command name
+ * @param {string} action - 'approve' | 'reject'
+ * @param {object} data - the learnData entry for this command
+ * @param {object} context - contextual signals
+ */
+function wikiIngest(cmd, action, data, context) {
+    const now = Date.now();
+
+    // 1. Update or create the command's index page
+    if (!_wiki.index[cmd]) {
+        _wiki.index[cmd] = {
+            firstSeen: now,
+            lastUpdated: now,
+            totalEvents: 0,
+            approves: 0,
+            rejects: 0,
+            confidence: 0,
+            links: [],        // cross-references to related commands
+            sources: [],      // raw event timestamps (last 20)
+            tags: [],         // auto-generated tags
+            summary: '',      // compiled summary
+            riskLevel: 'unknown', // unknown → safe → caution → danger
+        };
+    }
+    const page = _wiki.index[cmd];
+    page.lastUpdated = now;
+    page.totalEvents++;
+    if (action === 'approve') page.approves++;
+    else page.rejects++;
+    page.confidence = data.conf;
+    page.sources.push(now);
+    if (page.sources.length > 20) page.sources.shift();
+
+    // 2. Compile summary (like LLM writing wiki page)
+    const ratio = page.totalEvents > 0 ? page.approves / page.totalEvents : 0;
+    if (ratio >= 0.9 && page.totalEvents >= 5) {
+        page.summary = `Highly trusted command. Approved ${page.approves}/${page.totalEvents} times (${Math.round(ratio * 100)}%).`;
+        page.riskLevel = 'safe';
+        page.tags = [...new Set([...page.tags, 'trusted', 'auto-approve'])];
+    } else if (ratio >= 0.6) {
+        page.summary = `Generally safe. Approved ${page.approves}/${page.totalEvents} times. Monitor for changes.`;
+        page.riskLevel = 'safe';
+        page.tags = [...new Set([...page.tags, 'learning'])];
+    } else if (ratio >= 0.3) {
+        page.summary = `Mixed signals. ${page.approves} approves vs ${page.rejects} rejects. Needs more data.`;
+        page.riskLevel = 'caution';
+        page.tags = [...new Set([...page.tags, 'mixed', 'review'])];
+    } else {
+        page.summary = `Frequently rejected (${page.rejects}/${page.totalEvents}). Likely unsafe or unwanted.`;
+        page.riskLevel = 'danger';
+        page.tags = [...new Set([...page.tags, 'suspicious', 'blocked'])];
+    }
+
+    // 3. Update concept pages — group by semantic category
+    const concept = classifyCommand(cmd);
+    if (concept) {
+        if (!_wiki.concepts[concept]) {
+            _wiki.concepts[concept] = {
+                description: '',
+                commands: [],
+                evidence: [],
+                avgConfidence: 0,
+                riskLevel: 'unknown',
+            };
+        }
+        const cp = _wiki.concepts[concept];
+        if (!cp.commands.includes(cmd)) cp.commands.push(cmd);
+        cp.evidence.push({ cmd, action, time: now, conf: data.conf });
+        if (cp.evidence.length > 50) cp.evidence.shift();
+
+        // Recompile concept summary
+        const confs = cp.commands.map(c => _wiki.index[c]?.confidence || 0);
+        cp.avgConfidence = confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
+        cp.riskLevel = cp.avgConfidence >= 0.5 ? 'safe' : cp.avgConfidence >= 0 ? 'caution' : 'danger';
+        cp.description = `${cp.commands.length} commands in this category. Avg confidence: ${Math.round(cp.avgConfidence * 100)}%. Risk: ${cp.riskLevel}.`;
+    }
+
+    // 4. Build cross-references (like wiki backlinks)
+    if (context.project) {
+        // Link commands used in the same project
+        const projectCmds = Object.entries(_wiki.index)
+            .filter(([k, v]) => k !== cmd && v.tags.includes('proj:' + context.project))
+            .map(([k]) => k);
+        for (const related of projectCmds.slice(0, 5)) {
+            if (!page.links.includes(related)) page.links.push(related);
+            const relPage = _wiki.index[related];
+            if (relPage && !relPage.links.includes(cmd)) relPage.links.push(cmd);
+        }
+        if (!page.tags.includes('proj:' + context.project)) {
+            page.tags.push('proj:' + context.project);
+        }
+    }
+
+    // 5. Detect contradictions (like Karpathy's lint: "noting where new data contradicts old claims")
+    detectContradictions(cmd, action, data);
+
+    // 6. Update synthesis — high-level patterns
+    updateSynthesis();
+
+    // 7. Append to activity log
+    const ts = new Date(now).toISOString().slice(0, 19).replace('T', ' ');
+    _wiki.log.push({
+        time: ts,
+        op: 'ingest',
+        cmd,
+        action,
+        conf: Math.round(data.conf * 100) / 100,
+        concept: concept || '-',
+    });
+    if (_wiki.log.length > 200) _wiki.log = _wiki.log.slice(-200);
+
+    // 8. Periodic lint (every 50 events, like Karpathy's "lint the wiki")
+    if (_learnEpoch % 50 === 0 && now - _wiki.lastLint > 300000) {
+        wikiLint();
+    }
+}
+
+/**
+ * Classify a command into a semantic concept category.
+ * Like creating concept pages in the wiki.
+ */
+function classifyCommand(cmd) {
+    const categories = {
+        'package-manager': ['npm','npx','yarn','pnpm','bun','pip','pip3','cargo','go','mvn','gradle','brew','apt','apt-get','yum','dnf','pacman','snap','uvx','uv','pipx','poetry','pdm'],
+        'version-control': ['git'],
+        'container-ops': ['docker','docker-compose','podman','kubectl','helm'],
+        'build-tool': ['make','cmake','gcc','g++','clang','tsc','webpack','vite','esbuild','rollup','turbo'],
+        'test-runner': ['jest','vitest','mocha','playwright'],
+        'linter-formatter': ['eslint','prettier','ruff','black','mypy'],
+        'file-ops': ['ls','dir','cat','cp','mv','touch','mkdir','rm','find','head','tail','wc','sort','uniq','diff','tar','zip','unzip','gzip'],
+        'network': ['curl','wget','ping','dig','nslookup','host','netstat','ss'],
+        'system-info': ['ps','top','htop','lsof','df','du','free','uname','hostname','whoami','id','env','printenv','date'],
+        'text-processing': ['grep','sed','awk','tr','cut','tee','xargs','jq','yq'],
+        'database': ['sqlite3','psql','mysql','mongosh','redis-cli'],
+        'language-runtime': ['node','python','python3','deno','java','javac','rustc'],
+        'infra': ['terraform','ansible'],
+        'crypto-encoding': ['base64','md5','sha256sum','openssl'],
+    };
+    for (const [concept, cmds] of Object.entries(categories)) {
+        if (cmds.includes(cmd)) return concept;
+    }
+    return null;
+}
+
+/**
+ * Detect contradictions — when a command's behavior changes unexpectedly.
+ * Like Karpathy's: "noting where new data contradicts old claims"
+ */
+function detectContradictions(cmd, action, data) {
+    const page = _wiki.index[cmd];
+    if (!page || page.totalEvents < 5) return;
+
+    // Contradiction: command was mostly approved but now getting rejected
+    const ratio = page.approves / page.totalEvents;
+    if (action === 'reject' && ratio > 0.8 && page.totalEvents > 10) {
+        const contradiction = {
+            time: Date.now(),
+            type: 'behavior-shift',
+            cmd,
+            detail: `"${cmd}" was trusted (${Math.round(ratio * 100)}% approve rate) but just got rejected. Possible context change.`,
+            oldClaim: `${cmd} is safe (conf: ${Math.round(page.confidence * 100)}%)`,
+            newEvidence: `Rejected at epoch ${_learnEpoch}`,
+            resolved: false,
+        };
+        _wiki.contradictions.push(contradiction);
+        if (_wiki.contradictions.length > 50) _wiki.contradictions.shift();
+    }
+
+    // Contradiction: command was mostly rejected but now approved
+    if (action === 'approve' && ratio < 0.3 && page.totalEvents > 10) {
+        const contradiction = {
+            time: Date.now(),
+            type: 'rehabilitation',
+            cmd,
+            detail: `"${cmd}" was distrusted (${Math.round(ratio * 100)}% approve rate) but just got approved. User may have changed stance.`,
+            oldClaim: `${cmd} is suspicious`,
+            newEvidence: `Approved at epoch ${_learnEpoch}`,
+            resolved: false,
+        };
+        _wiki.contradictions.push(contradiction);
+        if (_wiki.contradictions.length > 50) _wiki.contradictions.shift();
+    }
+}
+
+/**
+ * Update synthesis — discover high-level patterns across the wiki.
+ * Like Karpathy's overview.md: "a high-level synthesis"
+ */
+function updateSynthesis() {
+    // Synthesize: which time slots are most active?
+    const timeSlots = { morning: 0, afternoon: 0, evening: 0, night: 0 };
+    for (const [, d] of Object.entries(_learnData)) {
+        for (const [slot, count] of Object.entries(d.contexts || {})) {
+            if (timeSlots[slot] !== undefined) timeSlots[slot] += count;
+        }
+    }
+    const peakTime = Object.entries(timeSlots).sort((a, b) => b[1] - a[1])[0];
+    _wiki.synthesis['peak-activity'] = {
+        description: `Most active during ${peakTime[0]} (${peakTime[1]} events)`,
+        members: Object.keys(timeSlots),
+        strength: peakTime[1],
+    };
+
+    // Synthesize: which concepts are most trusted?
+    const conceptRanking = Object.entries(_wiki.concepts)
+        .sort((a, b) => b[1].avgConfidence - a[1].avgConfidence);
+    if (conceptRanking.length > 0) {
+        _wiki.synthesis['trusted-categories'] = {
+            description: `Most trusted: ${conceptRanking.slice(0, 3).map(([k, v]) => `${k} (${Math.round(v.avgConfidence * 100)}%)`).join(', ')}`,
+            members: conceptRanking.slice(0, 3).map(([k]) => k),
+            strength: conceptRanking[0][1].avgConfidence,
+        };
+    }
+
+    // Synthesize: overall learning health
+    const totalObs = Object.values(_learnData).reduce((a, d) => a + d.obs, 0);
+    const avgConf = Object.values(_learnData).length > 0
+        ? Object.values(_learnData).reduce((a, d) => a + d.conf, 0) / Object.values(_learnData).length
+        : 0;
+    _wiki.synthesis['learning-health'] = {
+        description: `Epoch ${_learnEpoch}: ${Object.keys(_learnData).length} commands tracked, ${totalObs} total observations, avg confidence ${Math.round(avgConf * 100)}%`,
+        members: [],
+        strength: avgConf,
+    };
+}
+
+/**
+ * LINT — Periodic wiki health check.
+ * Like Karpathy's: "Look for contradictions, stale claims, orphan pages,
+ * missing cross-references, data gaps."
+ */
+function wikiLint() {
+    _wiki.lastLint = Date.now();
+    const issues = [];
+
+    // 1. Find orphan pages (commands with no cross-references)
+    const orphans = Object.entries(_wiki.index)
+        .filter(([, p]) => p.links.length === 0 && p.totalEvents >= 3)
+        .map(([k]) => k);
+    if (orphans.length > 0) {
+        issues.push({ type: 'orphans', detail: `${orphans.length} commands with no cross-references`, items: orphans.slice(0, 10) });
+    }
+
+    // 2. Find stale pages (not seen in 14+ days with low confidence)
+    const staleThreshold = Date.now() - 14 * 86400000;
+    const stale = Object.entries(_wiki.index)
+        .filter(([, p]) => p.lastUpdated < staleThreshold && Math.abs(p.confidence) < 0.3)
+        .map(([k]) => k);
+    if (stale.length > 0) {
+        issues.push({ type: 'stale', detail: `${stale.length} stale commands (>14 days, low confidence)`, items: stale.slice(0, 10) });
+    }
+
+    // 3. Find unresolved contradictions
+    const unresolved = _wiki.contradictions.filter(c => !c.resolved);
+    if (unresolved.length > 0) {
+        issues.push({ type: 'contradictions', detail: `${unresolved.length} unresolved contradictions`, items: unresolved.slice(0, 5).map(c => c.detail) });
+    }
+
+    // 4. Find concepts with too few members (under-represented categories)
+    const thinConcepts = Object.entries(_wiki.concepts)
+        .filter(([, c]) => c.commands.length === 1)
+        .map(([k]) => k);
+    if (thinConcepts.length > 0) {
+        issues.push({ type: 'thin-concepts', detail: `${thinConcepts.length} concepts with only 1 command`, items: thinConcepts });
+    }
+
+    // 5. Find commands tracked but not in any concept (missing classification)
+    const unclassified = Object.keys(_wiki.index).filter(cmd => {
+        return !Object.values(_wiki.concepts).some(c => c.commands.includes(cmd));
+    });
+    if (unclassified.length > 0) {
+        issues.push({ type: 'unclassified', detail: `${unclassified.length} commands not in any concept category`, items: unclassified.slice(0, 10) });
+    }
+
+    // Auto-resolve old contradictions (>7 days)
+    const resolveThreshold = Date.now() - 7 * 86400000;
+    for (const c of _wiki.contradictions) {
+        if (!c.resolved && c.time < resolveThreshold) c.resolved = true;
+    }
+
+    // Log lint results
+    const ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    _wiki.log.push({
+        time: ts,
+        op: 'lint',
+        issues: issues.length,
+        detail: issues.map(i => i.type + ':' + i.items.length).join(', ') || 'clean',
+    });
+
+    return issues;
+}
+
+/**
+ * QUERY — Read the wiki to answer questions about a command.
+ * Like Karpathy's: "The LLM reads the index first to find relevant pages."
+ * Returns compiled knowledge instead of raw data.
+ */
+function wikiQuery(cmd) {
+    const page = _wiki.index[cmd];
+    if (!page) return null;
+
+    // Find related commands via cross-references (associative trails)
+    const related = page.links
+        .map(link => ({ cmd: link, conf: _wiki.index[link]?.confidence || 0 }))
+        .sort((a, b) => b.conf - a.conf);
+
+    // Find concept
+    const concept = Object.entries(_wiki.concepts)
+        .find(([, c]) => c.commands.includes(cmd));
+
+    // Find relevant contradictions
+    const contradictions = _wiki.contradictions
+        .filter(c => c.cmd === cmd && !c.resolved);
+
+    return {
+        ...page,
+        related,
+        concept: concept ? { name: concept[0], ...concept[1] } : null,
+        contradictions,
+        synthesis: Object.values(_wiki.synthesis),
+    };
+}
+
+async function suggestPromotion(cmd, data) {
+    const confPct = Math.round(data.conf * 100);
+    const msg = `[Grav] 🧠 "${cmd}" confidence ${confPct}% sau ${data.obs} observations. Thêm vào whitelist?`;
+    const pick = await vscode.window.showInformationMessage(msg, 'Thêm', 'Bỏ qua', 'Blacklist');
+    if (pick === 'Thêm') {
+        _userWhitelist.push(cmd);
+        await vscode.workspace.getConfiguration('grav').update('terminalWhitelist', _userWhitelist, vscode.ConfigurationTarget.Global);
+        setupSafeApprove();
+        vscode.window.showInformationMessage(`[Grav] ✓ "${cmd}" → whitelist (conf: ${confPct}%)`);
+    } else if (pick === 'Blacklist') {
+        _userBlacklist.push(cmd);
+        await vscode.workspace.getConfiguration('grav').update('terminalBlacklist', _userBlacklist, vscode.ConfigurationTarget.Global);
+        setupSafeApprove();
+    } else {
+        data.promoted = false; // allow re-suggestion later
+    }
+}
+
+async function suggestDemotion(cmd, data) {
+    const confPct = Math.round(data.conf * 100);
+    const msg = `[Grav] ⚠️ "${cmd}" confidence ${confPct}% — thường bị reject. Thêm vào blacklist?`;
+    const pick = await vscode.window.showWarningMessage(msg, 'Blacklist', 'Bỏ qua');
+    if (pick === 'Blacklist') {
+        _userBlacklist.push(cmd);
+        await vscode.workspace.getConfiguration('grav').update('terminalBlacklist', _userBlacklist, vscode.ConfigurationTarget.Global);
+        setupSafeApprove();
+    } else {
+        data.demoted = false;
+    }
+}
+
+/**
+ * Get learning stats for dashboard — like Karpathy's "visualize everything" principle.
+ * Returns training metrics: confidence, velocity, observation count, trajectory, status.
+ */
+function getLearnStats() {
+    const entries = Object.entries(_learnData)
+        .sort((a, b) => b[1].obs - a[1].obs)
+        .slice(0, 30);
+    return {
+        epoch: _learnEpoch,
+        totalTracked: Object.keys(_learnData).length,
+        promoted: getPromotedCommands().length,
+        patterns: _patternCache.length,
+        commands: entries.map(([cmd, d]) => ({
+            cmd,
+            conf: Math.round(d.conf * 100) / 100,
+            velocity: Math.round(d.velocity * 1000) / 1000,
+            obs: d.obs,
+            status: d.conf >= LEARN.PROMOTE_THRESH && d.obs >= LEARN.OBSERVE_MIN ? 'promoted' :
+                    d.conf <= LEARN.DEMOTE_THRESH && d.obs >= LEARN.OBSERVE_MIN ? 'demoted' :
+                    d.obs < LEARN.OBSERVE_MIN ? 'observing' :
+                    d.conf > 0.3 ? 'learning' :
+                    d.conf < -0.3 ? 'suspicious' : 'neutral',
+            history: (d.history || []).map(h => ({ t: h.t, c: Math.round(h.c * 100) / 100 })),
+            topContext: getTopContext(d.contexts),
+            lastSeen: new Date(d.lastSeen).toLocaleDateString(),
+        })),
+        hyperparams: { ...LEARN },
+    };
+}
+
+function getTopContext(contexts) {
+    if (!contexts) return '';
+    const entries = Object.entries(contexts).sort((a, b) => b[1] - a[1]);
+    return entries.length > 0 ? entries[0][0] : '';
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Safe terminal auto-approve (enhanced with whitelist/blacklist + learning)
+// ═════════════════════════════════════════════════════════════
+function setupSafeApprove() {
+    try {
+        const c = vscode.workspace.getConfiguration();
+        const rules = c.get('chat.tools.terminal.autoApprove') || {};
+        // Merge built-in + user whitelist + promoted learned commands
+        const allWhitelist = [...SAFE_TERMINAL_CMDS, ..._userWhitelist];
+        const promoted = getPromotedCommands();
+        for (const cmd of promoted) {
+            if (!allWhitelist.includes(cmd)) allWhitelist.push(cmd);
+        }
+        // Add generalized patterns
+        for (const pat of _patternCache) {
+            if (!allWhitelist.includes(pat)) allWhitelist.push(pat);
+        }
+        for (const cmd of allWhitelist) {
+            if (!_userBlacklist.includes(cmd)) rules[cmd] = true;
+        }
+        // Remove blacklisted commands
+        for (const cmd of _userBlacklist) delete rules[cmd];
+        delete rules['/^/'];
+        delete rules['/.*/s'];
+        c.update('chat.tools.terminal.autoApprove', rules, vscode.ConfigurationTarget.Global).catch(() => {});
+        c.update('chat.tools.terminal.enableAutoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
+        c.update('chat.tools.terminal.ignoreDefaultAutoApproveRules', false, vscode.ConfigurationTarget.Global).catch(() => {});
+        c.update('chat.tools.terminal.autoReplyToPrompts', true, vscode.ConfigurationTarget.Global).catch(() => {});
+        c.update('chat.tools.edits.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
+        c.update('chat.agent.terminal.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
+    } catch (_) {}
+}
+
+// ═════════════════════════════════════════════════════════════
+//  HTTP bridge — runtime ↔ host
+// ═════════════════════════════════════════════════════════════
+function startBridge() {
+    if (_httpServer) return;
+    const url = require('url');
+    _httpServer = http.createServer((req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Content-Type', 'application/json');
+        if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+        const u = url.parse(req.url, true);
+
+        // Ingest click stats from runtime
+        if (u.query && u.query.stats) {
+            try {
+                const inc = JSON.parse(decodeURIComponent(u.query.stats));
+                for (const k in inc) { _stats[k] = (_stats[k] || 0) + inc[k]; }
+                _totalClicks = Object.values(_stats).reduce((a, b) => a + b, 0);
+                refreshBar();
+                if (_ctx) { _ctx.globalState.update('stats', _stats); _ctx.globalState.update('totalClicks', _totalClicks); }
+            } catch (_) {}
+        }
+
+        // Click log
+        if (u.pathname === '/api/click-log' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const now = new Date();
+                    const ts = [now.getHours(), now.getMinutes(), now.getSeconds()]
+                        .map(n => n < 10 ? '0' + n : n).join(':');
+                    _log.unshift({ time: ts, pattern: d.pattern || 'click', button: (d.button || '').substring(0, 80) });
+                    if (_log.length > 50) _log.pop();
+                    if (_ctx) _ctx.globalState.update('clickLog', _log);
+                } catch (_) {}
+                res.writeHead(200); res.end('{"ok":true}');
+            });
+            return;
+        }
+
+        // Terminal command evaluation
+        if (u.pathname === '/api/eval-command' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const result = evaluateCommand(d.command || '');
+                    res.writeHead(200); res.end(JSON.stringify(result));
+                } catch (_) { res.writeHead(400); res.end('{"error":"bad request"}'); }
+            });
+            return;
+        }
+
+        // Second Brain wiki query
+        if (u.pathname === '/api/wiki-query' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const result = d.command ? wikiQuery(d.command) : null;
+                    res.writeHead(200); res.end(JSON.stringify(result || { error: 'not found' }));
+                } catch (_) { res.writeHead(400); res.end('{"error":"bad request"}'); }
+            });
+            return;
+        }
+
+        // Second Brain wiki status
+        if (u.pathname === '/api/wiki-status') {
+            const status = {
+                pages: Object.keys(_wiki.index).length,
+                concepts: Object.keys(_wiki.concepts).length,
+                contradictions: _wiki.contradictions.filter(c => !c.resolved).length,
+                synthesis: Object.keys(_wiki.synthesis).length,
+                logEntries: _wiki.log.length,
+                lastLint: _wiki.lastLint,
+            };
+            res.writeHead(200); res.end(JSON.stringify(status));
+            return;
+        }
+
+        // Terminal command learning feedback (with RLVR context)
+        if (u.pathname === '/api/learn-command' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    if (cfg('learnEnabled', true) && d.command && d.action) {
+                        recordCommandAction(d.command, d.action, {
+                            exitCode: d.exitCode,
+                            project: d.project || (vscode.workspace.workspaceFolders?.[0]?.name),
+                            duration: d.duration,
+                        });
+                    }
+                    res.writeHead(200); res.end('{"ok":true}');
+                } catch (_) { res.writeHead(400); res.end('{"error":"bad request"}'); }
+            });
+            return;
+        }
+
+        // Quota detected
+        if (u.pathname === '/api/quota-detected' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                if (Date.now() - _lastQuotaMs > 60000) {
+                    _lastQuotaMs = Date.now();
+                    vscode.window.showWarningMessage('Quota exhausted — consider switching model manually.', 'OK');
+                }
+                res.writeHead(200); res.end('{"notified":true}');
+            });
+            return;
+        }
+
+        // Default: serve config
+        const dp = _ctx ? _ctx.globalState.get('disabledPatterns', []) : [];
+        const pats = cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry'])
+            .filter(p => !dp.includes(p) && p !== 'Accept');
+        res.writeHead(200);
+        res.end(JSON.stringify({
+            enabled: _enabled,
+            scrollEnabled: _scrollOn,
+            patterns: pats,
+            acceptInChatOnly: cfg('approvePatterns', []).includes('Accept') && !dp.includes('Accept'),
+            pauseMs: cfg('scrollPauseMs', 7000),
+            scrollMs: cfg('scrollIntervalMs', 500),
+            approveMs: cfg('approveIntervalMs', 1000),
+        }));
+    });
+
+    function tryPort(port) {
+        if (port > PORT_END) return;
+        _httpServer.removeAllListeners('error');
+        _httpServer.once('error', e => { if (e.code === 'EADDRINUSE') tryPort(port + 1); });
+        _httpServer.listen(port, '127.0.0.1', () => { _httpPort = port; });
+    }
+    tryPort(PORT_START);
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Status bar
+// ═════════════════════════════════════════════════════════════
+function createBar() {
+    _sbMain   = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
+    _sbClicks = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
+    _sbScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
+    _sbMain.command   = 'grav.dashboard';
+    _sbClicks.command = 'grav.dashboard';
+    _sbScroll.command = 'grav.dashboard';
+    _sbClicks.color   = '#f9e2af';
+    _ctx.subscriptions.push(_sbMain, _sbClicks, _sbScroll);
+    refreshBar();
+    _sbMain.show(); _sbClicks.show(); _sbScroll.show();
+}
+
+function refreshBar() {
+    if (!_sbMain) return;
+    _sbMain.text  = _enabled ? '$(rocket) Grav' : '$(circle-slash) Grav';
+    _sbMain.color = _enabled ? '#94e2d5' : '#f38ba8';
+    _sbMain.backgroundColor = _enabled ? undefined : new vscode.ThemeColor('statusBarItem.errorBackground');
+    if (_sbScroll) {
+        _sbScroll.text  = _scrollOn ? '$(fold-down) Scroll' : '$(circle-slash) Scroll';
+        _sbScroll.color = _scrollOn ? '#94e2d5' : '#f38ba8';
+    }
+    if (_sbClicks) _sbClicks.text = '$(target) ' + _totalClicks;
+}
+
+// ═════════════════════════════════════════════════════════════
+//  Dashboard (webview)
+// ═════════════════════════════════════════════════════════════
+function openDashboard() {
+    if (_dashboard) { _dashboard.dispose(); _dashboard = null; return; }
+    const panel = vscode.window.createWebviewPanel('gravDashboard', 'Grav — Dashboard', vscode.ViewColumn.One, { enableScripts: true });
+    _dashboard = panel;
+    panel.onDidDispose(() => { _dashboard = null; });
+
+    const renderPanel = () => {
+        const dp = _ctx.globalState.get('disabledPatterns', []);
+        const promoted = getPromotedCommands();
+        panel.webview.html = getDashboardHtml({
+            enabled: cfg('enabled', true),
+            scrollOn: cfg('autoScroll', true),
+            pauseMs: cfg('scrollPauseMs', 7000),
+            scrollMs: cfg('scrollIntervalMs', 500),
+            approveMs: cfg('approveIntervalMs', 1000),
+            patterns: cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry']),
+            disabledPatterns: dp,
+            language: cfg('language', 'vi'),
+            stats: _stats,
+            totalClicks: _totalClicks,
+            whiteCount: SAFE_TERMINAL_CMDS.length + _userWhitelist.length,
+            blackCount: DEFAULT_BLACKLIST.length + _userBlacklist.length,
+            learnCount: promoted.length,
+            learnEpoch: _learnEpoch,
+            learnTracking: Object.keys(_learnData).length,
+            learnPatterns: _patternCache.length,
+            wikiPages: Object.keys(_wiki.index).length,
+            wikiConcepts: Object.keys(_wiki.concepts).length,
+            wikiContradictions: _wiki.contradictions.filter(c => !c.resolved).length,
+            concepts: _wiki.concepts,
+            wikiLog: (_wiki.log || []).slice(-30),
+        });
+    };
+    renderPanel();
+
+    panel.webview.onDidReceiveMessage(async (msg) => {
+        const c = vscode.workspace.getConfiguration('grav');
+        switch (msg.command) {
+            case 'toggle':
+                _enabled = msg.enabled;
+                await c.update('enabled', msg.enabled, vscode.ConfigurationTarget.Global);
+                writeRuntimeConfig(); refreshBar(); break;
+            case 'scrollToggle':
+                _scrollOn = msg.enabled;
+                await c.update('autoScroll', msg.enabled, vscode.ConfigurationTarget.Global);
+                writeRuntimeConfig(); refreshBar(); break;
+            case 'save': {
+                const d = msg.data;
+                await c.update('enabled', d.enabled, vscode.ConfigurationTarget.Global);
+                await c.update('autoScroll', d.scrollOn, vscode.ConfigurationTarget.Global);
+                await c.update('scrollPauseMs', d.pauseMs, vscode.ConfigurationTarget.Global);
+                await c.update('scrollIntervalMs', d.scrollMs, vscode.ConfigurationTarget.Global);
+                await c.update('approveIntervalMs', d.approveMs, vscode.ConfigurationTarget.Global);
+                await c.update('approvePatterns', d.patterns, vscode.ConfigurationTarget.Global);
+                await _ctx.globalState.update('disabledPatterns', d.disabledPatterns);
+                _enabled = d.enabled; _scrollOn = d.scrollOn !== false;
+                _patterns = d.patterns.filter(p => !d.disabledPatterns.includes(p));
+                writeRuntimeConfig(); refreshBar(); break;
+            }
+            case 'changeLang':
+                await c.update('language', msg.lang, vscode.ConfigurationTarget.Global);
+                renderPanel(); break;
+            case 'reload':
+                vscode.commands.executeCommand('workbench.action.reloadWindow'); break;
+            case 'resetStats':
+                _stats = {}; _totalClicks = 0;
+                _ctx.globalState.update('stats', {}); _ctx.globalState.update('totalClicks', 0);
+                panel.webview.postMessage({ command: 'statsUpdated', stats: {}, totalClicks: 0 }); break;
+            case 'clearLog':
+                _log = []; _ctx.globalState.update('clickLog', []);
+                panel.webview.postMessage({ command: 'logUpdated', log: [] }); break;
+            case 'getLog':
+                panel.webview.postMessage({ command: 'logUpdated', log: _log }); break;
+            case 'getStats':
+                panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); break;
+            case 'manageTerminal':
+                vscode.commands.executeCommand('grav.manageTerminal'); break;
+        }
+    }, undefined, _ctx.subscriptions);
+
+    const ticker = setInterval(() => {
+        try { panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); }
+        catch (_) { clearInterval(ticker); }
+    }, 2000);
+    panel.onDidDispose(() => clearInterval(ticker));
+}
+
+function getDashboardHtml(c) {
+    let h = fs.readFileSync(path.join(__dirname, '..', 'media', 'dashboard.html'), 'utf8');
+    const lang = c.language || 'vi';
+    h = h.replace(/\{\{LANG\}\}/g, lang);
+    h = h.replace('{{TOTAL}}', String(c.totalClicks || 0));
+    h = h.replace('{{ENABLED_CHK}}', c.enabled ? 'checked' : '');
+    h = h.replace('{{SCROLL_CHK}}', c.scrollOn !== false ? 'checked' : '');
+    h = h.replace(/\{\{APPROVE_MS\}\}/g, String(c.approveMs || 1000));
+    h = h.replace(/\{\{SCROLL_MS\}\}/g, String(c.scrollMs || 500));
+    h = h.replace(/\{\{PAUSE_MS\}\}/g, String(c.pauseMs || 7000));
+    h = h.replace('{{LANG_VI}}', lang === 'vi' ? 'selected' : '');
+    h = h.replace('{{LANG_EN}}', lang === 'en' ? 'selected' : '');
+    h = h.replace('{{LANG_ZH}}', lang === 'zh' ? 'selected' : '');
+    h = h.replace('{{PATTERNS_JSON}}', JSON.stringify(c.patterns));
+    h = h.replace('{{DISABLED_JSON}}', JSON.stringify(c.disabledPatterns));
+    h = h.replace('{{STATS_JSON}}', JSON.stringify(c.stats || {}));
+    h = h.replace('{{WHITE_COUNT}}', String(c.whiteCount || 0));
+    h = h.replace('{{BLACK_COUNT}}', String(c.blackCount || 0));
+    h = h.replace('{{LEARN_COUNT}}', String(c.learnCount || 0));
+    h = h.replace('{{LEARN_EPOCH}}', String(c.learnEpoch || 0));
+    h = h.replace('{{LEARN_TRACKING}}', String(c.learnTracking || 0));
+    h = h.replace('{{LEARN_PATTERNS}}', String(c.learnPatterns || 0));
+    h = h.replace('{{WIKI_PAGES}}', String(c.wikiPages || 0));
+    h = h.replace('{{WIKI_CONCEPTS}}', String(c.wikiConcepts || 0));
+    h = h.replace('{{WIKI_CONTRADICTIONS}}', String(c.wikiContradictions || 0));
+    h = h.replace('{{CONCEPTS_JSON}}', JSON.stringify(c.concepts || {}));
+    h = h.replace('{{WIKI_LOG_JSON}}', JSON.stringify(c.wikiLog || []));
     return h;
 }
 
-// =============================================================
-// STATUS BAR
-// =============================================================
-function createStatusBar(ctx) {
-    if (statusBarItem) statusBarItem.dispose();
-    if (statusBarClicks) statusBarClicks.dispose();
-    if (statusBarScroll) statusBarScroll.dispose();
-    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
-    statusBarItem.command = 'ag-auto.openSettings'; ctx.subscriptions.push(statusBarItem);
-    statusBarClicks = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
-    statusBarClicks.command = 'ag-auto.openSettings'; statusBarClicks.color = '#f9e2af'; ctx.subscriptions.push(statusBarClicks);
-    statusBarScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
-    statusBarScroll.command = 'ag-auto.openSettings'; ctx.subscriptions.push(statusBarScroll);
-    updateStatusBar(); statusBarItem.show(); statusBarClicks.show(); statusBarScroll.show();
-}
-function updateStatusBar() {
-    if (!statusBarItem) return;
-    statusBarItem.text = _autoAcceptEnabled ? '$(check) AG ON' : '$(circle-slash) AG OFF';
-    statusBarItem.color = _autoAcceptEnabled ? '#4EC9B0' : '#F44747';
-    statusBarItem.backgroundColor = _autoAcceptEnabled ? undefined : new vscode.ThemeColor('statusBarItem.errorBackground');
-    if (statusBarScroll) { statusBarScroll.text = _httpScrollEnabled ? '$(fold-down) Scroll' : '$(circle-slash) Scroll'; statusBarScroll.color = _httpScrollEnabled ? '#4EC9B0' : '#F44747'; }
-    if (statusBarClicks) statusBarClicks.text = '$(target) ' + _totalClicks;
-}
-
-// =============================================================
-// HTTP SERVER
-// =============================================================
-function startHttpServer() {
-    if (_httpServer) return;
-    const cfg = vscode.workspace.getConfiguration('ag-auto');
-    _httpClickPatterns = cfg.get('clickPatterns', ['Allow','Always Allow','Run','Keep Waiting','Accept']);
-    ['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Allow This Con'].forEach(p => { if (!_httpClickPatterns.includes(p)) _httpClickPatterns.push(p); });
-    _httpScrollEnabled = cfg.get('scrollEnabled', true);
-    _httpScrollConfig = { pauseScrollMs: cfg.get('scrollPauseMs', 5000), scrollIntervalMs: cfg.get('scrollIntervalMs', 500), clickIntervalMs: cfg.get('clickIntervalMs', 2000) };
-    try {
-        const url = require('url');
-        _httpServer = http.createServer((req, res) => {
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-            res.setHeader('Content-Type', 'application/json');
-            if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-            const parsed = url.parse(req.url, true);
-            if (parsed.query && parsed.query.stats) {
-                try { const inc = JSON.parse(decodeURIComponent(parsed.query.stats)); for (const k in inc) { if (!_clickStats[k]) _clickStats[k] = 0; _clickStats[k] += inc[k]; } let t = 0; for (const k in _clickStats) t += _clickStats[k]; _totalClicks = t; if (statusBarClicks) statusBarClicks.text = '$(target) ' + _totalClicks; if (_extensionContext) { _extensionContext.globalState.update('clickStats', _clickStats); _extensionContext.globalState.update('totalClicks', _totalClicks); } } catch (_) {}
-            }
-            if (parsed.pathname === '/api/click-log' && req.method === 'POST') {
-                let body = ''; req.on('data', c => body += c);
-                req.on('end', () => {
-                    try { const d = JSON.parse(body); const now = new Date(); const ts = [now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>n<10?'0'+n:n).join(':')+' '+[now.getDate(),now.getMonth()+1].map(n=>n<10?'0'+n:n).join('/'); _clickLog.unshift({ time: ts, pattern: d.pattern || 'click', button: (d.button || '').substring(0, 80) }); if (_clickLog.length > 50) _clickLog.pop(); if (_extensionContext) _extensionContext.globalState.update('clickLog', _clickLog); res.writeHead(200); res.end('{"ok":true}'); } catch (_) { res.writeHead(200); res.end('{}'); }
-                }); return;
-            }
-            if (parsed.pathname === '/api/quota-detected' && req.method === 'POST') {
-                let body = ''; req.on('data', c => body += c);
-                req.on('end', () => {
-                    // Just notify user — no auto-switch
-                    if (Date.now() - _lastQuotaNotify > 60000) {
-                        _lastQuotaNotify = Date.now();
-                        vscode.window.showWarningMessage('Quota exhausted — switch model manually', 'OK');
-                    }
-                    res.writeHead(200); res.end('{"notified":true}');
-                }); return;
-            }
-            res.writeHead(200);
-            res.end(JSON.stringify({
-                enabled: _autoAcceptEnabled, scrollEnabled: _httpScrollEnabled,
-                clickPatterns: _httpClickPatterns.filter(p => p !== 'Accept'),
-                acceptInChatOnly: _httpClickPatterns.includes('Accept'),
-                pauseScrollMs: _httpScrollConfig.pauseScrollMs, scrollIntervalMs: _httpScrollConfig.scrollIntervalMs,
-                clickIntervalMs: _httpScrollConfig.clickIntervalMs,
-                clickStats: _clickStats, totalClicks: _totalClicks
-            }));
-        });
-        function tryPort(port) {
-            if (port > AG_HTTP_PORT_END) return;
-            _httpServer.removeAllListeners('error');
-            _httpServer.once('error', e => { if (e.code === 'EADDRINUSE') tryPort(port + 1); });
-            _httpServer.listen(port, '127.0.0.1', () => { _actualPort = port; console.log('[AG] HTTP port ' + port); });
-        }
-        tryPort(AG_HTTP_PORT_START);
-    } catch (e) { console.log('[AG] HTTP failed:', e.message); }
-}
-
-// =============================================================
-// AUTO-APPROVE ALL COMMANDS
-// =============================================================
-function configureAutoApprove() {
-    try {
-        const cfg = vscode.workspace.getConfiguration();
-        // Get current rules and force ALL false → true
-        const rules = cfg.get('chat.tools.terminal.autoApprove') || {};
-        if (typeof rules === 'object') {
-            for (const key in rules) {
-                if (rules[key] === false) rules[key] = true;
-                if (typeof rules[key] === 'object' && rules[key].approve === false) rules[key].approve = true;
-            }
-            // Ensure critical commands are approved
-            for (const cmd of ['curl','wget','rm','rmdir','chmod','chown','kill','dd','eval','jq','top','xargs']) rules[cmd] = true;
-            rules['/^/'] = true;
-            rules['/.*/s'] = true;
-            cfg.update('chat.tools.terminal.autoApprove', rules, vscode.ConfigurationTarget.Global).catch(() => {});
-        }
-        cfg.update('chat.tools.terminal.enableAutoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        cfg.update('chat.tools.terminal.ignoreDefaultAutoApproveRules', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        cfg.update('chat.tools.terminal.autoReplyToPrompts', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        cfg.update('chat.tools.edits.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        cfg.update('chat.agent.terminal.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        console.log('[AG] Auto-approve configured');
-    } catch (e) { console.log('[AG] Auto-approve error:', e.message); }
-}
-
-// =============================================================
-// ACTIVATE / DEACTIVATE
-// =============================================================
+// ═════════════════════════════════════════════════════════════
+//  Activate / Deactivate
+// ═════════════════════════════════════════════════════════════
 function activate(ctx) {
-    console.log('[AG] v7.1.0 activating');
-    _extensionContext = ctx;
-    _clickStats = ctx.globalState.get('clickStats', {});
+    _ctx = ctx;
+    _stats       = ctx.globalState.get('stats', {});
     _totalClicks = ctx.globalState.get('totalClicks', 0);
-    _clickLog = ctx.globalState.get('clickLog', []) || [];
+    _log         = ctx.globalState.get('clickLog', []) || [];
+    _enabled     = cfg('enabled', true);
+    _scrollOn    = cfg('autoScroll', true);
 
-    // Inject Layer 0
-    const ver = (ctx.extension && ctx.extension.packageJSON) ? ctx.extension.packageJSON.version : '0';
-    const lastVer = ctx.globalState.get('ag-injected-version', '0');
+    // Inject runtime
+    const ver     = ctx.extension?.packageJSON?.version || '0';
+    const lastVer = ctx.globalState.get('grav-version', '0');
     if (!isInjected() || ver !== lastVer) {
-        try { installScript(ctx); ctx.globalState.update('ag-injected-version', ver); clearCache(); updateChecksums(); setTimeout(() => vscode.commands.executeCommand('workbench.action.reloadWindow'), 1000); } catch (e) { console.error('[AG] Inject error:', e.message); }
+        try {
+            inject();
+            ctx.globalState.update('grav-version', ver);
+            clearCodeCache();
+            patchChecksums();
+            setTimeout(() => vscode.commands.executeCommand('workbench.action.reloadWindow'), 1000);
+        } catch (e) { console.error('[Grav] inject:', e.message); }
     } else {
-        try { const wb = getWorkbenchPath(); if (wb) writeFileElevated(path.join(path.dirname(wb), 'ag-auto-script.js'), buildScriptContent(ctx)); } catch (_) {}
-        updateChecksums();
+        // Hot-update runtime without reload
+        try {
+            const wb = workbenchPath();
+            if (wb) elevatedWrite(path.join(path.dirname(wb), RUNTIME_FILE), buildRuntime());
+        } catch (_) {}
+        patchChecksums();
     }
 
-    startHttpServer();
+    startBridge();
     startAcceptLoop();
-    writeConfigJson(ctx);
-    configureAutoApprove();
+    writeRuntimeConfig();
+    loadLearnData();
+    setupSafeApprove();
 
     // LS discovery
-    setTimeout(() => { discoverLanguageServer(); }, 8000);
-    setInterval(() => { if (!_lsConnected) discoverLanguageServer(); }, 60000);
+    setTimeout(() => discoverLS(), 8000);
+    setInterval(() => { if (!_lsOk) discoverLS(); }, 60000);
 
-    // Win32 Keep Waiting
+    // Win32 native "Keep Waiting" handler
     if (process.platform === 'win32') {
-        const { execFile } = require('child_process');
-        const ps = 'Add-Type @"\nusing System;using System.Text;using System.Runtime.InteropServices;\npublic class AgWin32{\npublic delegate bool EnumWindowsProc(IntPtr hWnd,IntPtr lParam);\n[DllImport("user32.dll")]public static extern bool EnumWindows(EnumWindowsProc cb,IntPtr lParam);\n[DllImport("user32.dll")]public static extern bool EnumChildWindows(IntPtr hwnd,EnumWindowsProc cb,IntPtr lParam);\n[DllImport("user32.dll")]public static extern int GetWindowText(IntPtr hWnd,StringBuilder s,int n);\n[DllImport("user32.dll")]public static extern int GetClassName(IntPtr hWnd,StringBuilder s,int n);\n[DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hWnd);\n[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr hWnd,uint Msg,IntPtr w,IntPtr l);\n}\n"@\n$global:clicked=$false\n[AgWin32]::EnumWindows({param($hWnd,$lp)\nif(-not [AgWin32]::IsWindowVisible($hWnd)){return $true}\nif($global:clicked){return $false}\n[AgWin32]::EnumChildWindows($hWnd,{param($ch,$lp2)\n$cls=New-Object System.Text.StringBuilder 64\n[AgWin32]::GetClassName($ch,$cls,64)|Out-Null\nif($cls.ToString() -eq \'Button\'){$txt=New-Object System.Text.StringBuilder 256\n[AgWin32]::GetWindowText($ch,$txt,256)|Out-Null\nif($txt.ToString() -match \'Keep Waiting\'){[AgWin32]::PostMessage($ch,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero);$global:clicked=$true}}\nreturn $true},[IntPtr]::Zero)|Out-Null\nif($global:clicked){return $false}\nreturn $true},[IntPtr]::Zero)|Out-Null\nif($global:clicked){Write-Output \'CLICKED\'}';
+        const ps = 'Add-Type @"\nusing System;using System.Text;using System.Runtime.InteropServices;\npublic class GravWin32{\npublic delegate bool EnumWindowsProc(IntPtr hWnd,IntPtr lParam);\n[DllImport("user32.dll")]public static extern bool EnumWindows(EnumWindowsProc cb,IntPtr lParam);\n[DllImport("user32.dll")]public static extern bool EnumChildWindows(IntPtr hwnd,EnumWindowsProc cb,IntPtr lParam);\n[DllImport("user32.dll")]public static extern int GetWindowText(IntPtr hWnd,StringBuilder s,int n);\n[DllImport("user32.dll")]public static extern int GetClassName(IntPtr hWnd,StringBuilder s,int n);\n[DllImport("user32.dll")]public static extern bool IsWindowVisible(IntPtr hWnd);\n[DllImport("user32.dll")]public static extern bool PostMessage(IntPtr hWnd,uint Msg,IntPtr w,IntPtr l);\n}\n"@\n$global:clicked=$false\n[GravWin32]::EnumWindows({param($hWnd,$lp)\nif(-not [GravWin32]::IsWindowVisible($hWnd)){return $true}\nif($global:clicked){return $false}\n[GravWin32]::EnumChildWindows($hWnd,{param($ch,$lp2)\n$cls=New-Object System.Text.StringBuilder 64\n[GravWin32]::GetClassName($ch,$cls,64)|Out-Null\nif($cls.ToString() -eq \'Button\'){$txt=New-Object System.Text.StringBuilder 256\n[GravWin32]::GetWindowText($ch,$txt,256)|Out-Null\nif($txt.ToString() -match \'Keep Waiting\'){[GravWin32]::PostMessage($ch,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero);$global:clicked=$true}}\nreturn $true},[IntPtr]::Zero)|Out-Null\nif($global:clicked){return $false}\nreturn $true},[IntPtr]::Zero)|Out-Null\nif($global:clicked){Write-Output \'CLICKED\'}';
         const kwi = setInterval(() => {
-            if (!_autoAcceptEnabled) return;
+            if (!_enabled) return;
             execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { timeout: 5000 }, (err, stdout) => {
-                if (stdout && stdout.trim() === 'CLICKED') { _totalClicks++; if (statusBarClicks) statusBarClicks.text = '$(target) ' + _totalClicks; }
+                if (stdout && stdout.trim() === 'CLICKED') { _totalClicks++; refreshBar(); }
             });
         }, 3000);
         ctx.subscriptions.push({ dispose: () => clearInterval(kwi) });
     }
 
-    createStatusBar(ctx);
-    ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('ag-auto')) updateStatusBar(); }));
-    ctx.subscriptions.push(vscode.commands.registerCommand('ag-auto.enable', async () => {
-        if (installScript(ctx)) { const c = await vscode.window.showInformationMessage('[AG] Injected! Reload?', 'Reload'); if (c === 'Reload') vscode.commands.executeCommand('workbench.action.reloadWindow'); }
+    createBar();
+    ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('grav')) { _enabled = cfg('enabled', true); _scrollOn = cfg('autoScroll', true); refreshBar(); }
     }));
-    ctx.subscriptions.push(vscode.commands.registerCommand('ag-auto.disable', async () => {
-        if (uninstallScript()) { const c = await vscode.window.showInformationMessage('[AG] Removed! Reload?', 'Reload'); if (c === 'Reload') vscode.commands.executeCommand('workbench.action.reloadWindow'); }
-    }));
-    ctx.subscriptions.push(vscode.commands.registerCommand('ag-auto.openSettings', () => openSettingsPanel(ctx)));
-    ctx.subscriptions.push(vscode.commands.registerCommand('ag-auto.switchModel', () => {
-        vscode.window.showInformationMessage('Use Cmd+Shift+, in chat input to switch model');
-    }));
+
+    // ── Commands ──────────────────────────────────────────────
+    ctx.subscriptions.push(
+        vscode.commands.registerCommand('grav.inject', async () => {
+            if (inject()) {
+                const c = await vscode.window.showInformationMessage('[Grav] Runtime injected. Reload?', 'Reload');
+                if (c === 'Reload') vscode.commands.executeCommand('workbench.action.reloadWindow');
+            }
+        }),
+        vscode.commands.registerCommand('grav.eject', async () => {
+            if (eject()) {
+                const c = await vscode.window.showInformationMessage('[Grav] Runtime removed. Reload?', 'Reload');
+                if (c === 'Reload') vscode.commands.executeCommand('workbench.action.reloadWindow');
+            }
+        }),
+        vscode.commands.registerCommand('grav.dashboard', () => openDashboard()),
+        vscode.commands.registerCommand('grav.diagnostics', async () => {
+            const promoted = getPromotedCommands();
+            const stats = getLearnStats();
+            const lines = [
+                `Grav v1.0.0`,
+                `Platform: ${process.platform} (${os.arch()})`,
+                `HTTP bridge: ${_httpPort || 'not started'}`,
+                `Enabled: ${_enabled}  Scroll: ${_scrollOn}`,
+                `Total clicks: ${_totalClicks}`,
+                `LS: ${_lsOk ? 'port ' + _lsPort : 'disconnected'}`,
+                `Workbench: ${workbenchPath() || 'not found'}`,
+                `Injected: ${isInjected()}`,
+                ``,
+                `── Terminal Command Management ──`,
+                `Built-in whitelist: ${SAFE_TERMINAL_CMDS.length} commands`,
+                `User whitelist: ${_userWhitelist.length} (${_userWhitelist.join(', ') || 'none'})`,
+                `User blacklist: ${_userBlacklist.length} (${_userBlacklist.join(', ') || 'none'})`,
+                ``,
+                `── Karpathy Learning Engine ──`,
+                `Epoch: ${stats.epoch}`,
+                `Tracking: ${stats.totalTracked} commands`,
+                `Promoted (conf ≥ ${LEARN.PROMOTE_THRESH}): ${promoted.length} (${promoted.join(', ') || 'none'})`,
+                `Generalized patterns: ${stats.patterns} (${_patternCache.join(', ') || 'none'})`,
+                `Learning rate (α): ${LEARN.ALPHA}`,
+                `Momentum: ${LEARN.MOMENTUM}`,
+                `Decay (γ): ${LEARN.GAMMA}`,
+                `Learning enabled: ${cfg('learnEnabled', true)}`,
+            ];
+            const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+            await vscode.window.showTextDocument(doc);
+        }),
+        vscode.commands.registerCommand('grav.manageTerminal', async () => {
+            const actions = [
+                { label: '$(add) Thêm vào Whitelist', description: 'Add command to whitelist', action: 'addWhite' },
+                { label: '$(remove) Xóa khỏi Whitelist', description: 'Remove from whitelist', action: 'removeWhite' },
+                { label: '$(shield) Thêm vào Blacklist', description: 'Block a command', action: 'addBlack' },
+                { label: '$(trash) Xóa khỏi Blacklist', description: 'Unblock a command', action: 'removeBlack' },
+                { label: '$(search) Kiểm tra lệnh', description: 'Test if a command would be allowed', action: 'test' },
+                { label: '$(book) Xem tất cả', description: 'View all whitelist/blacklist', action: 'viewAll' },
+                { label: '$(graph) Learning Stats', description: 'View adaptive learning data', action: 'learnStats' },
+                { label: '$(notebook) Second Brain Wiki', description: 'View compiled knowledge wiki', action: 'viewWiki' },
+                { label: '$(warning) Contradictions', description: 'View detected contradictions', action: 'viewContradictions' },
+                { label: '$(checklist) Lint Wiki', description: 'Health-check the knowledge base', action: 'lintWiki' },
+                { label: '$(clear-all) Reset Learning', description: 'Clear all learned data', action: 'resetLearn' },
+            ];
+            const pick = await vscode.window.showQuickPick(actions, { placeHolder: 'Quản lý Terminal Commands' });
+            if (!pick) return;
+            const c = vscode.workspace.getConfiguration('grav');
+
+            switch (pick.action) {
+                case 'addWhite': {
+                    const cmd = await vscode.window.showInputBox({ prompt: 'Nhập tên lệnh (vd: terraform, ansible-playbook)', placeHolder: 'command-name' });
+                    if (!cmd) return;
+                    const name = cmd.trim().toLowerCase();
+                    if (_userWhitelist.includes(name)) { vscode.window.showInformationMessage(`"${name}" đã có trong whitelist`); return; }
+                    _userWhitelist.push(name);
+                    await c.update('terminalWhitelist', _userWhitelist, vscode.ConfigurationTarget.Global);
+                    setupSafeApprove();
+                    vscode.window.showInformationMessage(`[Grav] ✓ "${name}" → whitelist`);
+                    break;
+                }
+                case 'removeWhite': {
+                    if (_userWhitelist.length === 0) { vscode.window.showInformationMessage('Whitelist trống'); return; }
+                    const items = _userWhitelist.map(w => ({ label: w }));
+                    const sel = await vscode.window.showQuickPick(items, { placeHolder: 'Chọn lệnh để xóa', canPickMany: true });
+                    if (!sel || sel.length === 0) return;
+                    const toRemove = sel.map(s => s.label);
+                    _userWhitelist = _userWhitelist.filter(w => !toRemove.includes(w));
+                    await c.update('terminalWhitelist', _userWhitelist, vscode.ConfigurationTarget.Global);
+                    setupSafeApprove();
+                    vscode.window.showInformationMessage(`[Grav] Đã xóa ${toRemove.join(', ')} khỏi whitelist`);
+                    break;
+                }
+                case 'addBlack': {
+                    const cmd = await vscode.window.showInputBox({ prompt: 'Nhập lệnh/pattern cần chặn (vd: rm -rf, /eval.*/, sudo su)', placeHolder: 'command or /regex/' });
+                    if (!cmd) return;
+                    const pattern = cmd.trim();
+                    if (_userBlacklist.includes(pattern)) { vscode.window.showInformationMessage(`"${pattern}" đã có trong blacklist`); return; }
+                    _userBlacklist.push(pattern);
+                    await c.update('terminalBlacklist', _userBlacklist, vscode.ConfigurationTarget.Global);
+                    setupSafeApprove();
+                    vscode.window.showInformationMessage(`[Grav] ✗ "${pattern}" → blacklist`);
+                    break;
+                }
+                case 'removeBlack': {
+                    if (_userBlacklist.length === 0) { vscode.window.showInformationMessage('Blacklist trống'); return; }
+                    const items = _userBlacklist.map(b => ({ label: b }));
+                    const sel = await vscode.window.showQuickPick(items, { placeHolder: 'Chọn pattern để xóa', canPickMany: true });
+                    if (!sel || sel.length === 0) return;
+                    const toRemove = sel.map(s => s.label);
+                    _userBlacklist = _userBlacklist.filter(b => !toRemove.includes(b));
+                    await c.update('terminalBlacklist', _userBlacklist, vscode.ConfigurationTarget.Global);
+                    setupSafeApprove();
+                    vscode.window.showInformationMessage(`[Grav] Đã xóa ${toRemove.join(', ')} khỏi blacklist`);
+                    break;
+                }
+                case 'test': {
+                    const cmd = await vscode.window.showInputBox({ prompt: 'Nhập lệnh đầy đủ để kiểm tra', placeHolder: 'npm run build && docker push myapp' });
+                    if (!cmd) return;
+                    const result = evaluateCommand(cmd);
+                    const icon = result.allowed ? '✓' : '✗';
+                    const lines = [
+                        `${icon} ${result.allowed ? 'ALLOWED' : 'BLOCKED'}`,
+                        `Reason: ${result.reason}`,
+                        `Commands found: ${result.commands.join(', ') || 'none'}`,
+                        ``,
+                        `Full command: ${cmd}`,
+                    ];
+                    const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+                    await vscode.window.showTextDocument(doc);
+                    break;
+                }
+                case 'viewAll': {
+                    const promoted = getPromotedCommands();
+                    const lines = [
+                        '═══ WHITELIST (Built-in) ═══',
+                        SAFE_TERMINAL_CMDS.join(', '),
+                        '',
+                        '═══ WHITELIST (User) ═══',
+                        _userWhitelist.join(', ') || '(trống)',
+                        '',
+                        '═══ WHITELIST (Learned — promoted by AI) ═══',
+                        promoted.join(', ') || '(chưa có)',
+                        '',
+                        '═══ GENERALIZED PATTERNS ═══',
+                        _patternCache.join(', ') || '(chưa có)',
+                        '',
+                        '═══ BLACKLIST (Built-in) ═══',
+                        DEFAULT_BLACKLIST.join('\n'),
+                        '',
+                        '═══ BLACKLIST (User) ═══',
+                        _userBlacklist.join('\n') || '(trống)',
+                    ];
+                    const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+                    await vscode.window.showTextDocument(doc);
+                    break;
+                }
+                case 'learnStats': {
+                    const stats = getLearnStats();
+                    if (stats.commands.length === 0) { vscode.window.showInformationMessage('[Grav] Chưa có dữ liệu học'); return; }
+                    const hdr = 'Command'.padEnd(22) + 'Conf'.padEnd(8) + 'Vel'.padEnd(8) + 'Obs'.padEnd(6) + 'Status'.padEnd(12) + 'Context'.padEnd(14) + 'Last Seen';
+                    const sep = '─'.repeat(80);
+                    const rows = stats.commands.map(s => {
+                        const confBar = s.conf >= 0
+                            ? '█'.repeat(Math.round(s.conf * 10)).padEnd(10)
+                            : '░'.repeat(Math.round(Math.abs(s.conf) * 10)).padEnd(10);
+                        return s.cmd.padEnd(22)
+                            + (s.conf >= 0 ? '+' : '') + String(s.conf).padEnd(7)
+                            + String(s.velocity).padEnd(8)
+                            + String(s.obs).padEnd(6)
+                            + s.status.padEnd(12)
+                            + (s.topContext || '-').padEnd(14)
+                            + s.lastSeen;
+                    });
+                    const footer = [
+                        '',
+                        `Epoch: ${stats.epoch} | Tracking: ${stats.totalTracked} | Promoted: ${stats.promoted} | Patterns: ${stats.patterns}`,
+                        `Hyperparams: α=${LEARN.ALPHA} momentum=${LEARN.MOMENTUM} γ=${LEARN.GAMMA} promote≥${LEARN.PROMOTE_THRESH} demote≤${LEARN.DEMOTE_THRESH}`,
+                    ];
+                    const doc = await vscode.workspace.openTextDocument({ content: [hdr, sep, ...rows, ...footer].join('\n'), language: 'text' });
+                    await vscode.window.showTextDocument(doc);
+                    break;
+                }
+                case 'viewWiki': {
+                    const pages = Object.entries(_wiki.index)
+                        .sort((a, b) => b[1].totalEvents - a[1].totalEvents);
+                    if (pages.length === 0) { vscode.window.showInformationMessage('[Grav] Wiki trống — chưa có dữ liệu'); return; }
+                    const lines = [
+                        '═══ SECOND BRAIN — KNOWLEDGE WIKI ═══',
+                        `Pages: ${pages.length} | Concepts: ${Object.keys(_wiki.concepts).length} | Contradictions: ${_wiki.contradictions.filter(c => !c.resolved).length}`,
+                        '',
+                        '── INDEX (sorted by activity) ──',
+                        'Command'.padEnd(20) + 'Events'.padEnd(8) + 'Conf'.padEnd(8) + 'Risk'.padEnd(10) + 'Links'.padEnd(7) + 'Summary',
+                        '─'.repeat(90),
+                        ...pages.map(([cmd, p]) =>
+                            cmd.padEnd(20) +
+                            String(p.totalEvents).padEnd(8) +
+                            (p.confidence >= 0 ? '+' : '') + String(Math.round(p.confidence * 100) / 100).padEnd(7) +
+                            p.riskLevel.padEnd(10) +
+                            String(p.links.length).padEnd(7) +
+                            (p.summary || '').substring(0, 50)
+                        ),
+                        '',
+                        '── CONCEPTS ──',
+                        ...Object.entries(_wiki.concepts).map(([name, c]) =>
+                            `  ${name}: ${c.commands.length} cmds, avg conf ${Math.round(c.avgConfidence * 100)}%, risk: ${c.riskLevel}`
+                        ),
+                        '',
+                        '── SYNTHESIS ──',
+                        ...Object.entries(_wiki.synthesis).map(([name, s]) =>
+                            `  ${name}: ${s.description}`
+                        ),
+                        '',
+                        '── RECENT LOG (last 15) ──',
+                        ...(_wiki.log || []).slice(-15).reverse().map(l =>
+                            `  [${l.time}] ${l.op} ${l.cmd || ''} ${l.action || ''} ${l.detail || ''}`
+                        ),
+                    ];
+                    const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+                    await vscode.window.showTextDocument(doc);
+                    break;
+                }
+                case 'viewContradictions': {
+                    const unresolved = _wiki.contradictions.filter(c => !c.resolved);
+                    if (unresolved.length === 0) { vscode.window.showInformationMessage('[Grav] Không có contradictions'); return; }
+                    const lines = [
+                        '═══ CONTRADICTIONS (unresolved) ═══',
+                        '',
+                        ...unresolved.map((c, i) => [
+                            `#${i + 1} [${c.type}] ${c.cmd}`,
+                            `  Detail: ${c.detail}`,
+                            `  Old claim: ${c.oldClaim}`,
+                            `  New evidence: ${c.newEvidence}`,
+                            `  Time: ${new Date(c.time).toLocaleString()}`,
+                            '',
+                        ].join('\n')),
+                    ];
+                    const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+                    await vscode.window.showTextDocument(doc);
+                    break;
+                }
+                case 'lintWiki': {
+                    const issues = wikiLint();
+                    if (issues.length === 0) { vscode.window.showInformationMessage('[Grav] Wiki sạch — không có vấn đề'); return; }
+                    const lines = [
+                        '═══ WIKI LINT REPORT ═══',
+                        `Time: ${new Date().toLocaleString()}`,
+                        `Issues found: ${issues.length}`,
+                        '',
+                        ...issues.map(issue => [
+                            `⚠ ${issue.type.toUpperCase()}: ${issue.detail}`,
+                            ...issue.items.map(item => `    • ${typeof item === 'string' ? item : JSON.stringify(item)}`),
+                            '',
+                        ].join('\n')),
+                    ];
+                    const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+                    await vscode.window.showTextDocument(doc);
+                    break;
+                }
+                case 'resetLearn': {
+                    const confirm = await vscode.window.showWarningMessage('Xóa toàn bộ dữ liệu học + wiki?', 'Xóa', 'Hủy');
+                    if (confirm !== 'Xóa') return;
+                    _learnData = {};
+                    _wiki = { index: {}, concepts: {}, log: [], synthesis: {}, contradictions: [], lastLint: 0 };
+                    _learnEpoch = 0;
+                    if (_ctx) {
+                        _ctx.globalState.update('learnData', {});
+                        _ctx.globalState.update('wiki', _wiki);
+                        _ctx.globalState.update('learnEpoch', 0);
+                    }
+                    setupSafeApprove();
+                    vscode.window.showInformationMessage('[Grav] Đã reset learning data + wiki');
+                    break;
+                }
+            }
+        }),
+        vscode.commands.registerCommand('grav.learnStats', async () => {
+            vscode.commands.executeCommand('grav.manageTerminal');
+        }),
+    );
 }
 
 function deactivate() {
-    if (statusBarItem) { statusBarItem.dispose(); statusBarItem = null; }
-    if (statusBarClicks) { statusBarClicks.dispose(); statusBarClicks = null; }
-    if (statusBarScroll) { statusBarScroll.dispose(); statusBarScroll = null; }
-    if (_autoAcceptInterval) { clearInterval(_autoAcceptInterval); _autoAcceptInterval = null; }
-    if (_httpServer) { try { _httpServer.close(); } catch (_) {} _httpServer = null; }
+    if (_sbMain)   _sbMain.dispose();
+    if (_sbClicks) _sbClicks.dispose();
+    if (_sbScroll) _sbScroll.dispose();
+    if (_acceptTimer) clearInterval(_acceptTimer);
+    if (_httpServer) try { _httpServer.close(); } catch (_) {}
 }
 
 module.exports = { activate, deactivate };
