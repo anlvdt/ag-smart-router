@@ -1933,8 +1933,18 @@ function openDashboard() {
     const ticker = setInterval(() => {
         try {
             panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks });
-            // Live update Second Brain data
+            // Live update Second Brain — send lightweight data only
             const promoted = getPromotedCommands();
+            // Strip heavy fields from concepts before sending
+            const lightConcepts = {};
+            for (const [k, v] of Object.entries(_wiki.concepts)) {
+                lightConcepts[k] = {
+                    commands: v.commands,
+                    avgConfidence: v.avgConfidence,
+                    riskLevel: v.riskLevel,
+                    description: v.description,
+                };
+            }
             panel.webview.postMessage({
                 command: 'brainUpdated',
                 epoch: _learnEpoch,
@@ -1946,11 +1956,13 @@ function openDashboard() {
                 wikiPages: Object.keys(_wiki.index).length,
                 wikiConcepts: Object.keys(_wiki.concepts).length,
                 wikiContradictions: _wiki.contradictions.filter(c => !c.resolved).length,
-                concepts: _wiki.concepts,
+                concepts: lightConcepts,
                 wikiLog: (_wiki.log || []).slice(-30),
             });
+        } catch (e) {
+            // Don't kill ticker on transient errors — only stop if panel is disposed
+            if (e.message && e.message.includes('disposed')) clearInterval(ticker);
         }
-        catch (_) { clearInterval(ticker); }
     }, 2000);
     panel.onDidDispose(() => clearInterval(ticker));
 }
