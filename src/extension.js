@@ -1200,6 +1200,139 @@ function setupSafeApprove() {
 }
 
 // ═════════════════════════════════════════════════════════════
+//  Terminal Activity Listener — captures commands for learning
+//
+//  Uses multiple VS Code APIs to capture terminal commands:
+//  1. onDidStartTerminalShellExecution (VS Code 1.93+)
+//  2. onDidEndTerminalShellExecution (exit code = RLVR signal)
+//  3. onDidWriteTerminalData fallback (older VS Code)
+// ═════════════════════════════════════════════════════════════
+function setupTerminalListener(ctx) {
+    // Track active shell executions for RLVR (exit code matching)
+    const _pendingExecs = new Map(); // executionId → { command, startTime }
+
+    // Method 1: Shell execution API (best — gives command + exit code)
+    if (vscode.window.onDidStartTerminalShellExecution) {
+        ctx.subscriptions.push(
+            vscode.window.onDidStartTerminalShellExecution(e => {
+                try {
+                    const cmdLine = e.execution?.commandLine?.value || e.execution?.commandLine || '';
+                    if (!cmdLine || cmdLine.length < 2) return;
+                    const id = e.execution?.id || Date.now().toString();
+                    _pendingExecs.set(id, { command: cmdLine, startTime: Date.now() });
+                    // Record as approve (user/agent initiated this command)
+                    if (cfg('learnEnabled', true)) {
+                        recordCommandAction(cmdLine, 'approve', {
+                            project: vscode.workspace.workspaceFolders?.[0]?.name,
+                        });
+                    }
+                } catch (_) {}
+            })
+        );
+    }
+
+    if (vscode.window.onDidEndTerminalShellExecution) {
+        ctx.subscriptions.push(
+            vscode.window.onDidEndTerminalShellExecution(e => {
+                try {
+                    const id = e.execution?.id || '';
+                    const exitCode = e.exitCode;
+                    const pending = _pendingExecs.get(id);
+                    if (pending) {
+                        _pendingExecs.delete(id);
+                        // RLVR: feed exit code back as verifiable reward
+                        if (cfg('learnEnabled', true) && typeof exitCode === 'number') {
+                            recordCommandAction(pending.command, exitCode === 0 ? 'approve' : 'reject', {
+                                exitCode,
+                                project: vscode.workspace.workspaceFolders?.[0]?.name,
+                                duration: Date.now() - pending.startTime,
+                            });
+                        }
+                    } else {
+                        // No pending match — try to get command from execution
+                        const cmdLine = e.execution?.commandLine?.value || e.execution?.commandLine || '';
+                        if (cmdLine && cfg('learnEnabled', true) && typeof exitCode === 'number') {
+                            recordCommandAction(cmdLine, exitCode === 0 ? 'approve' : 'reject', {
+                                exitCode,
+                                project: vscode.workspace.workspaceFolders?.[0]?.name,
+                            });
+                        }
+                    }
+                } catch (_) {}
+            })
+        );
+    }
+
+    // Method 2: Terminal data write listener (fallback for older VS Code)
+    // Parse command lines from terminal output
+    if (!vscode.window.onDidStartTerminalShellExecution && vscode.window.onDidWriteTerminalData) {
+        const _termBuffers = new Map(); // terminalId → buffer string
+        ctx.subscriptions.push(
+            vscode.window.onDidWriteTerminalData(e => {
+                try {
+                    if (!cfg('learnEnabled', true)) return;
+                    const tid = e.terminal?.name || 'default';
+                    const buf = (_termBuffers.get(tid) || '') + e.data;
+
+                    // Look for command patterns: prompt followed by command then newline
+                    const lines = buf.split(/\r?\n/);
+                    if (lines.length > 1) {
+                        // Process completed lines (all except last which may be incomplete)
+                        for (let i = 0; i < lines.length - 1; i++) {
+                            const line = lines[i].replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
+                            // Skip empty, prompts-only, or output lines
+                            if (!line || line.length < 3 || line.length > 500) continue;
+                            // Heuristic: lines starting with $ or > or ending with $ are prompts+commands
+                            const cmdMatch = line.match(/^[\$>%#]\s+(.+)/) || line.match(/\$\s+(.+)$/);
+                            if (cmdMatch) {
+                                const cmdLine = cmdMatch[1].trim();
+                                if (cmdLine.length >= 2) {
+                                    recordCommandAction(cmdLine, 'approve', {
+                                        project: vscode.workspace.workspaceFolders?.[0]?.name,
+                                    });
+                                }
+                            }
+                        }
+                        _termBuffers.set(tid, lines[lines.length - 1]);
+                    } else {
+                        _termBuffers.set(tid, buf.slice(-1000)); // keep last 1KB
+                    }
+                } catch (_) {}
+            })
+        );
+    }
+
+    // Method 3: Terminal open/close tracking (always available)
+    ctx.subscriptions.push(
+        vscode.window.onDidOpenTerminal(t => {
+            try {
+                const name = t.name || '';
+                // Agent-created terminals often have descriptive names
+                if (name && cfg('learnEnabled', true)) {
+                    // Extract command from terminal name if it looks like a command
+                    // e.g., "npm run build" or "git push"
+                    const cmds = extractCommands(name);
+                    if (cmds.length > 0 && cmds[0] !== 'terminal' && cmds[0] !== 'bash' && cmds[0] !== 'zsh' && cmds[0] !== 'sh') {
+                        recordCommandAction(name, 'approve', {
+                            project: vscode.workspace.workspaceFolders?.[0]?.name,
+                        });
+                    }
+                }
+            } catch (_) {}
+        })
+    );
+
+    // Cleanup stale pending executions (>5 min)
+    const cleanupTimer = setInterval(() => {
+        const cutoff = Date.now() - 300000;
+        for (const [id, p] of _pendingExecs) {
+            if (p.startTime < cutoff) _pendingExecs.delete(id);
+        }
+    }, 60000);
+    ctx.subscriptions.push({ dispose: () => clearInterval(cleanupTimer) });
+}
+
+// ═════════════════════════════════════════════════════════════
 //  HTTP bridge — runtime ↔ host
 // ═════════════════════════════════════════════════════════════
 function startBridge() {
@@ -1238,6 +1371,19 @@ function startBridge() {
                     _log.unshift({ time: ts, pattern: d.pattern || 'click', button: (d.button || '').substring(0, 80) });
                     if (_log.length > 50) _log.pop();
                     if (_ctx) _ctx.globalState.update('clickLog', _log);
+
+                    // Feed auto-approve clicks to learning engine
+                    // When runtime clicks "Run" or "Allow", the button text often contains the command
+                    if (cfg('learnEnabled', true) && d.button) {
+                        const btn = d.button.trim();
+                        // "Run `npm install`" or "Allow npm to run" patterns
+                        const cmdMatch = btn.match(/[`']([^`']+)[`']/) || btn.match(/^(?:Run|Allow|Execute)\s+(.+)/i);
+                        if (cmdMatch) {
+                            recordCommandAction(cmdMatch[1].trim(), 'approve', {
+                                project: vscode.workspace.workspaceFolders?.[0]?.name,
+                            });
+                        }
+                    }
                 } catch (_) {}
                 res.writeHead(200); res.end('{"ok":true}');
             });
@@ -1550,6 +1696,9 @@ function activate(ctx) {
     ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
         if (e.affectsConfiguration('grav')) { _enabled = cfg('enabled', true); _scrollOn = cfg('autoScroll', true); refreshBar(); }
     }));
+
+    // ── Terminal Activity Listener — feed data to Learning Engine ──
+    setupTerminalListener(ctx);
 
     // ── Commands ──────────────────────────────────────────────
     ctx.subscriptions.push(
