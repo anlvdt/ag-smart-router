@@ -619,10 +619,148 @@ function scheduleCdpReconnect() {
 }
 
 // =============================================================
-// MODEL SWITCH VIA VS CODE INTERNAL API
-// Uses workbench.action.chat.changeModel + vscode.lm.selectChatModels
-// This bypasses DOM entirely — direct internal command
+// ANTIGRAVITY LANGUAGE SERVER API (Direct Internal Access)
+// Discovers language_server process → extracts port + CSRF token
+// Calls GetUserStatus via HTTPS Connect protocol
+// This is how AntigravityQuota, ag-local-bridge etc. work
 // =============================================================
+let _lsPort = 0, _lsCsrf = '', _lsConnected = false;
+let _lsModels = []; // [{label, modelId, quotaRemaining, resetTime}]
+let _pendingModelSwitch = null; // model to switch to, sent to Layer 0 via HTTP
+
+/** Discover language server process and extract connection info */
+async function discoverLanguageServer() {
+    try {
+        const { execSync } = require('child_process');
+        let cmd;
+        if (process.platform === 'win32') {
+            cmd = 'wmic process where "name like \'%language_server%\'" get CommandLine /format:list 2>nul';
+        } else {
+            cmd = 'ps aux | grep language_server_macos | grep -v grep | grep -v enable_lsp';
+        }
+        const stdout = execSync(cmd, { timeout: 5000 }).toString();
+        if (!stdout) { console.log('[AG] Language server process not found'); return false; }
+
+        // Extract csrf_token
+        const csrfMatch = stdout.match(/--csrf_token\s+([a-f0-9-]+)/);
+        if (!csrfMatch) { console.log('[AG] CSRF token not found in process args'); return false; }
+        _lsCsrf = csrfMatch[1];
+
+        // Extract extension_server_port to find adjacent HTTPS port
+        const portMatch = stdout.match(/--extension_server_port\s+(\d+)/);
+        const extPort = portMatch ? parseInt(portMatch[1]) : 0;
+
+        // Find the actual HTTPS port by probing
+        const pid = stdout.match(/^\S+\s+(\d+)/m);
+        if (pid) {
+            let portsCmd;
+            if (process.platform === 'win32') {
+                portsCmd = 'netstat -ano | findstr ' + pid[1] + ' | findstr LISTENING';
+            } else {
+                portsCmd = 'lsof -p ' + pid[1] + ' -iTCP -sTCP:LISTEN -P -n 2>/dev/null';
+            }
+            const portsOut = execSync(portsCmd, { timeout: 5000 }).toString();
+            const portNums = [...portsOut.matchAll(/127\.0\.0\.1:(\d+)/g)].map(m => parseInt(m[1]));
+            
+            // Test each port with HTTPS Connect protocol
+            for (const port of portNums) {
+                const ok = await testLanguageServerPort(port, _lsCsrf);
+                if (ok) {
+                    _lsPort = port;
+                    _lsConnected = true;
+                    console.log('[AG] Language server connected: port=' + port + ' csrf=' + _lsCsrf.substring(0, 8) + '...');
+                    return true;
+                }
+            }
+        }
+        console.log('[AG] No working HTTPS port found for language server');
+        return false;
+    } catch (e) {
+        console.log('[AG] Language server discovery failed:', e.message);
+        return false;
+    }
+}
+
+/** Test if a port responds to language server API */
+function testLanguageServerPort(port, csrf) {
+    return new Promise(resolve => {
+        const https = require('https');
+        const data = JSON.stringify({ wrapper_data: {} });
+        const req = https.request({
+            hostname: '127.0.0.1', port,
+            path: '/exa.language_server_pb.LanguageServerService/GetUnleashData',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Codeium-Csrf-Token': csrf, 'Connect-Protocol-Version': '1' },
+            rejectUnauthorized: false, timeout: 3000
+        }, res => {
+            let body = '';
+            res.on('data', c => body += c);
+            res.on('end', () => { try { JSON.parse(body); resolve(true); } catch (_) { resolve(false); } });
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.write(data);
+        req.end();
+    });
+}
+
+/** Fetch user status and model quota from language server */
+function fetchQuotaFromLS() {
+    return new Promise((resolve, reject) => {
+        if (!_lsConnected || !_lsPort || !_lsCsrf) { reject(new Error('not connected')); return; }
+        const https = require('https');
+        const data = JSON.stringify({ metadata: { ideName: 'antigravity', extensionName: 'antigravity', locale: 'en' } });
+        const req = https.request({
+            hostname: '127.0.0.1', port: _lsPort,
+            path: '/exa.language_server_pb.LanguageServerService/GetUserStatus',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Codeium-Csrf-Token': _lsCsrf, 'Connect-Protocol-Version': '1', 'Content-Length': Buffer.byteLength(data) },
+            rejectUnauthorized: false, timeout: 5000
+        }, res => {
+            let body = '';
+            res.on('data', c => body += c);
+            res.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const models = (d.userStatus?.cascadeModelConfigData?.clientModelConfigs || []).map(m => ({
+                        label: m.label || '',
+                        modelId: m.modelOrAlias?.model || '',
+                        recommended: m.isRecommended || false
+                    }));
+                    _lsModels = models;
+                    resolve({ models, credits: d.userStatus?.planStatus?.availablePromptCredits || 0, flowCredits: d.userStatus?.planStatus?.availableFlowCredits || 0 });
+                } catch (e) { reject(e); }
+            });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+        req.write(data);
+        req.end();
+    });
+}
+
+/** Start language server quota polling */
+function startLSQuotaPoll() {
+    // Initial discovery
+    discoverLanguageServer().then(ok => {
+        if (ok) {
+            fetchQuotaFromLS().then(data => {
+                console.log('[AG] LS quota: ' + data.models.length + ' models, credits=' + data.credits);
+            }).catch(e => console.log('[AG] LS quota fetch failed:', e.message));
+        }
+    });
+    // Re-discover every 60s (process may restart)
+    setInterval(() => {
+        if (!_lsConnected) discoverLanguageServer();
+    }, 60000);
+    // Fetch quota every 30s
+    setInterval(async () => {
+        if (!_lsConnected) return;
+        try {
+            await fetchQuotaFromLS();
+        } catch (_) { _lsConnected = false; }
+    }, 30000);
+}
 
 // Map display names to model metadata for VS Code API
 const MODEL_API_MAP = {
@@ -1546,17 +1684,21 @@ function startHttpServer() {
                         const tgt = getNextFallbackModel(curModel);
                         console.log('[AG] Decided fallback: ' + tgt);
 
-                        // Try VS Code API first (direct internal command)
+                        // Also set pending switch so Layer 0 picks it up on next poll
+                        _pendingModelSwitch = tgt;
+
+                        // Try VS Code API first
                         const apiResult = await switchModelViaAPI(tgt);
                         if (apiResult) {
                             console.log('[AG] Model switched via VS Code API: ' + tgt);
+                            _pendingModelSwitch = null; // clear, API handled it
                             _recordRouteResult(tgt, true);
                             _resetCooldown();
                             res.writeHead(200);
                             res.end(JSON.stringify({ switchTo: tgt, method: 'api', success: true }));
                         } else {
-                            // Fallback: tell Layer 0 to do DOM switch
-                            console.log('[AG] API switch failed, delegating to Layer 0');
+                            // Layer 0 will pick up switchModel from next /ag-status poll
+                            console.log('[AG] API failed, pending switch set for Layer 0: ' + tgt);
                             _recordRouteResult(tgt, false);
                             res.writeHead(200);
                             res.end(JSON.stringify({ switchTo: tgt, method: 'layer0' }));
@@ -1643,6 +1785,7 @@ function startHttpServer() {
             const agCfg = vscode.workspace.getConfiguration('ag-auto');
             const resp = { enabled: _autoAcceptEnabled, scrollEnabled: _httpScrollEnabled, clickPatterns: _httpClickPatterns.filter(p => p !== 'Accept'), acceptInChatOnly: _httpClickPatterns.includes('Accept'), pauseScrollMs: _httpScrollConfig.pauseScrollMs, scrollIntervalMs: _httpScrollConfig.scrollIntervalMs, clickIntervalMs: _httpScrollConfig.clickIntervalMs, smartRouter: agCfg.get('smartRouter', true), quotaFallback: agCfg.get('quotaFallback', true), cdpConnected: _cdpConnected, clickStats: _clickStats, totalClicks: _totalClicks };
             if (_resetStatsRequested) { resp.resetStats = true; _resetStatsRequested = false; }
+            if (_pendingModelSwitch) { resp.switchModel = _pendingModelSwitch; _pendingModelSwitch = null; }
             res.end(JSON.stringify(resp));
         });
         function tryPort(port) {
@@ -1961,6 +2104,9 @@ function activate(ctx) {
             else console.log('[AG] No models discovered via vscode.lm API');
         }).catch(() => {});
     }, 10000);
+
+    // Start language server API integration (quota monitoring)
+    setTimeout(() => startLSQuotaPoll(), 8000);
 
     // CDP init
     const cfg = vscode.workspace.getConfiguration('ag-auto');
