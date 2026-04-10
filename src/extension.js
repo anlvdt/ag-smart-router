@@ -1931,7 +1931,25 @@ function openDashboard() {
     }, undefined, _ctx.subscriptions);
 
     const ticker = setInterval(() => {
-        try { panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); }
+        try {
+            panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks });
+            // Live update Second Brain data
+            const promoted = getPromotedCommands();
+            panel.webview.postMessage({
+                command: 'brainUpdated',
+                epoch: _learnEpoch,
+                tracking: Object.keys(_learnData).length,
+                whiteCount: SAFE_TERMINAL_CMDS.length + _userWhitelist.length,
+                blackCount: DEFAULT_BLACKLIST.length + _userBlacklist.length,
+                promoted: promoted.length,
+                patterns: _patternCache.length,
+                wikiPages: Object.keys(_wiki.index).length,
+                wikiConcepts: Object.keys(_wiki.concepts).length,
+                wikiContradictions: _wiki.contradictions.filter(c => !c.resolved).length,
+                concepts: _wiki.concepts,
+                wikiLog: (_wiki.log || []).slice(-30),
+            });
+        }
         catch (_) { clearInterval(ticker); }
     }, 2000);
     panel.onDidDispose(() => clearInterval(ticker));

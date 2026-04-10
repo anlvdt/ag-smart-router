@@ -434,6 +434,19 @@ window.addEventListener('message', function(e) {
     var m = e.data;
     if (m.command === 'statsUpdated') { document.getElementById('totalCount').textContent = m.totalClicks || 0; document.getElementById('statTotal').textContent = m.totalClicks || 0; renderBars(m.stats || {}); }
     if (m.command === 'logUpdated') renderLog(m.log);
+    if (m.command === 'brainUpdated') {
+        document.getElementById('brainEpoch').textContent = m.epoch || 0;
+        document.getElementById('brainTracking').textContent = m.tracking || 0;
+        document.getElementById('brainWhite').textContent = m.whiteCount || 0;
+        document.getElementById('brainBlack').textContent = m.blackCount || 0;
+        document.getElementById('brainPromoted').textContent = m.promoted || 0;
+        document.getElementById('brainPatterns').textContent = m.patterns || 0;
+        document.getElementById('wikiPages').textContent = m.wikiPages || 0;
+        document.getElementById('wikiConcepts').textContent = m.wikiConcepts || 0;
+        document.getElementById('wikiContradictions').textContent = m.wikiContradictions || 0;
+        if (m.concepts) renderConcepts(m.concepts);
+        if (m.wikiLog) renderWikiLog(m.wikiLog);
+    }
 });
 vscode.postMessage({ command: 'getStats' });
 vscode.postMessage({ command: 'getLog' });
