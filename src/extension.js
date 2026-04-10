@@ -70,32 +70,30 @@ const COOLDOWN_LEVELS = [3000, 5000, 15000, 30000, 60000, 120000]; // escalating
 
 // --- Model tiers for tier-aware fallback ---
 const MODEL_TIERS = {
-    "Claude Opus 4.7 (Thinking)": { tier: 'extreme', cost: 10, family: 'claude' },
-    "Claude Opus 4.6 (Thinking)": { tier: 'extreme', cost: 9, family: 'claude' },
-    "Claude Sonnet 4.6":          { tier: 'high',    cost: 5, family: 'claude' },
-    "Claude Sonnet 4.5":          { tier: 'high',    cost: 4, family: 'claude' },
-    "Gemini 3.5 Pro":             { tier: 'high',    cost: 4, family: 'gemini' },
-    "Gemini 3.1 Pro (High)":      { tier: 'default', cost: 3, family: 'gemini' },
-    "Gemini 3 Flash (New)":       { tier: 'cheap',   cost: 1, family: 'gemini' },
-    "Gemini 3 Flash":             { tier: 'cheap',   cost: 1, family: 'gemini' },
-    "GPT-OSS 120B (Medium)":      { tier: 'default', cost: 3, family: 'gpt' },
-    "GPT-OSS 100B":               { tier: 'default', cost: 2, family: 'gpt' }
+    "Claude Opus 4.6 (Thinking)":      { tier: 'extreme', cost: 10, family: 'claude', rank: 1 },
+    "Claude Sonnet 4.6 (Thinking)":    { tier: 'high',    cost: 6,  family: 'claude', rank: 2 },
+    "Gemini 3.1 Pro (High)":           { tier: 'high',    cost: 4,  family: 'gemini', rank: 3 },
+    "GPT-OSS 120B (Medium)":           { tier: 'default', cost: 3,  family: 'gpt',    rank: 4 },
+    "Gemini 3.1 Pro (Low)":            { tier: 'default', cost: 2,  family: 'gemini', rank: 5 },
+    "Gemini 3 Flash":                  { tier: 'cheap',   cost: 1,  family: 'gemini', rank: 6 }
 };
 
+// Fallback order: BEST → WORST (try strongest model first, degrade gracefully)
 const FALLBACK_MODELS = [
-    "Claude Opus 4.7 (Thinking)", "Claude Opus 4.6 (Thinking)",
-    "Claude Sonnet 4.6", "Claude Sonnet 4.5",
-    "Gemini 3.5 Pro", "Gemini 3.1 Pro (High)", "Gemini 3 Flash (New)", "Gemini 3 Flash",
-    "GPT-OSS 120B (Medium)", "GPT-OSS 100B"
+    "Claude Opus 4.6 (Thinking)",
+    "Claude Sonnet 4.6 (Thinking)",
+    "Gemini 3.1 Pro (High)",
+    "GPT-OSS 120B (Medium)",
+    "Gemini 3.1 Pro (Low)",
+    "Gemini 3 Flash"
 ];
 const MODEL_KEYWORDS = ["Claude", "Gemini", "GPT", "GPT-OSS"];
 const QUOTA_PHRASES = [
-    'exhausted your capacity', 'quota will reset', 'baseline model quota reached',
-    'exhausted your capacity on this model', 'model quota exceeded', 'rate limit exceeded',
-    'monthly usage limit', 'daily limit reached', 'insufficient credits',
-    'quota exhausted', 'capacity exceeded', 'model at capacity', 'too many requests',
-    'weekly limit reached', 'credit balance', 'credits exhausted',
-    'usage limit exceeded', 'request limit reached', 'try again later'
+    'baseline model quota reached', 'exhausted your capacity', 'quota will reset',
+    'model quota exceeded', 'rate limit exceeded', 'quota exhausted',
+    'capacity exceeded', 'model at capacity', 'too many requests',
+    'weekly limit reached', 'credits exhausted', 'usage limit exceeded',
+    'request limit reached', 'try again later'
 ];
 
 // =============================================================
@@ -219,63 +217,43 @@ const TIER_ORDER = ['extreme', 'high', 'default', 'cheap'];
 function getNextFallbackModel(cur) {
     _markExhausted(cur, 'sprint');
 
-    // Find current model's tier info
-    let curTier = null, curFamily = null;
+    // Find current model's rank
+    let curRank = 999;
     for (const f of FALLBACK_MODELS) {
         if (cur.indexOf(f) !== -1) {
             const info = MODEL_TIERS[f];
-            if (info) { curTier = info.tier; curFamily = info.family; }
+            if (info) curRank = info.rank;
             break;
         }
     }
 
-    // Build candidates: available models sorted by preference
-    const candidates = FALLBACK_MODELS.filter(m => !_isExhausted(m) && cur.indexOf(m) === -1);
-
-    if (candidates.length === 0) {
-        // All exhausted — pick the one exhausted longest ago
-        let oldest = Infinity, pick = FALLBACK_MODELS[0];
-        for (const k in _cdpExhaustedModels) {
-            const entry = _cdpExhaustedModels[k];
-            if (entry && entry.time < oldest) { oldest = entry.time; pick = k; }
-        }
-        return pick;
+    // Try models in order: best → worst, skip current and exhausted
+    // First: try models BELOW current rank (cheaper alternatives)
+    for (const f of FALLBACK_MODELS) {
+        const info = MODEL_TIERS[f];
+        if (!info || info.rank <= curRank) continue; // skip better or same
+        if (_isExhausted(f)) continue;
+        if (cur.indexOf(f) !== -1) continue;
+        console.log('[AG] Fallback: ' + cur.substring(0, 30) + ' → ' + f + ' (rank ' + curRank + ' → ' + info.rank + ')');
+        return f;
     }
 
-    // Score each candidate
-    const scored = candidates.map(m => {
-        const info = MODEL_TIERS[m] || { tier: 'default', cost: 3, family: 'other' };
-        let score = 100;
+    // All below exhausted — try ANY non-exhausted model (even better ones, different family)
+    for (const f of FALLBACK_MODELS) {
+        if (_isExhausted(f)) continue;
+        if (cur.indexOf(f) !== -1) continue;
+        console.log('[AG] Fallback (any available): ' + cur.substring(0, 30) + ' → ' + f);
+        return f;
+    }
 
-        // Prefer same tier (0 penalty), adjacent tier (-10 per step), far tier (-20 per step)
-        if (curTier) {
-            const curIdx = TIER_ORDER.indexOf(curTier);
-            const mIdx = TIER_ORDER.indexOf(info.tier);
-            const tierDist = Math.abs(curIdx - mIdx);
-            score -= tierDist * 15;
-        }
-
-        // Prefer different family (quota pools are separate per family)
-        if (curFamily && info.family !== curFamily) score += 20;
-
-        // Prefer lower cost models (save quota)
-        score -= info.cost * 2;
-
-        // Prefer models with better reliability history
-        const reliability = _getModelReliability(m);
-        score += reliability * 15;
-
-        // Penalize models that were recently used and failed
-        const stats = _routeStats[m];
-        if (stats && stats.lastUsed && (Date.now() - stats.lastUsed < 300000) && stats.fail > stats.success) {
-            score -= 30;
-        }
-
-        return { model: m, score };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    return scored[0].model;
+    // Everything exhausted — pick the one exhausted longest ago
+    let oldest = Infinity, pick = FALLBACK_MODELS[FALLBACK_MODELS.length - 1];
+    for (const k in _cdpExhaustedModels) {
+        const entry = _cdpExhaustedModels[k];
+        if (entry && entry.time < oldest) { oldest = entry.time; pick = k; }
+    }
+    console.log('[AG] Fallback (all exhausted, oldest): ' + pick);
+    return pick;
 }
 
 // =============================================================
@@ -764,18 +742,12 @@ function startLSQuotaPoll() {
 
 // Map display names to model metadata for VS Code API
 const MODEL_API_MAP = {
-    "Claude Opus 4.7 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.7-thinking', id: 'claude-opus-4.7-thinking' },
-    "Claude Opus 4.6 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.6-thinking', id: 'claude-opus-4.6-thinking' },
-    "Claude Sonnet 4.6 (Thinking)":{ vendor: 'copilot', family: 'claude-sonnet-4.6-thinking', id: 'claude-sonnet-4.6-thinking' },
-    "Claude Sonnet 4.6":           { vendor: 'copilot', family: 'claude-sonnet-4.6', id: 'claude-sonnet-4.6' },
-    "Claude Sonnet 4.5":           { vendor: 'copilot', family: 'claude-sonnet-4.5', id: 'claude-sonnet-4.5' },
-    "Gemini 3.5 Pro":              { vendor: 'copilot', family: 'gemini-3.5-pro', id: 'gemini-3.5-pro' },
-    "Gemini 3.1 Pro (High)":       { vendor: 'copilot', family: 'gemini-3.1-pro-high', id: 'gemini-3.1-pro-high' },
-    "Gemini 3.1 Pro (Low)":        { vendor: 'copilot', family: 'gemini-3.1-pro-low', id: 'gemini-3.1-pro-low' },
-    "Gemini 3 Flash (New)":        { vendor: 'copilot', family: 'gemini-3-flash', id: 'gemini-3-flash-new' },
-    "Gemini 3 Flash":              { vendor: 'copilot', family: 'gemini-3-flash', id: 'gemini-3-flash' },
-    "GPT-OSS 120B (Medium)":       { vendor: 'copilot', family: 'gpt-oss-120b-medium', id: 'gpt-oss-120b-medium' },
-    "GPT-OSS 100B":                { vendor: 'copilot', family: 'gpt-oss-100b', id: 'gpt-oss-100b' }
+    "Claude Opus 4.6 (Thinking)":      { vendor: 'copilot', family: 'claude-opus-4.6-thinking', id: 'claude-opus-4-6-thinking' },
+    "Claude Sonnet 4.6 (Thinking)":    { vendor: 'copilot', family: 'claude-sonnet-4.6-thinking', id: 'claude-sonnet-4-6-thinking' },
+    "Gemini 3.1 Pro (High)":           { vendor: 'copilot', family: 'gemini-3.1-pro-high', id: 'gemini-3.1-pro-high' },
+    "GPT-OSS 120B (Medium)":           { vendor: 'copilot', family: 'gpt-oss-120b-medium', id: 'gpt-oss-120b-medium' },
+    "Gemini 3.1 Pro (Low)":            { vendor: 'copilot', family: 'gemini-3.1-pro-low', id: 'gemini-3.1-pro-low' },
+    "Gemini 3 Flash":                  { vendor: 'copilot', family: 'gemini-3-flash', id: 'gemini-3-flash' }
 };
 
 /** Discover available models at runtime via vscode.lm API */
@@ -832,9 +804,10 @@ function switchModelViaKeyboard_macOS(targetDisplayName) {
         execSync('osascript -e \'tell application "System Events" to keystroke "," using {command down, shift down}\'', { timeout: 3000 });
         execSync('sleep 0.8');
 
-        // Step 4: Type model name to filter (first word is enough)
-        const search = targetDisplayName.split('(')[0].trim();
-        execSync('osascript -e \'tell application "System Events" to keystroke "' + search.replace(/"/g, '\\"') + '"\'', { timeout: 3000 });
+        // Step 4: Type model name to filter (use label that matches picker)
+        const search = targetDisplayName;
+        console.log('[AG] Typing model name: ' + search);
+        execSync('osascript -e \'tell application "System Events" to keystroke "' + search.replace(/"/g, '\\"').replace(/'/g, '') + '"\'', { timeout: 3000 });
         execSync('sleep 0.5');
 
         // Step 5: Enter to select
