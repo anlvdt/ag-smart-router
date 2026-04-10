@@ -596,28 +596,65 @@ function pruneEntries() {
 }
 
 /**
- * Step 5: Generalize — discover command patterns from data.
- * Like learning representations: group similar commands into abstract patterns.
- * e.g., if user approves "npm run build", "npm run test", "npm run lint"
- *        → generalize pattern "npm" (the base command is already whitelisted,
- *          but we also learn that npm subcommands are safe)
+ * Generalize — discover command patterns from data.
+ * Enhanced: prefix groups, subcommand patterns, co-occurrence clusters.
  */
 function generalizePatterns() {
     _patternCache = [];
-    // Group by prefix (first token before space/dash)
+
+    // Method 1: Prefix grouping (npm-*, docker-*, etc.)
     const groups = {};
     for (const [cmd, d] of Object.entries(_learnData)) {
-        if (d.conf < 0.3 || d.obs < 2) continue;
+        if (d.conf < 0.2 || d.obs < 2) continue;
         const prefix = cmd.replace(/[-_].*$/, '').replace(/\d+$/, '');
         if (prefix && prefix.length >= 2) {
             if (!groups[prefix]) groups[prefix] = [];
             groups[prefix].push(cmd);
         }
     }
-    // If a prefix group has enough members, the prefix itself becomes a pattern
     for (const [prefix, members] of Object.entries(groups)) {
         if (members.length >= LEARN.GENERALIZE_MIN && !SAFE_TERMINAL_CMDS.includes(prefix)) {
             _patternCache.push(prefix);
+        }
+    }
+
+    // Method 2: Subcommand patterns — if "npm run build", "npm run test", "npm run dev"
+    // all approved → generalize "npm" subcommands as safe
+    const subCmdGroups = {};
+    for (const [cmd, d] of Object.entries(_learnData)) {
+        if (d.conf < 0.3) continue;
+        // Check if this looks like a subcommand (contains spaces in original cmdLine)
+        // We track base commands, so look for similar base commands with high confidence
+        const concept = classifyCommand(cmd);
+        if (concept) {
+            if (!subCmdGroups[concept]) subCmdGroups[concept] = { safe: 0, total: 0 };
+            subCmdGroups[concept].total++;
+            if (d.conf > 0.5) subCmdGroups[concept].safe++;
+        }
+    }
+
+    // Method 3: Co-occurrence clusters from sequences
+    if (_wiki.sequences) {
+        const coOccur = {};
+        for (const [seq, count] of Object.entries(_wiki.sequences)) {
+            if (count < 2) continue;
+            const [a, b] = seq.split(' → ');
+            if (a && b) {
+                if (!coOccur[a]) coOccur[a] = new Set();
+                if (!coOccur[b]) coOccur[b] = new Set();
+                coOccur[a].add(b);
+                coOccur[b].add(a);
+            }
+        }
+        // Commands that frequently co-occur with trusted commands get a boost
+        for (const [cmd, peers] of Object.entries(coOccur)) {
+            if (_learnData[cmd] && _learnData[cmd].conf < 0.3) {
+                const trustedPeers = [...peers].filter(p => _learnData[p]?.conf > 0.5);
+                if (trustedPeers.length >= 2) {
+                    // Boost confidence slightly — "guilt by association" (positive)
+                    _learnData[cmd].conf = Math.min(1, _learnData[cmd].conf + 0.05);
+                }
+            }
         }
     }
 }
@@ -808,24 +845,30 @@ function wikiIngest(cmd, action, data, context) {
     page.sources.push(now);
     if (page.sources.length > 20) page.sources.shift();
 
-    // 2. Compile summary (like LLM writing wiki page)
+    // 2. Compile summary — enhanced with recency weighting and concept context
     const ratio = page.totalEvents > 0 ? page.approves / page.totalEvents : 0;
-    if (ratio >= 0.9 && page.totalEvents >= 5) {
-        page.summary = `Highly trusted command. Approved ${page.approves}/${page.totalEvents} times (${Math.round(ratio * 100)}%).`;
+    const recency = Math.min(1, (Date.now() - page.firstSeen) / (7 * 86400000)); // 0-1 over first week
+    const dataMaturity = Math.min(1, page.totalEvents / 20); // 0-1 over first 20 events
+
+    // Weighted risk: combine ratio, confidence, and data maturity
+    const riskScore = ratio * 0.4 + ((data.conf + 1) / 2) * 0.4 + dataMaturity * 0.2;
+
+    if (riskScore >= 0.8 && page.totalEvents >= 5) {
+        page.summary = `Highly trusted. ${page.approves}/${page.totalEvents} approved (${Math.round(ratio * 100)}%), conf: ${Math.round(data.conf * 100)}%.`;
         page.riskLevel = 'safe';
-        page.tags = [...new Set([...page.tags, 'trusted', 'auto-approve'])];
-    } else if (ratio >= 0.6) {
-        page.summary = `Generally safe. Approved ${page.approves}/${page.totalEvents} times. Monitor for changes.`;
+        page.tags = [...new Set([...page.tags.filter(t => t !== 'suspicious' && t !== 'blocked' && t !== 'mixed'), 'trusted', 'auto-approve'])];
+    } else if (riskScore >= 0.55) {
+        page.summary = `Generally safe. ${page.approves}/${page.totalEvents} approved. Confidence trending ${data.velocity > 0 ? 'up' : 'down'}.`;
         page.riskLevel = 'safe';
-        page.tags = [...new Set([...page.tags, 'learning'])];
-    } else if (ratio >= 0.3) {
-        page.summary = `Mixed signals. ${page.approves} approves vs ${page.rejects} rejects. Needs more data.`;
+        page.tags = [...new Set([...page.tags.filter(t => t !== 'suspicious' && t !== 'blocked'), 'learning'])];
+    } else if (riskScore >= 0.3) {
+        page.summary = `Mixed signals. ${page.approves} approves vs ${page.rejects} rejects. Conf: ${Math.round(data.conf * 100)}%.`;
         page.riskLevel = 'caution';
-        page.tags = [...new Set([...page.tags, 'mixed', 'review'])];
+        page.tags = [...new Set([...page.tags.filter(t => t !== 'trusted' && t !== 'auto-approve'), 'mixed', 'review'])];
     } else {
-        page.summary = `Frequently rejected (${page.rejects}/${page.totalEvents}). Likely unsafe or unwanted.`;
+        page.summary = `Frequently rejected (${page.rejects}/${page.totalEvents}). Conf: ${Math.round(data.conf * 100)}%.`;
         page.riskLevel = 'danger';
-        page.tags = [...new Set([...page.tags, 'suspicious', 'blocked'])];
+        page.tags = [...new Set([...page.tags.filter(t => t !== 'trusted' && t !== 'auto-approve'), 'suspicious', 'blocked'])];
     }
 
     // 3. Update concept pages — group by semantic category
@@ -853,8 +896,11 @@ function wikiIngest(cmd, action, data, context) {
     }
 
     // 4. Build cross-references (like wiki backlinks)
+    // Enhanced: link by project, by time proximity, and by sequence
     if (context.project) {
-        // Link commands used in the same project
+        if (!page.tags.includes('proj:' + context.project)) {
+            page.tags.push('proj:' + context.project);
+        }
         const projectCmds = Object.entries(_wiki.index)
             .filter(([k, v]) => k !== cmd && v.tags.includes('proj:' + context.project))
             .map(([k]) => k);
@@ -863,16 +909,47 @@ function wikiIngest(cmd, action, data, context) {
             const relPage = _wiki.index[related];
             if (relPage && !relPage.links.includes(cmd)) relPage.links.push(cmd);
         }
-        if (!page.tags.includes('proj:' + context.project)) {
-            page.tags.push('proj:' + context.project);
-        }
     }
 
-    // 5. Detect contradictions (like Karpathy's lint: "noting where new data contradicts old claims")
+    // Sequence learning: link to the previous command (temporal proximity)
+    // If user runs A then B, they're likely related
+    if (!_wiki._lastCmd) _wiki._lastCmd = { cmd: null, time: 0 };
+    if (_wiki._lastCmd.cmd && _wiki._lastCmd.cmd !== cmd && (now - _wiki._lastCmd.time) < 30000) {
+        const prevCmd = _wiki._lastCmd.cmd;
+        if (!page.links.includes(prevCmd)) page.links.push(prevCmd);
+        const prevPage = _wiki.index[prevCmd];
+        if (prevPage && !prevPage.links.includes(cmd)) prevPage.links.push(cmd);
+
+        // Track command sequences for pattern discovery
+        if (!_wiki.sequences) _wiki.sequences = {};
+        const seqKey = prevCmd + ' → ' + cmd;
+        _wiki.sequences[seqKey] = (_wiki.sequences[seqKey] || 0) + 1;
+    }
+    _wiki._lastCmd = { cmd, time: now };
+
+    // Similar command inference: share knowledge between python/python3, node/node18, etc.
+    const similar = findSimilarCommands(cmd);
+    for (const sim of similar) {
+        if (!page.links.includes(sim)) page.links.push(sim);
+        const simPage = _wiki.index[sim];
+        if (simPage && !simPage.links.includes(cmd)) simPage.links.push(cmd);
+    }
+
+    // Trim links to prevent unbounded growth
+    if (page.links.length > 20) {
+        // Keep links with highest confidence
+        page.links = page.links
+            .map(l => ({ cmd: l, conf: Math.abs(_wiki.index[l]?.confidence || 0) }))
+            .sort((a, b) => b.conf - a.conf)
+            .slice(0, 15)
+            .map(l => l.cmd);
+    }
+
+    // 5. Detect contradictions
     detectContradictions(cmd, action, data);
 
-    // 6. Update synthesis — high-level patterns
-    updateSynthesis();
+    // 6. Update synthesis — throttled (every 5 events instead of every event)
+    if (_learnEpoch % 5 === 0) updateSynthesis();
 
     // 7. Append to activity log
     const ts = new Date(now).toISOString().slice(0, 19).replace('T', ' ');
@@ -894,7 +971,7 @@ function wikiIngest(cmd, action, data, context) {
 
 /**
  * Classify a command into a semantic concept category.
- * Like creating concept pages in the wiki.
+ * Enhanced: fuzzy matching for versioned commands, scripts, paths.
  */
 function classifyCommand(cmd) {
     const categories = {
@@ -902,69 +979,173 @@ function classifyCommand(cmd) {
         'version-control': ['git'],
         'container-ops': ['docker','docker-compose','podman','kubectl','helm'],
         'build-tool': ['make','cmake','gcc','g++','clang','tsc','webpack','vite','esbuild','rollup','turbo'],
-        'test-runner': ['jest','vitest','mocha','playwright'],
-        'linter-formatter': ['eslint','prettier','ruff','black','mypy'],
-        'file-ops': ['ls','dir','cat','cp','mv','touch','mkdir','rm','find','head','tail','wc','sort','uniq','diff','tar','zip','unzip','gzip'],
-        'network': ['curl','wget','ping','dig','nslookup','host','netstat','ss'],
+        'test-runner': ['jest','vitest','mocha','playwright','pytest','unittest'],
+        'linter-formatter': ['eslint','prettier','ruff','black','mypy','pylint','flake8'],
+        'file-ops': ['ls','dir','cat','cp','mv','touch','mkdir','rm','find','head','tail','wc','sort','uniq','diff','tar','zip','unzip','gzip','chmod','chown'],
+        'network': ['curl','wget','ping','dig','nslookup','host','netstat','ss','ssh','scp','rsync'],
         'system-info': ['ps','top','htop','lsof','df','du','free','uname','hostname','whoami','id','env','printenv','date'],
         'text-processing': ['grep','sed','awk','tr','cut','tee','xargs','jq','yq'],
         'database': ['sqlite3','psql','mysql','mongosh','redis-cli'],
-        'language-runtime': ['node','python','python3','deno','java','javac','rustc'],
-        'infra': ['terraform','ansible'],
+        'language-runtime': ['node','python','python3','deno','java','javac','rustc','ruby','perl','php','lua'],
+        'infra': ['terraform','ansible','pulumi','cdk'],
         'crypto-encoding': ['base64','md5','sha256sum','openssl'],
+        'shell-script': ['bash','sh','zsh'],
     };
+
+    // Exact match first
     for (const [concept, cmds] of Object.entries(categories)) {
         if (cmds.includes(cmd)) return concept;
     }
+
+    // Fuzzy match: strip version numbers (python3.11 → python3, node18 → node)
+    const stripped = cmd.replace(/[\d.]+$/, '');
+    if (stripped !== cmd && stripped.length >= 2) {
+        for (const [concept, cmds] of Object.entries(categories)) {
+            if (cmds.includes(stripped)) return concept;
+        }
+    }
+
+    // Script detection: *.sh, *.py, *.js, *.ts
+    if (/\.(sh|bash|zsh)$/i.test(cmd)) return 'shell-script';
+    if (/\.(py|pyw)$/i.test(cmd)) return 'language-runtime';
+    if (/\.(js|ts|mjs|cjs)$/i.test(cmd)) return 'language-runtime';
+    if (/\.(rb|pl|php|lua)$/i.test(cmd)) return 'language-runtime';
+
+    // Path-based detection: ./something or /usr/bin/something
+    if (cmd.startsWith('./') || cmd.startsWith('/')) {
+        if (/dev|start|run|build|test|deploy|serve/i.test(cmd)) return 'shell-script';
+    }
+
     return null;
 }
 
 /**
+ * Find commands similar to the given one.
+ * Enables knowledge sharing: python ↔ python3, node ↔ node18, etc.
+ */
+function findSimilarCommands(cmd) {
+    const similar = [];
+    const allCmds = Object.keys(_wiki.index);
+
+    // Strip version: python3 → python, node18 → node
+    const base = cmd.replace(/[\d.]+$/, '');
+    if (base !== cmd && base.length >= 2) {
+        for (const other of allCmds) {
+            if (other !== cmd && other.startsWith(base)) similar.push(other);
+        }
+    }
+    // Reverse: python → python3
+    for (const other of allCmds) {
+        if (other !== cmd && other.replace(/[\d.]+$/, '') === cmd) similar.push(other);
+    }
+
+    // Same concept category
+    const myConcept = classifyCommand(cmd);
+    if (myConcept) {
+        const cp = _wiki.concepts[myConcept];
+        if (cp) {
+            for (const other of cp.commands) {
+                if (other !== cmd && !similar.includes(other)) similar.push(other);
+            }
+        }
+    }
+
+    return similar.slice(0, 5);
+}
+
+/**
  * Detect contradictions — when a command's behavior changes unexpectedly.
- * Like Karpathy's: "noting where new data contradicts old claims"
+ * Enhanced: lower thresholds, velocity-based detection, concept-level contradictions.
  */
 function detectContradictions(cmd, action, data) {
     const page = _wiki.index[cmd];
-    if (!page || page.totalEvents < 5) return;
+    if (!page || page.totalEvents < 3) return;
 
-    // Contradiction: command was mostly approved but now getting rejected
     const ratio = page.approves / page.totalEvents;
-    if (action === 'reject' && ratio > 0.8 && page.totalEvents > 10) {
-        const contradiction = {
-            time: Date.now(),
-            type: 'behavior-shift',
-            cmd,
-            detail: `"${cmd}" was trusted (${Math.round(ratio * 100)}% approve rate) but just got rejected. Possible context change.`,
-            oldClaim: `${cmd} is safe (conf: ${Math.round(page.confidence * 100)}%)`,
-            newEvidence: `Rejected at epoch ${_learnEpoch}`,
-            resolved: false,
-        };
-        _wiki.contradictions.push(contradiction);
-        if (_wiki.contradictions.length > 50) _wiki.contradictions.shift();
+
+    // Type 1: Behavior shift — trusted command suddenly rejected
+    if (action === 'reject' && ratio > 0.7 && page.totalEvents >= 5) {
+        addContradiction('behavior-shift', cmd,
+            `"${cmd}" was trusted (${Math.round(ratio * 100)}% approve) but just got rejected.`,
+            `${cmd} is safe (conf: ${Math.round(page.confidence * 100)}%)`,
+            `Rejected at epoch ${_learnEpoch}`);
     }
 
-    // Contradiction: command was mostly rejected but now approved
-    if (action === 'approve' && ratio < 0.3 && page.totalEvents > 10) {
-        const contradiction = {
-            time: Date.now(),
-            type: 'rehabilitation',
-            cmd,
-            detail: `"${cmd}" was distrusted (${Math.round(ratio * 100)}% approve rate) but just got approved. User may have changed stance.`,
-            oldClaim: `${cmd} is suspicious`,
-            newEvidence: `Approved at epoch ${_learnEpoch}`,
-            resolved: false,
-        };
-        _wiki.contradictions.push(contradiction);
-        if (_wiki.contradictions.length > 50) _wiki.contradictions.shift();
+    // Type 2: Rehabilitation — distrusted command suddenly approved
+    if (action === 'approve' && ratio < 0.4 && page.totalEvents >= 5) {
+        addContradiction('rehabilitation', cmd,
+            `"${cmd}" was distrusted (${Math.round(ratio * 100)}% approve) but just got approved.`,
+            `${cmd} is suspicious`,
+            `Approved at epoch ${_learnEpoch}`);
+    }
+
+    // Type 3: Velocity reversal — confidence was climbing but suddenly drops (or vice versa)
+    if (data.history && data.history.length >= 3) {
+        const recent = data.history.slice(-3);
+        const prevDir = recent[1].c - recent[0].c; // was going up or down?
+        const currDir = recent[2].c - recent[1].c; // now going?
+        if (Math.abs(prevDir) > 0.1 && Math.abs(currDir) > 0.1 && Math.sign(prevDir) !== Math.sign(currDir)) {
+            addContradiction('velocity-reversal', cmd,
+                `"${cmd}" confidence reversed direction: was ${prevDir > 0 ? 'rising' : 'falling'}, now ${currDir > 0 ? 'rising' : 'falling'}.`,
+                `Trend was ${prevDir > 0 ? 'positive' : 'negative'}`,
+                `Reversed at epoch ${_learnEpoch}, conf: ${Math.round(data.conf * 100)}%`);
+        }
+    }
+
+    // Type 4: Exit code contradiction — command approved but consistently fails
+    if (action === 'approve' && data.rewards && data.rewards.length >= 3) {
+        const recentRewards = data.rewards.slice(-3);
+        const allNegContext = recentRewards.every(r => r < 1.0 && r > 0); // approved but with penalty (exit ≠ 0)
+        if (allNegContext && page.riskLevel === 'safe') {
+            addContradiction('exit-code-mismatch', cmd,
+                `"${cmd}" is marked safe but last 3 executions had non-zero exit codes.`,
+                `${cmd} is safe`,
+                `Consistently failing despite approval`);
+        }
+    }
+
+    // Type 5: Concept-level contradiction — command disagrees with its category
+    const concept = classifyCommand(cmd);
+    if (concept && _wiki.concepts[concept]) {
+        const cp = _wiki.concepts[concept];
+        if (cp.avgConfidence > 0.5 && data.conf < -0.2) {
+            addContradiction('concept-outlier', cmd,
+                `"${cmd}" (conf: ${Math.round(data.conf * 100)}%) is an outlier in "${concept}" (avg: ${Math.round(cp.avgConfidence * 100)}%).`,
+                `${concept} category is generally safe`,
+                `${cmd} is significantly below category average`);
+        }
+    }
+}
+
+function addContradiction(type, cmd, detail, oldClaim, newEvidence) {
+    // Dedup: don't add same type+cmd within 5 minutes
+    const recent = _wiki.contradictions.find(c =>
+        c.cmd === cmd && c.type === type && !c.resolved && (Date.now() - c.time) < 300000);
+    if (recent) return;
+
+    _wiki.contradictions.push({
+        time: Date.now(),
+        type,
+        cmd,
+        detail,
+        oldClaim,
+        newEvidence,
+        resolved: false,
+    });
+    if (_wiki.contradictions.length > 100) {
+        // Keep unresolved ones, prune oldest resolved
+        const unresolved = _wiki.contradictions.filter(c => !c.resolved);
+        const resolved = _wiki.contradictions.filter(c => c.resolved).slice(-20);
+        _wiki.contradictions = [...resolved, ...unresolved];
     }
 }
 
 /**
  * Update synthesis — discover high-level patterns across the wiki.
- * Like Karpathy's overview.md: "a high-level synthesis"
+ * Enhanced: command sequences, risk trends, project profiles.
  */
 function updateSynthesis() {
-    // Synthesize: which time slots are most active?
+    // 1. Peak activity time
     const timeSlots = { morning: 0, afternoon: 0, evening: 0, night: 0 };
     for (const [, d] of Object.entries(_learnData)) {
         for (const [slot, count] of Object.entries(d.contexts || {})) {
@@ -973,32 +1154,86 @@ function updateSynthesis() {
     }
     const peakTime = Object.entries(timeSlots).sort((a, b) => b[1] - a[1])[0];
     _wiki.synthesis['peak-activity'] = {
-        description: `Most active during ${peakTime[0]} (${peakTime[1]} events)`,
+        description: `Most active: ${peakTime[0]} (${peakTime[1]} events)`,
         members: Object.keys(timeSlots),
         strength: peakTime[1],
     };
 
-    // Synthesize: which concepts are most trusted?
+    // 2. Trusted categories ranking
     const conceptRanking = Object.entries(_wiki.concepts)
+        .filter(([, c]) => c.commands.length > 0)
         .sort((a, b) => b[1].avgConfidence - a[1].avgConfidence);
     if (conceptRanking.length > 0) {
         _wiki.synthesis['trusted-categories'] = {
-            description: `Most trusted: ${conceptRanking.slice(0, 3).map(([k, v]) => `${k} (${Math.round(v.avgConfidence * 100)}%)`).join(', ')}`,
-            members: conceptRanking.slice(0, 3).map(([k]) => k),
+            description: conceptRanking.map(([k, v]) => `${k}: ${Math.round(v.avgConfidence * 100)}%`).join(', '),
+            members: conceptRanking.map(([k]) => k),
             strength: conceptRanking[0][1].avgConfidence,
         };
     }
 
-    // Synthesize: overall learning health
+    // 3. Learning health
     const totalObs = Object.values(_learnData).reduce((a, d) => a + d.obs, 0);
     const avgConf = Object.values(_learnData).length > 0
-        ? Object.values(_learnData).reduce((a, d) => a + d.conf, 0) / Object.values(_learnData).length
-        : 0;
+        ? Object.values(_learnData).reduce((a, d) => a + d.conf, 0) / Object.values(_learnData).length : 0;
     _wiki.synthesis['learning-health'] = {
-        description: `Epoch ${_learnEpoch}: ${Object.keys(_learnData).length} commands tracked, ${totalObs} total observations, avg confidence ${Math.round(avgConf * 100)}%`,
+        description: `Epoch ${_learnEpoch}: ${Object.keys(_learnData).length} cmds, ${totalObs} obs, avg conf ${Math.round(avgConf * 100)}%`,
         members: [],
         strength: avgConf,
     };
+
+    // 4. Top command sequences (new — Karpathy's "associative trails")
+    if (_wiki.sequences) {
+        const topSeqs = Object.entries(_wiki.sequences)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+        if (topSeqs.length > 0) {
+            _wiki.synthesis['common-sequences'] = {
+                description: topSeqs.map(([seq, n]) => `${seq} (×${n})`).join(', '),
+                members: topSeqs.map(([seq]) => seq),
+                strength: topSeqs[0][1],
+            };
+        }
+    }
+
+    // 5. Risk trend — is the system getting safer or riskier over time?
+    const recentHistory = [];
+    for (const [, d] of Object.entries(_learnData)) {
+        if (d.history && d.history.length >= 2) {
+            const last = d.history[d.history.length - 1];
+            const prev = d.history[Math.max(0, d.history.length - 5)];
+            recentHistory.push(last.c - prev.c); // positive = improving
+        }
+    }
+    if (recentHistory.length > 0) {
+        const avgTrend = recentHistory.reduce((a, b) => a + b, 0) / recentHistory.length;
+        _wiki.synthesis['risk-trend'] = {
+            description: avgTrend > 0.05 ? 'Improving — confidence rising across commands' :
+                         avgTrend < -0.05 ? 'Degrading — confidence falling, review needed' :
+                         'Stable — no significant changes',
+            members: [],
+            strength: avgTrend,
+        };
+    }
+
+    // 6. Project profiles — which projects use which commands
+    const projects = {};
+    for (const [cmd, d] of Object.entries(_learnData)) {
+        for (const [key, count] of Object.entries(d.contexts || {})) {
+            if (key.startsWith('proj:')) {
+                const proj = key.slice(5);
+                if (!projects[proj]) projects[proj] = [];
+                projects[proj].push({ cmd, count, conf: d.conf });
+            }
+        }
+    }
+    const projEntries = Object.entries(projects).sort((a, b) => b[1].length - a[1].length);
+    if (projEntries.length > 0) {
+        _wiki.synthesis['project-profiles'] = {
+            description: projEntries.map(([p, cmds]) => `${p}: ${cmds.length} cmds`).join(', '),
+            members: projEntries.map(([p]) => p),
+            strength: projEntries[0][1].length,
+        };
+    }
 }
 
 /**
