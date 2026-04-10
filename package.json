@@ -2,7 +2,7 @@
     "name": "ag-autopilot",
     "displayName": "AG Autopilot",
     "description": "Autopilot for Antigravity AI: Auto Click, Auto Scroll, Smart Model Router, Quota Fallback. | Tự lái mọi thứ cho Antigravity AI. v6.0.0 - Quota-aware Smart Router, Tier-aware Fallback, Adaptive Cooldown, Routing History",
-    "version": "6.0.0",
+    "version": "6.1.0",
     "publisher": "ANLE",
     "repository": {
         "type": "git",

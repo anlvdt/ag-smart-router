@@ -6,6 +6,22 @@
     window._agAutoLoaded = true;
     window._agModelSwitchLoaded = true;
 
+    // --- Shadow DOM piercing query helper ---
+    function pierceQuery(selector, root) {
+        var results = [];
+        var walk = function(node) {
+            if (!node) return;
+            if (node.nodeType === 1) {
+                try { if (node.matches(selector)) results.push(node); } catch(_) {}
+                if (node.shadowRoot) walk(node.shadowRoot);
+            }
+            var children = node.childNodes || (node.children ? Array.from(node.children) : []);
+            for (var i = 0; i < children.length; i++) walk(children[i]);
+        };
+        walk(root || document);
+        return results;
+    }
+
     // --- Cleanup old instances ---
     if (window._agToolIntervals) {
         window._agToolIntervals.forEach(clearInterval);
@@ -157,10 +173,13 @@
         if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey) return;
 
         var el = e.target;
-        if (!el || el.tagName !== 'TEXTAREA') return;
-        if (!el.closest || !el.closest('.antigravity-agent-side-panel, [class*="chat"], [class*="agent"]')) return;
+        if (!el) return;
+        // Support both textarea and contenteditable elements
+        var isInput = el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.getAttribute('contenteditable') === 'true' || el.getAttribute('role') === 'textbox';
+        if (!isInput) return;
+        if (!el.closest || !el.closest('.antigravity-agent-side-panel, [class*="chat"], [class*="agent"], [class*="inline-chat"], [class*="command-approval"], [class*="jetski"]')) return;
 
-        var prompt = (el.value || '').trim();
+        var prompt = (el.value || el.textContent || '').trim();
         if (!prompt || prompt.length < 3) return;
 
         // Intercept Enter — delegate routing to Extension Host
@@ -187,11 +206,11 @@
                     el.dispatchEvent(new KeyboardEvent('keyup', opts));
                     // Fallback: click Send button
                     setTimeout(function () {
-                        var btns = document.querySelectorAll('button, [role="button"]');
+                        var btns = pierceQuery('button, vscode-button, [role="button"]', document);
                         for (var i = 0; i < btns.length; i++) {
                             var t = (btns[i].innerText || '').trim().toLowerCase();
                             var a = (btns[i].getAttribute('aria-label') || '').toLowerCase();
-                            if ((t === 'send' || t === 'submit' || a.indexOf('send') !== -1) && btns[i].offsetParent !== null) {
+                            if ((t === 'send' || t === 'submit' || a.indexOf('send') !== -1) && (btns[i].offsetParent !== null || btns[i].shadowRoot)) {
                                 btns[i].click(); break;
                             }
                         }
@@ -226,11 +245,12 @@
     if (!window._agTotalClicks) window._agTotalClicks = 0;
 
     function isApprovalButton(btn) {
-        var parent = btn.parentElement;
+        var parent = btn.parentElement || (btn.getRootNode && btn.getRootNode().host);
         if (!parent) return false;
-        for (var level = 0; level < 3; level++) {
+        for (var level = 0; level < 5; level++) {
             if (!parent) break;
-            var siblingBtns = parent.querySelectorAll('button, a.action-label, [role="button"], .monaco-button, span.bg-ide-button-background');
+            // Pierce shadow DOM when searching for sibling reject buttons
+            var siblingBtns = pierceQuery('button, vscode-button, a.action-label, [role="button"], .monaco-button, span.bg-ide-button-background', parent);
             for (var i = 0; i < siblingBtns.length; i++) {
                 var sib = siblingBtns[i];
                 if (sib === btn) continue;
@@ -239,27 +259,171 @@
                     if (sibText === REJECT_WORDS[j] || sibText.indexOf(REJECT_WORDS[j]) === 0) return true;
                 }
             }
-            parent = parent.parentElement;
+            parent = parent.parentElement || (parent.getRootNode && parent.getRootNode().host);
         }
         return false;
     }
 
     var autoClick = setInterval(function () {
         if (!window._agAutoEnabled) return;
-        var clickables = Array.from(document.querySelectorAll('button, a.action-label, [role="button"], .monaco-button'));
-        document.querySelectorAll('span.cursor-pointer').forEach(function (s) { clickables.push(s); });
+        
+        // --- QUOTA EXHAUSTION DETECTION ---
+        if (window._agQuotaFallback && !_isRoutingInProgress) {
+            var quotaTextMatch = false;
+            var bodyText = document.body.innerText || '';
+            if (bodyText.indexOf('Your Claude Code usage is unusually high') !== -1 || bodyText.indexOf('free limit reached') !== -1) {
+                quotaTextMatch = true;
+            } else {
+                // Check inner nodes deeply just in case it's in shadow DOM
+                var twq = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+                while (twq.nextNode()) {
+                    var vq = (twq.currentNode.nodeValue || '').trim().toLowerCase();
+                    if (vq.indexOf('usage is unusually high') !== -1 || vq.indexOf('free limit reached') !== -1) {
+                        quotaTextMatch = true; break;
+                    }
+                }
+            }
+            if (quotaTextMatch) {
+                // Stop to switch
+                _isRoutingInProgress = true;
+                _routingLockTime = Date.now();
+                var switchTarget = 'Gemini 3.1 Pro (High)';
+                console.log('[AG] Quota exhausted! Switching to: ' + switchTarget);
+                
+                // Directly click the model dropdown
+                var M_pats = ["Select a model", "Claude", "Gemini", "GPT"];
+                var tw = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+                var dropdownClicked = false;
+                while (tw.nextNode()) {
+                    var v = (tw.currentNode.nodeValue || '').trim();
+                    if (!v || v.length < 3 || v.length > 120) continue;
+                    var found = false;
+                    for (var m = 0; m < M_pats.length; m++) { if (v.indexOf(M_pats[m]) !== -1) { found = true; break; } }
+                    if (found) {
+                        var anc = tw.currentNode.parentElement;
+                        for (var l = 0; l < 8 && anc; l++) {
+                            if (anc.tagName === 'BUTTON' || anc.tagName === 'VSCODE-BUTTON' || anc.getAttribute('role') === 'button' || (anc.style && anc.style.cursor === 'pointer')) {
+                                anc.click();
+                                dropdownClicked = true;
+                                break;
+                            }
+                            anc = anc.parentElement || (anc.getRootNode && anc.getRootNode().host);
+                        }
+                    }
+                    if (dropdownClicked) break;
+                }
+                
+                if (dropdownClicked) {
+                    setTimeout(function() {
+                        var tgt = switchTarget; var sn = tgt.split(' ').slice(0, 3).join(' ');
+                        var items = pierceQuery('vscode-option, [role=menuitem], [role=option], .monaco-list-row, .action-label, [class*=list-row], [class*=option], [class*=item]', document);
+                        var modelClicked = false;
+                        for (var i = 0; i < items.length; i++) {
+                            var t = (items[i].innerText || items[i].textContent || '').trim();
+                            if ((t.indexOf(tgt) !== -1 || (sn && t.indexOf(sn) !== -1)) && (items[i].offsetParent !== null || items[i].closest('[class*=overlay],[class*=popover],[class*=popup],[class*=shadow]'))) {
+                                items[i].click(); modelClicked = true; break;
+                            }
+                        }
+                        if (!modelClicked) {
+                            var firstWord = tgt.split(' ')[0];
+                            for (var i = 0; i < items.length; i++) {
+                                var t = (items[i].innerText || items[i].textContent || '').trim();
+                                if (t.indexOf(firstWord) !== -1 && t.length < 80) { items[i].click(); modelClicked = true; break; }
+                            }
+                        }
+                        // Press escape
+                        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', keyCode: 27, bubbles: true}));
+                        setTimeout(function() { _isRoutingInProgress = false; }, 300);
+                    }, 800);
+                } else {
+                    _isRoutingInProgress = false;
+                }
+            }
+        }
+
+        // Pierce Shadow DOM to find buttons inside Antigravity's new popup architecture
+        var clickables = pierceQuery('button, vscode-button, a.action-label, [role="button"], [class*="button"], span.cursor-pointer, span.bg-ide-button-background', document);
         var targetBtn = null;
         var matchedPattern = '';
 
         for (var i = 0; i < clickables.length; i++) {
             var b = clickables[i];
-            if (b.offsetParent === null || _clicked.has(b)) continue;
-            var text = (b.innerText || b.textContent || '').trim();
-            if (!text || text.length > 40) continue;
+            if (_clicked.has(b)) continue;
+            // Extract button's own text — NOT nested children's full text
+            // For long command popups, innerText includes the command description
+            var rawText = (b.innerText || b.textContent || '').trim();
+            var ariaLabel = (b.getAttribute('aria-label') || '').trim();
+            var titleAttr = (b.getAttribute('title') || '').trim();
+            var firstLine = rawText.split('\n')[0].trim();
+            var directText = '';
+            for (var cn = 0; cn < b.childNodes.length; cn++) {
+                if (b.childNodes[cn].nodeType === 3) directText += b.childNodes[cn].nodeValue || '';
+            }
+            directText = directText.trim();
+            
+            var text = directText || titleAttr || firstLine || ariaLabel;
+            
+            // DEBUG: if it contains Allow, log it to HTTP API
+            var lcRaw = rawText.toLowerCase(), lcAria = ariaLabel.toLowerCase(), lcTitle = titleAttr.toLowerCase();
+            if (lcRaw.indexOf('allow') !== -1 || lcAria.indexOf('allow') !== -1 || lcTitle.indexOf('allow') !== -1) {
+                try {
+                    fetch('http://127.0.0.1:48787/api/click-log', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            pattern: 'DEBUG',
+                            button: JSON.stringify({
+                                raw: rawText.substring(0,50),
+                                first: firstLine,
+                                direct: directText,
+                                aria: ariaLabel,
+                                title: titleAttr,
+                                tag: b.tagName,
+                                offsetParent: !!b.offsetParent,
+                                classes: b.className,
+                                closestQuickInput: !!(b.closest && b.closest('[class*=quick-input]')),
+                                shadow: !!b.shadowRoot
+                            })
+                        })
+                    }).catch(function(){});
+                } catch(e){}
+            }
+
+            if (!text) continue;
+
+            // EXTREME DEEP AUDIT: Dump to 48888 if it's remotely related to Allow or Run
+            var lcAll = (b.outerHTML || '').toLowerCase();
+            if (lcAll.indexOf('allow') !== -1 || lcAll.indexOf('run command') !== -1 || lcAll.indexOf('curl') !== -1) {
+                try {
+                    fetch('http://127.0.0.1:48888/', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            ts: Date.now(),
+                            isTarget: matchedPattern,
+                            tag: b.tagName,
+                            className: b.className,
+                            offsetParent: !!b.offsetParent,
+                            shadowRoot: !!b.shadowRoot,
+                            rect: b.getBoundingClientRect ? b.getBoundingClientRect().width : 0,
+                            innerText: (b.innerText || '').substring(0, 50),
+                            outerHTML: (b.outerHTML || '').substring(0, 300)
+                        })
+                    }).catch(function(){});
+                } catch(e){}
+            }
+
+            // Relaxed visibility: allow buttons in overlays/popups that lack offsetParent
+            if (b.offsetParent === null && !b.shadowRoot && !(b.closest && b.closest('[class*=overlay],[class*=popover],[class*=popup],[class*=dialog],[class*=notification],[class*=quick-input],[class*=context-view],[class*=action-widget],[class*=chat]'))) {
+                // If it's the specific curl command block, bypass visibility check!
+                if (lcAll.indexOf('curl') !== -1 || lcAll.indexOf('allow') !== -1) {
+                   // Force allow
+                } else {
+                    continue;
+                }
+            }
 
             var skipEditor = false;
             for (var se = 0; se < EDITOR_SKIP_WORDS.length; se++) {
-                if (text.indexOf(EDITOR_SKIP_WORDS[se]) === 0) { skipEditor = true; break; }
+                if (text.indexOf(EDITOR_SKIP_WORDS[se]) === 0 || firstLine.indexOf(EDITOR_SKIP_WORDS[se]) === 0) { skipEditor = true; break; }
             }
             if (skipEditor) continue;
 
@@ -272,11 +436,23 @@
                 if (b.closest && b.closest('[class*="editor"], [id*="editor"]')) continue;
             }
 
+            // Match against all text variants: direct text, first line, aria-label
             var matchesPattern = false;
-            for (var p = 0; p < CLICK_PATTERNS.length; p++) {
-                if (text === CLICK_PATTERNS[p] || text.indexOf(CLICK_PATTERNS[p]) === 0) { matchesPattern = true; matchedPattern = CLICK_PATTERNS[p]; break; }
+            var candidates = [text, firstLine, ariaLabel, rawText.split('\n')[0]];
+            for (var ci = 0; ci < candidates.length; ci++) {
+                var cand = (candidates[ci] || '').trim();
+                if (!cand) continue;
+                for (var p = 0; p < CLICK_PATTERNS.length; p++) {
+                    if (cand === CLICK_PATTERNS[p] || cand.indexOf(CLICK_PATTERNS[p]) === 0) { matchesPattern = true; matchedPattern = CLICK_PATTERNS[p]; break; }
+                }
+                if (matchesPattern) break;
             }
             if (!matchesPattern) continue;
+
+            // FIX: Don't require a 'Deny' sibling if the button explicitly matches our critical patterns!
+            if (matchedPattern === 'Allow' || matchedPattern === 'Run' || matchedPattern === 'Always Allow' || matchedPattern === 'Accept all') {
+                targetBtn = b; break;
+            }
 
             if (b.tagName === 'SPAN' && b.classList.contains('cursor-pointer')) { targetBtn = b; break; }
             if (isApprovalButton(b)) { targetBtn = b; break; }
@@ -286,7 +462,7 @@
         if (!targetBtn && window._agAcceptChatOnly) {
             for (var ai = 0; ai < clickables.length; ai++) {
                 var ab = clickables[ai];
-                if (ab.offsetParent === null || _clicked.has(ab)) continue;
+                if ((ab.offsetParent === null && !ab.shadowRoot) || _clicked.has(ab)) continue;
                 var aText = (ab.innerText || ab.textContent || '').trim();
                 if (aText.indexOf('Accept') !== 0) continue;
                 if (/^Accept\s+(all|changes|incoming|current|both|combination)/i.test(aText)) continue;
@@ -308,7 +484,47 @@
             }
             console.log('[AG Autopilot] 🎯 Click: [' + (targetBtn.innerText || '').trim().substring(0, 40) + '] pattern=' + matchedPattern);
             _clicked.add(targetBtn);
+            
+            if (matchedPattern === 'Allow' || matchedPattern === 'Run') {
+                try {
+                    fetch('http://127.0.0.1:' + AG_HTTP_PORT + '/api/debug-element', {
+                        method: 'POST',
+                        body: JSON.stringify({ pattern: matchedPattern, html: targetBtn.outerHTML || '' })
+                    }).catch(function(){});
+                } catch(e){}
+            }
+
+            var evtOptions = { bubbles: true, cancelable: true, view: window, detail: 1, clientX: 1, clientY: 1 };
+            try { targetBtn.dispatchEvent(new PointerEvent('pointerdown', evtOptions)); targetBtn.dispatchEvent(new PointerEvent('pointerup', evtOptions)); } catch(e){}
+            targetBtn.dispatchEvent(new MouseEvent('mousedown', evtOptions));
+            targetBtn.dispatchEvent(new MouseEvent('mouseup', evtOptions));
+            targetBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
             targetBtn.click();
+
+            // If it's a span/icon inside a button, also trigger the parent
+            // But if it's already an anchor (A), do not click the parent, as that triggers split-button dropdowns!
+            if (targetBtn.tagName !== 'BUTTON' && targetBtn.tagName !== 'VSCODE-BUTTON' && targetBtn.tagName !== 'A' && targetBtn.parentElement) {
+                var p = targetBtn.parentElement;
+                if (p.tagName === 'BUTTON' || p.tagName === 'VSCODE-BUTTON' || p.tagName === 'A' || p.classList.contains('monaco-button')) {
+                    try { p.dispatchEvent(new PointerEvent('pointerdown', evtOptions)); p.dispatchEvent(new PointerEvent('pointerup', evtOptions)); } catch(e){}
+                    p.dispatchEvent(new MouseEvent('mousedown', evtOptions));
+                    p.dispatchEvent(new MouseEvent('mouseup', evtOptions));
+                    p.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
+                    p.click();
+                    _clicked.add(p);
+                } else if (p.parentElement) {
+                    var gp = p.parentElement;
+                    if (gp.tagName === 'BUTTON' || gp.tagName === 'VSCODE-BUTTON' || gp.tagName === 'A' || gp.classList.contains('monaco-button')) {
+                        try { gp.dispatchEvent(new PointerEvent('pointerdown', evtOptions)); gp.dispatchEvent(new PointerEvent('pointerup', evtOptions)); } catch(e){}
+                        gp.dispatchEvent(new MouseEvent('mousedown', evtOptions));
+                        gp.dispatchEvent(new MouseEvent('mouseup', evtOptions));
+                        gp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true, cancelable: true }));
+                        gp.click();
+                        _clicked.add(gp);
+                    }
+                }
+            }
+
             _agSessionTotal++;
             if (!_agSessionStats[matchedPattern]) _agSessionStats[matchedPattern] = 0;
             _agSessionStats[matchedPattern]++;
@@ -334,7 +550,7 @@
         if (!window._agAutoEnabled || !window._agScrollEnabled) return;
         // Re-query panel every 20 cycles (~10s) or if cached ref is detached
         if (!_agCachedPanel || !_agCachedPanel.isConnected || ++_agPanelCheckCount > 20) {
-            _agCachedPanel = document.querySelector('.antigravity-agent-side-panel');
+            _agCachedPanel = document.querySelector('.antigravity-agent-side-panel') || pierceQuery('.antigravity-agent-side-panel, [class*="agent-panel"], [class*="jetski"]', document)[0] || null;
             _agPanelCheckCount = 0;
         }
         if (!_agCachedPanel) return;
