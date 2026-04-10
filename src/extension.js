@@ -764,16 +764,18 @@ function startLSQuotaPoll() {
 
 // Map display names to model metadata for VS Code API
 const MODEL_API_MAP = {
-    "Claude Opus 4.7 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.7-thinking' },
-    "Claude Opus 4.6 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.6-thinking' },
-    "Claude Sonnet 4.6":           { vendor: 'copilot', family: 'claude-sonnet-4.6' },
-    "Claude Sonnet 4.5":           { vendor: 'copilot', family: 'claude-sonnet-4.5' },
-    "Gemini 3.5 Pro":              { vendor: 'copilot', family: 'gemini-3.5-pro' },
-    "Gemini 3.1 Pro (High)":       { vendor: 'copilot', family: 'gemini-3.1-pro' },
-    "Gemini 3 Flash (New)":        { vendor: 'copilot', family: 'gemini-3-flash' },
-    "Gemini 3 Flash":              { vendor: 'copilot', family: 'gemini-3-flash' },
-    "GPT-OSS 120B (Medium)":       { vendor: 'copilot', family: 'gpt-oss-120b' },
-    "GPT-OSS 100B":                { vendor: 'copilot', family: 'gpt-oss-100b' }
+    "Claude Opus 4.7 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.7-thinking', id: 'claude-opus-4.7-thinking' },
+    "Claude Opus 4.6 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.6-thinking', id: 'claude-opus-4.6-thinking' },
+    "Claude Sonnet 4.6 (Thinking)":{ vendor: 'copilot', family: 'claude-sonnet-4.6-thinking', id: 'claude-sonnet-4.6-thinking' },
+    "Claude Sonnet 4.6":           { vendor: 'copilot', family: 'claude-sonnet-4.6', id: 'claude-sonnet-4.6' },
+    "Claude Sonnet 4.5":           { vendor: 'copilot', family: 'claude-sonnet-4.5', id: 'claude-sonnet-4.5' },
+    "Gemini 3.5 Pro":              { vendor: 'copilot', family: 'gemini-3.5-pro', id: 'gemini-3.5-pro' },
+    "Gemini 3.1 Pro (High)":       { vendor: 'copilot', family: 'gemini-3.1-pro-high', id: 'gemini-3.1-pro-high' },
+    "Gemini 3.1 Pro (Low)":        { vendor: 'copilot', family: 'gemini-3.1-pro-low', id: 'gemini-3.1-pro-low' },
+    "Gemini 3 Flash (New)":        { vendor: 'copilot', family: 'gemini-3-flash', id: 'gemini-3-flash-new' },
+    "Gemini 3 Flash":              { vendor: 'copilot', family: 'gemini-3-flash', id: 'gemini-3-flash' },
+    "GPT-OSS 120B (Medium)":       { vendor: 'copilot', family: 'gpt-oss-120b-medium', id: 'gpt-oss-120b-medium' },
+    "GPT-OSS 100B":                { vendor: 'copilot', family: 'gpt-oss-100b', id: 'gpt-oss-100b' }
 };
 
 /** Discover available models at runtime via vscode.lm API */
@@ -812,27 +814,44 @@ async function switchModelViaAPI(targetDisplayName) {
         return false;
     }
 
-    // Strategy 1: workbench.action.chat.changeModel (direct internal command)
+    // Strategy 1: Focus chat panel first, then call changeModel
+    // Commands only work when chat widget is focused/loaded
     try {
+        // Focus the chat panel to ensure commands are registered
+        await vscode.commands.executeCommand('workbench.action.chat.open');
+        await new Promise(r => setTimeout(r, 500));
+        
         await vscode.commands.executeCommand('workbench.action.chat.changeModel', {
             vendor: meta.vendor,
             id: meta.id || meta.family,
             family: meta.family
         });
-        console.log('[AG] changeModel command executed for: ' + targetDisplayName);
+        console.log('[AG] changeModel executed: ' + targetDisplayName);
         return true;
     } catch (e) {
         console.log('[AG] changeModel failed:', e.message);
     }
 
-    // Strategy 2: workbench.action.chat.switchToNextModel (cycle through)
+    // Strategy 2: switchToNextModel (cycles through models)
     try {
-        // This cycles to next model — may not land on target, but at least changes model
+        await vscode.commands.executeCommand('workbench.action.chat.open');
+        await new Promise(r => setTimeout(r, 300));
         await vscode.commands.executeCommand('workbench.action.chat.switchToNextModel');
         console.log('[AG] switchToNextModel executed');
         return true;
     } catch (e) {
         console.log('[AG] switchToNextModel failed:', e.message);
+    }
+
+    // Strategy 3: Open model picker (user sees picker but it's better than nothing)
+    try {
+        await vscode.commands.executeCommand('workbench.action.chat.open');
+        await new Promise(r => setTimeout(r, 300));
+        await vscode.commands.executeCommand('workbench.action.chat.openModelPicker');
+        console.log('[AG] openModelPicker executed — user needs to select');
+        return true;
+    } catch (e) {
+        console.log('[AG] openModelPicker failed:', e.message);
     }
 
     return false;
