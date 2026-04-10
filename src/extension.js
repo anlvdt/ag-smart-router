@@ -1211,12 +1211,19 @@ function setupTerminalListener(ctx) {
     // Track active shell executions for RLVR (exit code matching)
     const _pendingExecs = new Map(); // executionId → { command, startTime }
 
+    // Log which methods are available
+    const hasShellExec = !!vscode.window.onDidStartTerminalShellExecution;
+    const hasShellEnd  = !!vscode.window.onDidEndTerminalShellExecution;
+    const hasWriteData = !!vscode.window.onDidWriteTerminalData;
+    console.log(`[Grav] Terminal listener: shellExec=${hasShellExec} shellEnd=${hasShellEnd} writeData=${hasWriteData}`);
+
     // Method 1: Shell execution API (best — gives command + exit code)
     if (vscode.window.onDidStartTerminalShellExecution) {
         ctx.subscriptions.push(
             vscode.window.onDidStartTerminalShellExecution(e => {
                 try {
                     const cmdLine = e.execution?.commandLine?.value || e.execution?.commandLine || '';
+                    console.log('[Grav] shellExec START:', cmdLine);
                     if (!cmdLine || cmdLine.length < 2) return;
                     const id = e.execution?.id || Date.now().toString();
                     _pendingExecs.set(id, { command: cmdLine, startTime: Date.now() });
@@ -1226,7 +1233,7 @@ function setupTerminalListener(ctx) {
                             project: vscode.workspace.workspaceFolders?.[0]?.name,
                         });
                     }
-                } catch (_) {}
+                } catch (err) { console.error('[Grav] shellExec error:', err.message); }
             })
         );
     }
@@ -1307,12 +1314,12 @@ function setupTerminalListener(ctx) {
         vscode.window.onDidOpenTerminal(t => {
             try {
                 const name = t.name || '';
+                console.log('[Grav] terminal opened:', name);
                 // Agent-created terminals often have descriptive names
                 if (name && cfg('learnEnabled', true)) {
-                    // Extract command from terminal name if it looks like a command
-                    // e.g., "npm run build" or "git push"
                     const cmds = extractCommands(name);
                     if (cmds.length > 0 && cmds[0] !== 'terminal' && cmds[0] !== 'bash' && cmds[0] !== 'zsh' && cmds[0] !== 'sh') {
+                        console.log('[Grav] learning from terminal name:', name, '→', cmds);
                         recordCommandAction(name, 'approve', {
                             project: vscode.workspace.workspaceFolders?.[0]?.name,
                         });
@@ -1330,6 +1337,92 @@ function setupTerminalListener(ctx) {
         }
     }, 60000);
     ctx.subscriptions.push({ dispose: () => clearInterval(cleanupTimer) });
+
+    // Method 4: Poll shell integration command history
+    // Antigravity reuses terminals — shellExec only fires once per terminal.
+    // This polls all terminals for new commands via shellIntegration API.
+    const _seenCmds = new Set(); // "terminalName:cmdLine:timestamp" dedup keys
+    const pollTimer = setInterval(() => {
+        if (!cfg('learnEnabled', true) || !_enabled) return;
+        try {
+            for (const term of vscode.window.terminals) {
+                const si = term.shellIntegration;
+                if (!si) continue;
+                // shellIntegration.executeCommand is the latest command
+                // shellIntegration.cwd gives current directory
+                const exec = si.executeCommand;
+                if (exec) {
+                    const cmdLine = exec.commandLine?.value || exec.commandLine || '';
+                    if (cmdLine && cmdLine.length >= 2) {
+                        const key = term.name + ':' + cmdLine + ':' + (exec.startTimestamp || 0);
+                        if (!_seenCmds.has(key)) {
+                            _seenCmds.add(key);
+                            console.log('[Grav] poll captured:', cmdLine);
+                            const exitCode = typeof exec.exitCode === 'number' ? exec.exitCode : undefined;
+                            recordCommandAction(cmdLine, exitCode === undefined || exitCode === 0 ? 'approve' : 'reject', {
+                                exitCode,
+                                project: vscode.workspace.workspaceFolders?.[0]?.name,
+                            });
+                        }
+                    }
+                }
+                // Also check command history if available
+                if (si.commandDetection && si.commandDetection.commands) {
+                    for (const cmd of si.commandDetection.commands) {
+                        const cmdLine = cmd.command || cmd.commandLine?.value || '';
+                        if (!cmdLine || cmdLine.length < 2) continue;
+                        const key = term.name + ':' + cmdLine + ':' + (cmd.timestamp || cmd.startTimestamp || 0);
+                        if (_seenCmds.has(key)) continue;
+                        _seenCmds.add(key);
+                        console.log('[Grav] history captured:', cmdLine);
+                        const exitCode = typeof cmd.exitCode === 'number' ? cmd.exitCode : undefined;
+                        recordCommandAction(cmdLine, exitCode === undefined || exitCode === 0 ? 'approve' : 'reject', {
+                            exitCode,
+                            project: vscode.workspace.workspaceFolders?.[0]?.name,
+                        });
+                    }
+                }
+            }
+            // Prevent memory leak — trim seen set
+            if (_seenCmds.size > 5000) {
+                const arr = [..._seenCmds];
+                _seenCmds.clear();
+                for (let i = arr.length - 2000; i < arr.length; i++) _seenCmds.add(arr[i]);
+            }
+        } catch (err) { /* silent — polling should never crash */ }
+    }, 3000); // poll every 3 seconds
+    ctx.subscriptions.push({ dispose: () => clearInterval(pollTimer) });
+
+    // Method 5: Listen for shellIntegration changes on each terminal
+    // When a terminal gets shell integration, subscribe to its command events
+    if (vscode.window.onDidChangeTerminalShellIntegration) {
+        ctx.subscriptions.push(
+            vscode.window.onDidChangeTerminalShellIntegration(e => {
+                try {
+                    const si = e.shellIntegration;
+                    if (!si || !si.onDidExecuteCommand) return;
+                    console.log('[Grav] shellIntegration ready for:', e.terminal?.name);
+                    ctx.subscriptions.push(
+                        si.onDidExecuteCommand(cmd => {
+                            try {
+                                const cmdLine = cmd.commandLine?.value || cmd.commandLine || '';
+                                console.log('[Grav] shellIntegration cmd:', cmdLine, 'exit:', cmd.exitCode);
+                                if (!cmdLine || cmdLine.length < 2 || !cfg('learnEnabled', true)) return;
+                                const key = (e.terminal?.name || '') + ':' + cmdLine + ':' + Date.now();
+                                if (_seenCmds.has(key)) return;
+                                _seenCmds.add(key);
+                                const exitCode = typeof cmd.exitCode === 'number' ? cmd.exitCode : undefined;
+                                recordCommandAction(cmdLine, exitCode === undefined || exitCode === 0 ? 'approve' : 'reject', {
+                                    exitCode,
+                                    project: vscode.workspace.workspaceFolders?.[0]?.name,
+                                });
+                            } catch (_) {}
+                        })
+                    );
+                } catch (_) {}
+            })
+        );
+    }
 }
 
 // ═════════════════════════════════════════════════════════════
