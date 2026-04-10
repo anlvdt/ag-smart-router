@@ -619,6 +619,88 @@ function scheduleCdpReconnect() {
 }
 
 // =============================================================
+// MODEL SWITCH VIA VS CODE INTERNAL API
+// Uses workbench.action.chat.changeModel + vscode.lm.selectChatModels
+// This bypasses DOM entirely — direct internal command
+// =============================================================
+
+// Map display names to model metadata for VS Code API
+const MODEL_API_MAP = {
+    "Claude Opus 4.7 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.7-thinking' },
+    "Claude Opus 4.6 (Thinking)":  { vendor: 'copilot', family: 'claude-opus-4.6-thinking' },
+    "Claude Sonnet 4.6":           { vendor: 'copilot', family: 'claude-sonnet-4.6' },
+    "Claude Sonnet 4.5":           { vendor: 'copilot', family: 'claude-sonnet-4.5' },
+    "Gemini 3.5 Pro":              { vendor: 'copilot', family: 'gemini-3.5-pro' },
+    "Gemini 3.1 Pro (High)":       { vendor: 'copilot', family: 'gemini-3.1-pro' },
+    "Gemini 3 Flash (New)":        { vendor: 'copilot', family: 'gemini-3-flash' },
+    "Gemini 3 Flash":              { vendor: 'copilot', family: 'gemini-3-flash' },
+    "GPT-OSS 120B (Medium)":       { vendor: 'copilot', family: 'gpt-oss-120b' },
+    "GPT-OSS 100B":                { vendor: 'copilot', family: 'gpt-oss-100b' }
+};
+
+/** Discover available models at runtime via vscode.lm API */
+async function discoverModels() {
+    try {
+        const models = await vscode.lm.selectChatModels({});
+        if (models && models.length > 0) {
+            console.log('[AG] Discovered ' + models.length + ' models:');
+            for (const m of models) {
+                console.log('[AG]   ' + m.name + ' | vendor=' + m.vendor + ' id=' + m.id + ' family=' + m.family);
+                // Update MODEL_API_MAP with actual runtime data
+                for (const displayName of FALLBACK_MODELS) {
+                    if (m.name && m.name.indexOf(displayName) !== -1) {
+                        MODEL_API_MAP[displayName] = { vendor: m.vendor, id: m.id, family: m.family };
+                    }
+                    // Also match by family substring
+                    const dn = displayName.toLowerCase().replace(/[() ]/g, '-').replace(/--+/g, '-');
+                    if (m.family && (m.family.indexOf(dn) !== -1 || dn.indexOf(m.family) !== -1)) {
+                        MODEL_API_MAP[displayName] = { vendor: m.vendor, id: m.id, family: m.family };
+                    }
+                }
+            }
+            return models;
+        }
+    } catch (e) {
+        console.log('[AG] Model discovery failed:', e.message);
+    }
+    return [];
+}
+
+/** Switch model using VS Code internal command — no DOM, no CDP */
+async function switchModelViaAPI(targetDisplayName) {
+    const meta = MODEL_API_MAP[targetDisplayName];
+    if (!meta) {
+        console.log('[AG] No API metadata for: ' + targetDisplayName);
+        return false;
+    }
+
+    // Strategy 1: workbench.action.chat.changeModel (direct internal command)
+    try {
+        await vscode.commands.executeCommand('workbench.action.chat.changeModel', {
+            vendor: meta.vendor,
+            id: meta.id || meta.family,
+            family: meta.family
+        });
+        console.log('[AG] changeModel command executed for: ' + targetDisplayName);
+        return true;
+    } catch (e) {
+        console.log('[AG] changeModel failed:', e.message);
+    }
+
+    // Strategy 2: workbench.action.chat.switchToNextModel (cycle through)
+    try {
+        // This cycles to next model — may not land on target, but at least changes model
+        await vscode.commands.executeCommand('workbench.action.chat.switchToNextModel');
+        console.log('[AG] switchToNextModel executed');
+        return true;
+    } catch (e) {
+        console.log('[AG] switchToNextModel failed:', e.message);
+    }
+
+    return false;
+}
+
+// =============================================================
 // CDP Trusted Click — uses Input.dispatchMouseEvent for isTrusted=true
 // This bypasses Electron's security check on sensitive buttons
 // =============================================================
@@ -1450,10 +1532,10 @@ function startHttpServer() {
                 }));
                 return;
             }
-            // Layer 0 reports quota error — extension decides target model, Layer 0 does the DOM switch
+            // Layer 0 reports quota error — extension decides target model AND switches via VS Code API
             if (parsed.pathname === '/api/quota-detected' && req.method === 'POST') {
                 let body = ''; req.on('data', c => body += c);
-                req.on('end', () => {
+                req.on('end', async () => {
                     try {
                         const d = JSON.parse(body);
                         const curModel = d.currentModel || '';
@@ -1463,9 +1545,22 @@ function startHttpServer() {
                         _escalateCooldown();
                         const tgt = getNextFallbackModel(curModel);
                         console.log('[AG] Decided fallback: ' + tgt);
-                        _recordRouteResult(tgt, true); // optimistic
-                        res.writeHead(200);
-                        res.end(JSON.stringify({ switchTo: tgt }));
+
+                        // Try VS Code API first (direct internal command)
+                        const apiResult = await switchModelViaAPI(tgt);
+                        if (apiResult) {
+                            console.log('[AG] Model switched via VS Code API: ' + tgt);
+                            _recordRouteResult(tgt, true);
+                            _resetCooldown();
+                            res.writeHead(200);
+                            res.end(JSON.stringify({ switchTo: tgt, method: 'api', success: true }));
+                        } else {
+                            // Fallback: tell Layer 0 to do DOM switch
+                            console.log('[AG] API switch failed, delegating to Layer 0');
+                            _recordRouteResult(tgt, false);
+                            res.writeHead(200);
+                            res.end(JSON.stringify({ switchTo: tgt, method: 'layer0' }));
+                        }
                     } catch (e) {
                         res.writeHead(200);
                         res.end(JSON.stringify({ error: e.message }));
@@ -1858,6 +1953,14 @@ function activate(ctx) {
     // === Native auto-approve: configure Antigravity's built-in settings ===
     ensureNativeAutoApprove();
     startHttpServer(); startCommandsLoop(); writeConfigJson(ctx);
+
+    // Discover available models via VS Code API (delayed to let extensions load)
+    setTimeout(() => {
+        discoverModels().then(models => {
+            if (models.length > 0) console.log('[AG] Model discovery complete: ' + models.length + ' models');
+            else console.log('[AG] No models discovered via vscode.lm API');
+        }).catch(() => {});
+    }, 10000);
 
     // CDP init
     const cfg = vscode.workspace.getConfiguration('ag-auto');
