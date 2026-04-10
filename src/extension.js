@@ -1081,10 +1081,9 @@ function startCdpQuotaFallback() {
 
             const tgt = getNextFallbackModel(cur);
             console.log('[AG] Switching "' + cur.substring(0, 30) + '" -> ' + tgt + ' (type: ' + quotaResult.type + ')');
-            vscode.window.setStatusBarMessage('$(sync~spin) Switching to ' + tgt + '...', 5000);
 
             if (await cdpSwitchModel(tgt)) {
-                vscode.window.setStatusBarMessage('$(check) Switched to ' + tgt, 3000);
+                console.log('[AG] Switched to ' + tgt);
                 _resetCooldown();
                 _cdpConsecutiveHits = 0;
                 _recordRouteResult(tgt, true);
@@ -1092,6 +1091,7 @@ function startCdpQuotaFallback() {
                 await cdpSendContinue();
                 await new Promise(r => setTimeout(r, 3000));
             } else {
+                console.log('[AG] CDP switch failed for ' + tgt);
                 _recordRouteResult(tgt, false);
             }
             _cdpQuotaSwitchInProgress = false;
@@ -1110,7 +1110,6 @@ function startCdpQuotaFallback() {
             const level = await cdpCheckQuotaLevel();
             if (level && level.low) {
                 console.log('[AG] Proactive: quota level low (' + level.level.toFixed(1) + '%)');
-                vscode.window.setStatusBarMessage('$(warning) Quota low: ' + level.level.toFixed(0) + '%', 5000);
             }
         } catch (_) {}
     }, 30000);
@@ -1375,26 +1374,8 @@ async function handleQuotaSwitch() {
     _cdpLastSwitchAt = Date.now();
     _cdpConsecutiveHits++;
     _escalateCooldown();
-    console.log('[AG] Quota switch #' + _cdpConsecutiveHits);
-    if (_cdpConnected) {
-        try {
-            await cdpDismissQuota(); await new Promise(r => setTimeout(r, 500)); await cdpDismissQuota();
-            const cur = await cdpGetCurrentModel();
-            if (cur) {
-                const tgt = getNextFallbackModel(cur);
-                vscode.window.setStatusBarMessage('$(sync~spin) Switching to ' + tgt + '...', 5000);
-                if (await cdpSwitchModel(tgt)) {
-                    vscode.window.setStatusBarMessage('$(check) Switched to ' + tgt, 3000);
-                    _resetCooldown();
-                    _cdpConsecutiveHits = 0;
-                    await new Promise(r => setTimeout(r, 2000));
-                    await cdpSendContinue();
-                    await new Promise(r => setTimeout(r, 3000));
-                    _quotaSwitchInProgress = false; return;
-                }
-            }
-        } catch (_) {}
-    }
+    console.log('[AG] Manual quota switch #' + _cdpConsecutiveHits);
+    // Show quick pick only when user manually triggers via command palette / status bar
     _quotaSwitchInProgress = false;
     showQuickPick();
 }
@@ -1468,6 +1449,28 @@ function startHttpServer() {
                     consecutiveHits: _cdpConsecutiveHits
                 }));
                 return;
+            }
+            // Layer 0 reports quota error — extension decides target model, Layer 0 does the DOM switch
+            if (parsed.pathname === '/api/quota-detected' && req.method === 'POST') {
+                let body = ''; req.on('data', c => body += c);
+                req.on('end', () => {
+                    try {
+                        const d = JSON.parse(body);
+                        const curModel = d.currentModel || '';
+                        console.log('[AG] Layer 0 quota detected: "' + d.phrase + '" | model: ' + curModel);
+                        _markExhausted(curModel, (d.phrase || '').indexOf('baseline') !== -1 ? 'weekly' : 'sprint');
+                        _cdpConsecutiveHits++;
+                        _escalateCooldown();
+                        const tgt = getNextFallbackModel(curModel);
+                        console.log('[AG] Decided fallback: ' + tgt);
+                        _recordRouteResult(tgt, true); // optimistic
+                        res.writeHead(200);
+                        res.end(JSON.stringify({ switchTo: tgt }));
+                    } catch (e) {
+                        res.writeHead(200);
+                        res.end(JSON.stringify({ error: e.message }));
+                    }
+                }); return;
             }
             if (parsed.pathname === '/api/smart-route' && req.method === 'POST') {
                 let body = ''; req.on('data', c => body += c);
