@@ -1977,6 +1977,24 @@ function startCommandsLoop() {
                 if (_settingsPanel) _settingsPanel.webview.postMessage({ command: 'clickLogUpdate', log: _clickLog });
             }
         }
+
+        // 3. OS-level keyboard Enter to approve inline command dialogs in webview
+        // Only when Antigravity is frontmost AND agent is running (requestInProgress)
+        // The "Run command?" dialog has Allow button focused by default
+        if (process.platform === 'darwin' && _autoAcceptEnabled) {
+            try {
+                const front = execSync('osascript -e \'tell application "System Events" to get name of first process whose frontmost is true\'', { timeout: 2000 }).toString().trim();
+                if (front === 'Electron' || front === 'Antigravity') {
+                    // Use antigravity.agent.acceptAgentStep command first (safer than raw Enter)
+                    try {
+                        await vscode.commands.executeCommand('antigravity.agent.acceptAgentStep');
+                    } catch (_) {}
+                    try {
+                        await vscode.commands.executeCommand('antigravity.terminalCommand.accept');
+                    } catch (_) {}
+                }
+            } catch (_) {}
+        }
     }, ms);
 }
 
