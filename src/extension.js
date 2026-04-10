@@ -808,100 +808,77 @@ async function discoverModels() {
 
 /** Switch model using VS Code internal command — no DOM, no CDP */
 async function switchModelViaAPI(targetDisplayName) {
-    const meta = MODEL_API_MAP[targetDisplayName];
-    if (!meta) {
-        console.log('[AG] No API metadata for: ' + targetDisplayName);
-    }
-
-    // Strategy 1: OS-level mouse simulation via cliclick (macOS only)
+    // OS-level keyboard simulation: focus chat → open model picker → type → select
     if (process.platform === 'darwin') {
-        try {
-            const result = switchModelViaCLIClick(targetDisplayName);
-            if (result) {
-                console.log('[AG] Model switched via cliclick: ' + targetDisplayName);
-                return true;
-            }
-        } catch (e) {
-            console.log('[AG] cliclick failed:', e.message);
-        }
+        return switchModelViaKeyboard_macOS(targetDisplayName);
+    } else if (process.platform === 'win32') {
+        return switchModelViaKeyboard_windows(targetDisplayName);
     }
-
-    // Strategy 2: VS Code commands (usually fails but try anyway)
-    try {
-        await vscode.commands.executeCommand('workbench.action.chat.open');
-        await new Promise(r => setTimeout(r, 500));
-        if (meta) {
-            await vscode.commands.executeCommand('workbench.action.chat.changeModel', {
-                vendor: meta.vendor, id: meta.id || meta.family, family: meta.family
-            });
-            console.log('[AG] changeModel executed: ' + targetDisplayName);
-            return true;
-        }
-    } catch (e) {
-        console.log('[AG] changeModel failed:', e.message);
-    }
-
     return false;
 }
 
-/** Switch model using OS-level mouse click simulation (macOS) */
-function switchModelViaCLIClick(targetDisplayName) {
+/** macOS: switch model via AppleScript keyboard simulation */
+function switchModelViaKeyboard_macOS(targetDisplayName) {
     try {
-        // Check if cliclick is available
-        execSync('which cliclick', { timeout: 2000 });
-    } catch (_) {
-        console.log('[AG] cliclick not installed');
-        return false;
-    }
-
-    try {
-        // Get Antigravity window position
-        const winInfo = execSync(`osascript -e '
-            tell application "System Events"
-                tell process "Electron"
-                    set w to front window
-                    set p to position of w
-                    set s to size of w
-                    return (item 1 of p) & "," & (item 2 of p) & "," & (item 1 of s) & "," & (item 2 of s)
-                end tell
-            end tell
-        '`, { timeout: 5000 }).toString().trim();
-
-        const parts = winInfo.split(',').map(s => parseInt(s.trim()));
-        if (parts.length < 4) { console.log('[AG] Invalid window info'); return false; }
-        const [wx, wy, ww, wh] = parts;
-        console.log('[AG] Window: ' + wx + ',' + wy + ' ' + ww + 'x' + wh);
-
-        // Model selector position: near bottom-left of chat panel
-        // ~15% from left, ~95% from top (near textarea)
-        const modelX = wx + Math.round(ww * 0.15);
-        const modelY = wy + Math.round(wh * 0.95);
-
-        // Focus Antigravity
+        // Step 1: Focus Antigravity
         execSync('osascript -e \'tell application "Antigravity" to activate\'', { timeout: 3000 });
-        
-        // Click model selector
-        console.log('[AG] Clicking model selector at (' + modelX + ',' + modelY + ')');
-        execSync('cliclick c:' + modelX + ',' + modelY, { timeout: 3000 });
+        execSync('sleep 0.3');
 
-        // Wait for dropdown
-        const sleep = ms => execSync('sleep ' + (ms / 1000));
-        sleep(800);
+        // Step 2: Cmd+L to focus chat input
+        execSync('osascript -e \'tell application "System Events" to keystroke "l" using {command down}\'', { timeout: 3000 });
+        execSync('sleep 0.5');
 
-        // Type model name to filter dropdown
-        const search = targetDisplayName.substring(0, 12);
-        console.log('[AG] Typing: ' + search);
-        execSync('cliclick t:"' + search + '"', { timeout: 3000 });
-        sleep(500);
+        // Step 3: Cmd+Shift+, to open model picker
+        execSync('osascript -e \'tell application "System Events" to keystroke "," using {command down, shift down}\'', { timeout: 3000 });
+        execSync('sleep 0.8');
 
-        // Press Enter to select
-        execSync('cliclick kp:return', { timeout: 3000 });
-        sleep(300);
+        // Step 4: Type model name to filter (first word is enough)
+        const search = targetDisplayName.split('(')[0].trim();
+        execSync('osascript -e \'tell application "System Events" to keystroke "' + search.replace(/"/g, '\\"') + '"\'', { timeout: 3000 });
+        execSync('sleep 0.5');
 
-        console.log('[AG] cliclick model switch completed');
+        // Step 5: Enter to select
+        execSync('osascript -e \'tell application "System Events" to key code 36\'', { timeout: 3000 });
+        execSync('sleep 0.3');
+
+        console.log('[AG] Model switched via keyboard (macOS): ' + targetDisplayName);
         return true;
     } catch (e) {
-        console.log('[AG] cliclick switch error:', e.message);
+        console.log('[AG] Keyboard switch failed (macOS):', e.message);
+        return false;
+    }
+}
+
+/** Windows: switch model via PowerShell keyboard simulation */
+function switchModelViaKeyboard_windows(targetDisplayName) {
+    try {
+        const { execSync: exec } = require('child_process');
+        const search = targetDisplayName.split('(')[0].trim();
+        
+        // PowerShell script to simulate keystrokes
+        const ps = `
+Add-Type -AssemblyName System.Windows.Forms
+# Focus Antigravity
+$ag = Get-Process | Where-Object { $_.MainWindowTitle -like '*Antigravity*' } | Select-Object -First 1
+if ($ag) { [Microsoft.VisualBasic.Interaction]::AppActivate($ag.Id) }
+Start-Sleep -Milliseconds 300
+# Ctrl+L to focus chat
+[System.Windows.Forms.SendKeys]::SendWait("^l")
+Start-Sleep -Milliseconds 500
+# Ctrl+Shift+, to open model picker
+[System.Windows.Forms.SendKeys]::SendWait("^+{,}")
+Start-Sleep -Milliseconds 800
+# Type model name
+[System.Windows.Forms.SendKeys]::SendWait("${search}")
+Start-Sleep -Milliseconds 500
+# Enter to select
+[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+`;
+        exec('powershell.exe -NoProfile -NonInteractive -Command "' + ps.replace(/"/g, '\\"').replace(/\n/g, '; ') + '"', { timeout: 10000 });
+        console.log('[AG] Model switched via keyboard (Windows): ' + targetDisplayName);
+        return true;
+    } catch (e) {
+        console.log('[AG] Keyboard switch failed (Windows):', e.message);
         return false;
     }
 }
