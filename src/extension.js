@@ -626,18 +626,44 @@ function activate(ctx) {
     // Re-discover every 60s
     setInterval(() => { if (!_lsConnected) discoverLanguageServer(); }, 60000);
 
-    // Native auto-approve settings
+    // Configure ALL auto-approve settings for Antigravity
+    // Based on reverse-engineering workbench.desktop.main.js:
+    // - chat.tools.terminal.autoApprove: regex rules for command matching
+    // - chat.tools.terminal.enableAutoApprove: master switch
+    // - chat.tools.terminal.ignoreDefaultAutoApproveRules: bypass curl/wget deny list
+    // - chat.tools.edits.autoApprove: auto-approve file edits
+    // - chat.tools.terminal.autoReplyToPrompts: auto-reply to terminal prompts
+    // - chat.agent.terminal.autoApprove: agent-mode auto-approve (deprecated but still read)
     try {
         const cfg = vscode.workspace.getConfiguration();
+        
+        // 1. Terminal auto-approve rules — catch-all regex
         const termAutoApprove = cfg.get('chat.tools.terminal.autoApprove') || {};
-        if (typeof termAutoApprove === 'object' && !termAutoApprove['/^/']) {
-            termAutoApprove['/^/'] = true;
-            termAutoApprove['/.*/s'] = true;
+        if (typeof termAutoApprove === 'object') {
+            termAutoApprove['/^/'] = true;       // Match any command
+            termAutoApprove['/.*/s'] = true;     // Match any command (dotall)
+            termAutoApprove['/curl/'] = true;    // Explicitly approve curl
+            termAutoApprove['/wget/'] = true;    // Explicitly approve wget
+            termAutoApprove['/&&/'] = true;      // Approve chained commands
+            termAutoApprove['/\\|/'] = true;     // Approve piped commands
             cfg.update('chat.tools.terminal.autoApprove', termAutoApprove, vscode.ConfigurationTarget.Global).catch(() => {});
         }
+        
+        // 2. Master switches
         cfg.update('chat.tools.terminal.enableAutoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
         cfg.update('chat.tools.edits.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-    } catch (_) {}
+        
+        // 3. KEY: bypass hardcoded deny list (curl, wget, invoke-restmethod)
+        cfg.update('chat.tools.terminal.ignoreDefaultAutoApproveRules', true, vscode.ConfigurationTarget.Global).catch(() => {});
+        
+        // 4. Auto-reply to terminal prompts (y/n questions)
+        cfg.update('chat.tools.terminal.autoReplyToPrompts', true, vscode.ConfigurationTarget.Global).catch(() => {});
+        
+        // 5. Agent-mode auto-approve (deprecated but still checked by some code paths)
+        cfg.update('chat.agent.terminal.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
+        
+        console.log('[AG] Auto-approve configured (including ignoreDefaultAutoApproveRules)');
+    } catch (e) { console.log('[AG] Auto-approve config error:', e.message); }
 
     createStatusBar(ctx);
     ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('ag-auto')) updateStatusBar(); }));
