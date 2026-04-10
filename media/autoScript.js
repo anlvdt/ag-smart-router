@@ -81,8 +81,6 @@
     var CLICK_INTERVAL_MS = /*{{CLICK_INTERVAL_MS}}*/1000;
     var SCROLL_INTERVAL_MS = /*{{SCROLL_INTERVAL_MS}}*/500;
     var CLICK_PATTERNS = /*{{CLICK_PATTERNS}}*/["Allow", "Always Allow", "Run", "Keep Waiting", "Accept all"];
-    // Always include Dismiss for quota handling
-    if (CLICK_PATTERNS.indexOf('Dismiss') === -1) CLICK_PATTERNS.push('Dismiss');
     window._agAcceptChatOnly = false;
     window._agAutoEnabled = /*{{ENABLED}}*/true;
     window._agScrollEnabled = true;
@@ -369,7 +367,7 @@
     // Strategy: dismiss → try DOM model switch → send Continue only after switch
     var _quotaPoll = setInterval(function () {
         if (!window._agAutoEnabled || !window._agQuotaFallback || _quotaSwitchInProgress) return;
-        if (Date.now() - _lastQuotaSwitch < 10000) return; // cooldown
+        if (Date.now() - _lastQuotaSwitch < 10000) return;
         var phrase = _agDetectQuota();
         if (!phrase) return;
         _lastQuotaSwitch = Date.now();
@@ -377,11 +375,7 @@
         var curModel = _agGetCurrentModel();
         console.log('[AG] Quota detected: "' + phrase + '" | Current: ' + curModel);
 
-        // Step 1: Dismiss quota banner
-        _agClickDismiss();
-        setTimeout(function () { _agClickDismiss(); }, 500);
-
-        // Step 2: Ask extension for target model
+        // Full flow in one shot: get target → dismiss → switch → continue
         if (AG_HTTP_PORT > 0) {
             try {
                 var x = new XMLHttpRequest();
@@ -392,18 +386,48 @@
                     try {
                         var resp = JSON.parse(x.responseText);
                         var target = resp.switchTo;
+                        if (!target) { _quotaSwitchInProgress = false; return; }
+
                         if (resp.success) {
-                            // Extension switched model via API
-                            console.log('[AG] Model switched via API: ' + target);
+                            // API switched — dismiss then continue
+                            console.log('[AG] API switched to: ' + target);
+                            _agClickDismiss();
                             setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 2000);
-                        } else if (target) {
-                            // API failed — do full DOM switch sequence: click selector → pick model → Continue
-                            console.log('[AG] Doing DOM model switch to: ' + target);
-                            _agDoModelSwitch(target);
-                            // _agDoModelSwitch handles Continue internally after successful switch
-                        } else {
-                            _quotaSwitchInProgress = false;
+                            return;
                         }
+
+                        // DOM flow: dismiss → wait → click model selector → pick model → continue
+                        console.log('[AG] Starting DOM switch to: ' + target);
+                        _agClickDismiss();
+
+                        setTimeout(function () {
+                            // After dismiss settles, click model selector
+                            if (!_agClickModelSelector()) {
+                                console.log('[AG] Model selector not found');
+                                _quotaSwitchInProgress = false;
+                                return;
+                            }
+                            // Wait for dropdown, then select
+                            var attempts = 0;
+                            var trySelect = setInterval(function () {
+                                attempts++;
+                                if (_agSelectModelInDropdown(target)) {
+                                    clearInterval(trySelect);
+                                    console.log('[AG] Selected: ' + target);
+                                    // Wait for model to apply, then Continue
+                                    setTimeout(function () {
+                                        _agSendContinue();
+                                        console.log('[AG] Continue sent');
+                                        _quotaSwitchInProgress = false;
+                                    }, 2000);
+                                } else if (attempts > 15) {
+                                    clearInterval(trySelect);
+                                    console.log('[AG] Dropdown selection failed');
+                                    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+                                    _quotaSwitchInProgress = false;
+                                }
+                            }, 300);
+                        }, 1000); // 1s after dismiss
                     } catch (_) { _quotaSwitchInProgress = false; }
                 };
                 x.onerror = x.ontimeout = function () { _quotaSwitchInProgress = false; };
@@ -513,8 +537,8 @@
             }
             if (!matched) continue;
 
-            // Allow/Run/Always Allow/Dismiss: click directly (critical patterns)
-            if (matched === 'Allow' || matched === 'Run' || matched === 'Always Allow' || matched === 'Accept all' || matched === 'Dismiss') { target = b; break; }
+            // Allow/Run/Always Allow: click directly (critical patterns)
+            if (matched === 'Allow' || matched === 'Run' || matched === 'Always Allow' || matched === 'Accept all') { target = b; break; }
             if (hasRejectSibling(b)) { target = b; break; }
         }
 
