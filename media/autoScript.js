@@ -21,6 +21,47 @@
         return r;
     }
 
+    // =================================================================
+    // INTERNAL VS CODE COMMAND EXECUTION (Layer 0 runs in workbench renderer)
+    // We can access the internal command service via the global require
+    // This is the ONLY way to switch models — no external API exists
+    // =================================================================
+    var _commandService = null;
+
+    function getCommandService() {
+        if (_commandService) return _commandService;
+        try {
+            // VS Code/Antigravity exposes require in workbench renderer
+            if (typeof require === 'function') {
+                // Try to get the command service from the workbench services
+                var services = require('vs/workbench/services/commands/common/commandService');
+                if (services && services.CommandService) {
+                    // Access via instantiation service
+                    var inst = require('vs/platform/instantiation/common/instantiation');
+                    // This won't work directly — need the service instance
+                }
+            }
+        } catch (_) {}
+
+        // Alternative: use the global vscode API if available in workbench context
+        try {
+            if (window._commandService) { _commandService = window._commandService; return _commandService; }
+        } catch (_) {}
+
+        return null;
+    }
+
+    /** Execute VS Code command from workbench renderer context */
+    function executeCommand(commandId, args) {
+        try {
+            // Method 1: Use the global command handler that VS Code keybindings use
+            if (window.document && window.document.querySelector) {
+                // Trigger command via keyboard shortcut simulation won't work for non-keybinding commands
+            }
+        } catch (_) {}
+        return false;
+    }
+
     // --- Auto-dismiss "corrupt installation" ---
     (function () {
         function dismiss() {
@@ -268,16 +309,25 @@
         }, 500);
     }
 
-    // Quota polling — runs every 3s, reports to extension host for model decision
+    // Quota polling — runs every 3s
+    // Layer 0 runs in workbench.html — it CAN see quota banners (they render as notifications/overlays in main DOM)
+    // But model selector is inside webview iframe — DOM click may not work
+    // Strategy: dismiss quota → ask extension for target model → try DOM switch → always send Continue
     var _quotaPoll = setInterval(function () {
         if (!window._agAutoEnabled || !window._agQuotaFallback || _quotaSwitchInProgress) return;
         if (Date.now() - _lastQuotaSwitch < 10000) return; // cooldown
         var phrase = _agDetectQuota();
         if (!phrase) return;
         _lastQuotaSwitch = Date.now();
+        _quotaSwitchInProgress = true;
         var curModel = _agGetCurrentModel();
-        console.log('[AG] Quota detected: "' + phrase + '" | Current model: ' + curModel);
-        // Report to extension host — it decides the target model
+        console.log('[AG] Quota detected: "' + phrase + '" | Current: ' + curModel);
+
+        // Step 1: Dismiss quota banner immediately
+        _agClickDismiss();
+        setTimeout(function () { _agClickDismiss(); }, 500);
+
+        // Step 2: Ask extension host for target model + try API switch
         if (AG_HTTP_PORT > 0) {
             try {
                 var x = new XMLHttpRequest();
@@ -287,13 +337,45 @@
                 x.onload = function () {
                     try {
                         var resp = JSON.parse(x.responseText);
-                        if (resp.switchTo) {
+                        if (resp.success) {
+                            // Extension switched model via API — just send Continue
+                            console.log('[AG] Model switched via API: ' + resp.switchTo);
+                            setTimeout(function () {
+                                _agSendContinue();
+                                _quotaSwitchInProgress = false;
+                            }, 1500);
+                        } else if (resp.switchTo) {
+                            // API failed — try DOM switch, then send Continue regardless
+                            console.log('[AG] API switch failed, trying DOM for: ' + resp.switchTo);
                             _agDoModelSwitch(resp.switchTo);
+                            // Send Continue after delay regardless of DOM switch result
+                            setTimeout(function () {
+                                _agSendContinue();
+                                setTimeout(function () { _quotaSwitchInProgress = false; }, 2000);
+                            }, 4000);
+                        } else {
+                            // No target — just send Continue on current model
+                            setTimeout(function () {
+                                _agSendContinue();
+                                _quotaSwitchInProgress = false;
+                            }, 1000);
                         }
-                    } catch (_) {}
+                    } catch (_) {
+                        setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
+                    }
+                };
+                x.onerror = x.ontimeout = function () {
+                    // Extension unreachable — just dismiss and send Continue
+                    console.log('[AG] Extension unreachable, sending Continue');
+                    setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
                 };
                 x.send(JSON.stringify({ phrase: phrase, currentModel: curModel || 'unknown' }));
-            } catch (_) {}
+            } catch (_) {
+                setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
+            }
+        } else {
+            // No HTTP port — just dismiss and Continue
+            setTimeout(function () { _agSendContinue(); _quotaSwitchInProgress = false; }, 1000);
         }
     }, 3000);
     window._agToolIntervals.push(_quotaPoll);
