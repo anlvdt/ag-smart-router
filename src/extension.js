@@ -765,11 +765,18 @@ function recordCommandAction(cmdLine, action, context = {}) {
 }
 
 function saveLearnData() {
-    if (_ctx) {
-        _ctx.globalState.update('learnData', _learnData);
-        _ctx.globalState.update('learnEpoch', _learnEpoch);
-        _ctx.globalState.update('wiki', _wiki);
-    }
+    if (!_ctx) return;
+    // Throttle saves — max once per 2 seconds to avoid settings API timeout
+    if (saveLearnData._pending) return;
+    saveLearnData._pending = true;
+    setTimeout(() => {
+        saveLearnData._pending = false;
+        try {
+            _ctx.globalState.update('learnData', _learnData);
+            _ctx.globalState.update('learnEpoch', _learnEpoch);
+            _ctx.globalState.update('wiki', _wiki);
+        } catch (_) {}
+    }, 2000);
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -1405,33 +1412,36 @@ function getTopContext(contexts) {
 //  Safe terminal auto-approve (enhanced with whitelist/blacklist + learning)
 // ═════════════════════════════════════════════════════════════
 function setupSafeApprove() {
-    try {
-        const c = vscode.workspace.getConfiguration();
-        const rules = c.get('chat.tools.terminal.autoApprove') || {};
-        // Merge built-in + user whitelist + promoted learned commands
-        const allWhitelist = [...SAFE_TERMINAL_CMDS, ..._userWhitelist];
-        const promoted = getPromotedCommands();
-        for (const cmd of promoted) {
-            if (!allWhitelist.includes(cmd)) allWhitelist.push(cmd);
-        }
-        // Add generalized patterns
-        for (const pat of _patternCache) {
-            if (!allWhitelist.includes(pat)) allWhitelist.push(pat);
-        }
-        for (const cmd of allWhitelist) {
-            if (!_userBlacklist.includes(cmd)) rules[cmd] = true;
-        }
-        // Remove blacklisted commands
-        for (const cmd of _userBlacklist) delete rules[cmd];
-        delete rules['/^/'];
-        delete rules['/.*/s'];
-        c.update('chat.tools.terminal.autoApprove', rules, vscode.ConfigurationTarget.Global).catch(() => {});
-        c.update('chat.tools.terminal.enableAutoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        c.update('chat.tools.terminal.ignoreDefaultAutoApproveRules', false, vscode.ConfigurationTarget.Global).catch(() => {});
-        c.update('chat.tools.terminal.autoReplyToPrompts', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        c.update('chat.tools.edits.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-        c.update('chat.agent.terminal.autoApprove', true, vscode.ConfigurationTarget.Global).catch(() => {});
-    } catch (_) {}
+    // Delay to avoid timeout during IDE startup — settings API can be slow
+    setTimeout(() => {
+        try {
+            const c = vscode.workspace.getConfiguration();
+            const rules = c.get('chat.tools.terminal.autoApprove') || {};
+            const allWhitelist = [...SAFE_TERMINAL_CMDS, ..._userWhitelist];
+            const promoted = getPromotedCommands();
+            for (const cmd of promoted) {
+                if (!allWhitelist.includes(cmd)) allWhitelist.push(cmd);
+            }
+            for (const pat of _patternCache) {
+                if (!allWhitelist.includes(pat)) allWhitelist.push(pat);
+            }
+            for (const cmd of allWhitelist) {
+                if (!_userBlacklist.includes(cmd)) rules[cmd] = true;
+            }
+            for (const cmd of _userBlacklist) delete rules[cmd];
+            delete rules['/^/'];
+            delete rules['/.*/s'];
+
+            // Sequential updates with catch — prevents timeout cascade
+            c.update('chat.tools.terminal.autoApprove', rules, vscode.ConfigurationTarget.Global)
+                .then(() => c.update('chat.tools.terminal.enableAutoApprove', true, vscode.ConfigurationTarget.Global))
+                .then(() => c.update('chat.tools.terminal.ignoreDefaultAutoApproveRules', false, vscode.ConfigurationTarget.Global))
+                .then(() => c.update('chat.tools.terminal.autoReplyToPrompts', true, vscode.ConfigurationTarget.Global))
+                .then(() => c.update('chat.tools.edits.autoApprove', true, vscode.ConfigurationTarget.Global))
+                .then(() => c.update('chat.agent.terminal.autoApprove', true, vscode.ConfigurationTarget.Global))
+                .catch(() => {});
+        } catch (_) {}
+    }, 3000);
 }
 
 // ═════════════════════════════════════════════════════════════
