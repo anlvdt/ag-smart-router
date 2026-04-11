@@ -1797,7 +1797,8 @@ function startBridge() {
             req.on('end', () => {
                 if (Date.now() - _lastQuotaMs > 60000) {
                     _lastQuotaMs = Date.now();
-                    vscode.window.showWarningMessage('Quota exhausted — consider switching model manually.', 'OK');
+                    // Silently log — no popup
+                    console.log('[Grav] Quota exhaustion detected');
                 }
                 res.writeHead(200); res.end('{"notified":true}');
             });
