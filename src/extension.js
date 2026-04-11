@@ -1941,40 +1941,43 @@ function openDashboard() {
     }, undefined, _ctx.subscriptions);
 
     const ticker = setInterval(() => {
+        // Stats update (simple, always works)
+        try { panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); } catch (_) {}
+
+        // Brain update (separate try-catch, safe serialization)
         try {
-            panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks });
-            // Live update Second Brain — send lightweight data only
-            const promoted = getPromotedCommands();
-            // Strip heavy fields from concepts before sending
-            const lightConcepts = {};
-            for (const [k, v] of Object.entries(_wiki.concepts)) {
-                lightConcepts[k] = {
-                    commands: v.commands,
-                    avgConfidence: v.avgConfidence,
-                    riskLevel: v.riskLevel,
-                    description: v.description,
-                };
+            const msg = { command: 'brainUpdated' };
+            msg.epoch = _learnEpoch || 0;
+            msg.tracking = Object.keys(_learnData || {}).length;
+            msg.whiteCount = SAFE_TERMINAL_CMDS.length + (_userWhitelist || []).length;
+            msg.blackCount = DEFAULT_BLACKLIST.length + (_userBlacklist || []).length;
+            msg.promoted = getPromotedCommands().length;
+            msg.patterns = (_patternCache || []).length;
+            msg.wikiPages = Object.keys((_wiki && _wiki.index) || {}).length;
+            msg.wikiConcepts = Object.keys((_wiki && _wiki.concepts) || {}).length;
+            msg.wikiContradictions = ((_wiki && _wiki.contradictions) || []).filter(function(c) { return !c.resolved; }).length;
+
+            // Safe concept serialization
+            var concepts = {};
+            if (_wiki && _wiki.concepts) {
+                for (var ck in _wiki.concepts) {
+                    var cv = _wiki.concepts[ck];
+                    concepts[ck] = { commands: (cv.commands || []).slice(0, 20), avgConfidence: cv.avgConfidence || 0, riskLevel: cv.riskLevel || 'unknown', description: cv.description || '' };
+                }
             }
-            panel.webview.postMessage({
-                command: 'brainUpdated',
-                epoch: _learnEpoch,
-                tracking: Object.keys(_learnData).length,
-                whiteCount: SAFE_TERMINAL_CMDS.length + _userWhitelist.length,
-                blackCount: DEFAULT_BLACKLIST.length + _userBlacklist.length,
-                promoted: promoted.length,
-                patterns: _patternCache.length,
-                wikiPages: Object.keys(_wiki.index).length,
-                wikiConcepts: Object.keys(_wiki.concepts).length,
-                wikiContradictions: _wiki.contradictions.filter(c => !c.resolved).length,
-                concepts: lightConcepts,
-                wikiLog: (_wiki.log || []).slice(-30),
+            msg.concepts = concepts;
+
+            // Safe log serialization
+            msg.wikiLog = ((_wiki && _wiki.log) || []).slice(-15).map(function(l) {
+                return { time: l.time || '', op: l.op || '', cmd: l.cmd || '', action: l.action || '', conf: l.conf, detail: l.detail || '' };
             });
+
+            panel.webview.postMessage(msg);
         } catch (e) {
-            // Don't kill ticker on transient errors — only stop if panel is disposed
-            if (e.message && e.message.includes('disposed')) clearInterval(ticker);
+            if (e.message && e.message.indexOf('disposed') >= 0) clearInterval(ticker);
         }
-    }, 2000);
-    panel.onDidDispose(() => clearInterval(ticker));
+    }, 2500);
+    panel.onDidDispose(function() { clearInterval(ticker); });
 }
 
 function getDashboardHtml(c) {
