@@ -26,7 +26,7 @@
 
     // ── Config (injected at build time) ──────────────────────
     var PAUSE_MS   = /*{{PAUSE_MS}}*/7000;
-    var APPROVE_MS = /*{{APPROVE_MS}}*/1000;
+    var APPROVE_MS = /*{{APPROVE_MS}}*/500;
     var SCROLL_MS  = /*{{SCROLL_MS}}*/500;
     var PATTERNS   = /*{{PATTERNS}}*/["Run", "Allow", "Always Allow", "Keep Waiting", "Continue"];
     var ENABLED    = /*{{ENABLED}}*/true;
@@ -278,24 +278,20 @@
 
     // ═════════════════════════════════════════════════════════
     //  Module 4: Auto-approve engine
-    //  Enhancements:
-    //    - 8s cooldown per-button (prevent double-click)
-    //    - AI-typing gate: skip approval while AI is streaming
-    //    - User activity detection: skip if user clicked recently
-    //    - Source tagging: { source: 'grav' } in click-log payload
+    //  v2: Optimized for speed — removed AI-typing gate for
+    //  "Accept all" buttons, reduced cooldown, faster scan.
     // ═════════════════════════════════════════════════════════
-    var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline'];
+    var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline', 'Reject all'];
     // Only skip editor merge/diff buttons — NOT chat panel buttons
     var EDITOR_SKIP  = ['Accept Changes', 'Accept Incoming', 'Accept Current', 'Accept Both', 'Accept Combination'];
 
-    // Cooldown: Map<DOMElement → timestamp> — but WeakMap can't iterate, so use WeakMap for O(1) lookup
-    var _clickedAt   = new WeakMap(); // btn → timestamp of Grav's last click
-    var _COOLDOWN_MS = 8000;          // 8 seconds between Grav clicks on same element
+    // Cooldown: reduced from 8s to 2s — fast enough to prevent double-click
+    var _clickedAt   = new WeakMap();
+    var _COOLDOWN_MS = 2000;
 
-    // User activity tracking (was user active very recently?)
+    // User activity tracking
     var _lastUserClick = 0;
     document.addEventListener('mousedown', function (e) {
-        // Only count genuine user clicks (isTrusted = not simulated)
         if (e.isTrusted) _lastUserClick = Date.now();
     }, true);
 
@@ -316,6 +312,20 @@
         '[class*=progress-indicator]',
         '[aria-busy="true"]',
     ];
+
+    // Patterns that should ALWAYS be clicked even while AI is typing
+    // These are user-facing approval dialogs that block the AI pipeline
+    var ALWAYS_CLICK = {
+        'Accept all': 1, 'Allow': 1, 'Run': 1, 'Always Allow': 1,
+        'Allow in this Session': 1, 'Allow in this Workspace': 1,
+        'Always Allow Without Review': 1, 'Allow and Review': 1,
+        'Allow and Skip Reviewing Result': 1,
+        'Approve Tool Result': 1, 'Approve all': 1,
+        'Trust': 1, 'Run Task': 1, 'Accept & Run': 1,
+        'Accept': 1, 'Allow Once': 1,
+        'Keep All Edits': 1, 'Keep & Continue': 1, 'Keep': 1,
+        'Proceed': 1, 'Continue': 1,
+    };
 
     function isAiTyping() {
         if (window.__gravAiTyping) return true;
@@ -352,46 +362,48 @@
         return false;
     }
 
+    // Fast scan: use querySelectorAll instead of deepQuery for speed
+    // deepQuery walks shadow DOM which is very slow on complex UIs
+    var _fastScanSelectors = 'button, vscode-button, a.action-label, [role="button"]';
+
     var approveEngine = setInterval(function () {
         if (!window.__gravEnabled) return;
 
-        // Gate 1: AI is still typing → wait
-        if (isAiTyping()) return;
+        var aiTyping = isAiTyping();
 
-        // Gate 2: User just clicked something (< 600ms ago) → user already handled it
-        if (Date.now() - _lastUserClick < 600) return;
+        // Gate: User just clicked something (< 300ms ago)
+        if (Date.now() - _lastUserClick < 300) return;
 
-        var btns = deepQuery('button, vscode-button, a.action-label, [role="button"], span.cursor-pointer', document);
+        // Fast scan first (no shadow DOM walk)
+        var btns = document.querySelectorAll(_fastScanSelectors);
         var target = null, matched = '', text = '';
 
         for (var i = 0; i < btns.length; i++) {
             var b = btns[i];
 
-            // Cooldown: skip if Grav already clicked this button recently
+            // Cooldown check
             var lastClick = _clickedAt.get(b);
             if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
 
-            // Must be visible (or in overlay/dialog)
+            // Visibility check (relaxed for overlays/dialogs)
             if (b.offsetParent === null && !b.closest('[class*=overlay],[class*=popup],[class*=dialog],[class*=notification],[class*=quick-input],[class*=context-view]')) continue;
 
             text = labelOf(b);
-            if (!text || text.length > 50) continue;
+            if (!text || text.length > 60) continue;
 
-            // Skip editor merge/diff buttons — but allow "Accept All" in chat panels
+            // Skip editor merge/diff buttons
             var skip = false;
             var inEditor = b.closest && (b.closest('.monaco-diff-editor') || b.closest('.merge-editor-view') || b.closest('.view-zones') || b.closest('.view-lines'));
             if (inEditor) {
-                // In editor context: skip all Accept-related buttons
                 if (text.indexOf('Accept') === 0) { skip = true; }
             } else {
-                // Outside editor: only skip non-chat merge buttons
                 for (var s = 0; s < EDITOR_SKIP.length; s++) {
                     if (text.indexOf(EDITOR_SKIP[s]) === 0) { skip = true; break; }
                 }
             }
             if (skip) continue;
 
-            // Match against patterns (longest match first to avoid partial matches)
+            // Match against patterns (longest match first)
             matched = '';
             var matchLen = 0;
             for (var p = 0; p < PATTERNS.length; p++) {
@@ -401,23 +413,42 @@
             }
             if (!matched) continue;
 
-            // Critical patterns: click immediately (no need for reject sibling)
-            if (matched === 'Allow' || matched === 'Run' || matched === 'Always Allow' || matched === 'Accept all'
-                || matched === 'Allow in this Session' || matched === 'Allow in this Workspace'
-                || matched === 'Always Allow Without Review' || matched === 'Allow and Review'
-                || matched === 'Allow and Skip Reviewing Result'
-                || matched === 'Approve Tool Result' || matched === 'Approve all'
-                || matched === 'Keep All Edits' || matched === 'Keep & Continue' || matched === 'Keep'
-                || matched === 'Proceed' || matched === 'Trust' || matched === 'Run Task'
-                || matched === 'Accept & Run' || matched === 'Continue' || matched === 'Accept') {
+            // KEY FIX: If AI is typing, only click ALWAYS_CLICK patterns
+            // These are approval dialogs that BLOCK the AI — must click to unblock
+            if (aiTyping && !ALWAYS_CLICK[matched]) continue;
+
+            // All matched patterns with ALWAYS_CLICK → click immediately
+            if (ALWAYS_CLICK[matched]) {
                 target = b; break;
             }
             // Others: only if there's a reject sibling (confirms it's a permission dialog)
             if (hasRejectNearby(b)) { target = b; break; }
         }
 
+        // If fast scan missed, try shadow DOM scan (slower, less frequent)
+        if (!target && !aiTyping) {
+            var shadowBtns = deepQuery('button, vscode-button, [role="button"]', document);
+            for (var i = 0; i < shadowBtns.length; i++) {
+                var b = shadowBtns[i];
+                var lastClick = _clickedAt.get(b);
+                if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
+                if (b.offsetParent === null) continue;
+                text = labelOf(b);
+                if (!text || text.length > 60) continue;
+                matched = '';
+                var matchLen = 0;
+                for (var p = 0; p < PATTERNS.length; p++) {
+                    if ((text === PATTERNS[p] || text.indexOf(PATTERNS[p]) === 0) && PATTERNS[p].length > matchLen) {
+                        matched = PATTERNS[p]; matchLen = PATTERNS[p].length;
+                    }
+                }
+                if (!matched) continue;
+                if (ALWAYS_CLICK[matched] || hasRejectNearby(b)) { target = b; break; }
+            }
+        }
+
         // Accept (chat-only mode)
-        if (!target && window.__gravAcceptChat) {
+        if (!target && window.__gravAcceptChat && !aiTyping) {
             for (var i = 0; i < btns.length; i++) {
                 var b = btns[i];
                 var lastClick = _clickedAt.get(b);

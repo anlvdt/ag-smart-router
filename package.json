@@ -2,7 +2,7 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "Autopilot cho Antigravity AI. Auto-approve, auto-scroll, quota radar, AI learning engine.",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "icon": "icons/icon.png",
     "publisher": "ANLE",
     "repository": {
