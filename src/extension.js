@@ -46,6 +46,16 @@ const ACCEPT_CMDS = [
     'antigravity.acceptCompletion',
 ];
 
+const DEFAULT_PATTERNS = [
+    'Run','Allow','Always Allow','Keep Waiting','Continue','Retry',
+    'Accept all','Accept','Accept & Run',
+    'Allow in this Session','Allow in this Workspace',
+    'Always Allow Without Review','Allow and Review','Allow and Skip Reviewing Result',
+    'Approve Tool Result','Approve all',
+    'Keep All Edits','Keep & Continue','Keep',
+    'Proceed','Trust','Run Task',
+];
+
 const SAFE_TERMINAL_CMDS = [
     'ls','dir','cat','echo','pwd','cd','mkdir','cp','mv','touch',
     'npm','npx','yarn','pnpm','bun','deno','node','python','python3','pip','pip3',
@@ -136,6 +146,23 @@ let _userWhitelist = [];
 let _userBlacklist = [];
 let _patternCache  = []; // generalized patterns discovered from data
 
+// ── Session Intelligence state ───────────────────────────────
+// Resets each time the extension activates (per IDE session)
+let _sessionState = {
+    startMs:       0,
+    msgCount:      0,
+    toolCalls:     [],        // [{ tool, startMs, endMs, durationMs }]
+    responseTimes: [],        // ms per AI message
+    lastActivityMs:0,
+    aiTyping:      false,
+    approveCount:  0,
+    rejectCount:   0,         // manual rejects from user (future)
+    toolBreakdown: {},        // { toolType: { count, totalMs } }
+};
+
+// ── Inline terminal log (captured from runtime UI scan) ──────
+let _termLog = [];            // [{ time, cmd, source }] — max 100 entries
+
 // ── Second Brain state (Karpathy LLM Wiki pattern) ──────────
 // 3-layer architecture:
 //   Layer 1: Raw events (_learnData) — immutable observations
@@ -210,8 +237,8 @@ function cfg(key, fallback) {
 // ═════════════════════════════════════════════════════════════
 function buildRuntime() {
     const dp = _ctx.globalState.get('disabledPatterns', []);
-    const pats = cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry'])
-        .filter(p => !dp.includes(p) && p !== 'Accept');
+    const pats = cfg('approvePatterns', DEFAULT_PATTERNS)
+        .filter(p => !dp.includes(p));
     let src = fs.readFileSync(path.join(_ctx.extensionPath, 'media', 'runtime.js'), 'utf8');
     src = src.replace(/\/\*\{\{PAUSE_MS\}\}\*\/\d+/,    String(cfg('scrollPauseMs', 7000)));
     src = src.replace(/\/\*\{\{SCROLL_MS\}\}\*\/\d+/,   String(cfg('scrollIntervalMs', 500)));
@@ -315,8 +342,8 @@ function writeRuntimeConfig() {
     try {
         const wb = workbenchPath(); if (!wb) return;
         const dp = _ctx.globalState.get('disabledPatterns', []);
-        const pats = cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry'])
-            .filter(p => !dp.includes(p) && p !== 'Accept');
+        const pats = cfg('approvePatterns', DEFAULT_PATTERNS)
+            .filter(p => !dp.includes(p));
         elevatedWrite(path.join(path.dirname(wb), CONFIG_FILE), JSON.stringify({
             enabled: cfg('enabled', true),
             patterns: pats,
@@ -710,6 +737,22 @@ function recordCommandAction(cmdLine, action, context = {}) {
             } else if (context.exitCode !== 0 && action === 'approve') {
                 reward -= LEARN.CONTEXT_WEIGHT;  // approved but failed = slight penalty
             }
+        }
+
+        // Behavioral cooldown: 3× penalty for repeat rejects within 10 minutes.
+        // If user rejects same command ≥2 times quickly → strong signal, accelerate demote.
+        if (action === 'reject') {
+            if (!d.rejectTimes) d.rejectTimes = [];
+            d.rejectTimes.push(now);
+            d.rejectTimes = d.rejectTimes.filter(t => now - t < 600000); // keep last 10 min
+            if (d.rejectTimes.length >= 2) reward *= 3.0;
+        }
+
+        // Session scoring: commands succeeding repeatedly in current project → bonus
+        if (action === 'approve' && context.project) {
+            const sessionKey = 'sess:' + context.project;
+            d.contexts[sessionKey] = (d.contexts[sessionKey] || 0) + 1;
+            if (d.contexts[sessionKey] >= 3) reward += LEARN.CONTEXT_WEIGHT * 0.5;
         }
 
         // Time-of-day context (track when user uses this command)
@@ -1408,6 +1451,55 @@ function getTopContext(contexts) {
     return entries.length > 0 ? entries[0][0] : '';
 }
 
+/**
+ * Safe serialization of session state for dashboard messages.
+ * Strips internal fields (_ts) and limits array lengths.
+ */
+function safeSession() {
+    const now = Date.now();
+    const sessionMs = _sessionState.startMs ? now - _sessionState.startMs : 0;
+    const avgResponseMs = _sessionState.responseTimes.length > 0
+        ? Math.round(_sessionState.responseTimes.reduce((a, b) => a + b, 0) / _sessionState.responseTimes.length)
+        : 0;
+
+    // Tool breakdown — last 20 tool calls for timeline bar
+    const recentTools = _sessionState.toolCalls.slice(-20).map(tc => ({
+        tool: tc.tool,
+        durationMs: tc.durationMs,
+        done: tc.endMs > 0,
+    }));
+
+    return {
+        sessionMs,
+        msgCount:    _sessionState.msgCount,
+        approveCount: _sessionState.approveCount,
+        aiTyping:    _sessionState.aiTyping,
+        avgResponseMs,
+        toolBreakdown: _sessionState.toolBreakdown,
+        recentTools,
+        learningHealth: learningHealth(),
+    };
+}
+
+/**
+ * Learning health traffic-light indicator.
+ * Returns: 'healthy' | 'learning' | 'degrading' | 'new'
+ */
+function learningHealth() {
+    const total = Object.keys(_learnData).length;
+    if (total === 0) return 'new';
+    const trend = _wiki.synthesis['risk-trend'];
+    if (trend) {
+        if (trend.strength > 0.05) return 'healthy';
+        if (trend.strength < -0.05) return 'degrading';
+    }
+    const avgConf = total > 0
+        ? Object.values(_learnData).reduce((a, d) => a + d.conf, 0) / total : 0;
+    if (avgConf > 0.3) return 'healthy';
+    if (avgConf > 0) return 'learning';
+    return 'degrading';
+}
+
 // ═════════════════════════════════════════════════════════════
 //  Safe terminal auto-approve (enhanced with whitelist/blacklist + learning)
 // ═════════════════════════════════════════════════════════════
@@ -1710,6 +1802,12 @@ function startBridge() {
                     if (_log.length > 50) _log.pop();
                     if (_ctx) _ctx.globalState.update('clickLog', _log);
 
+                    // Track session approve count (only Grav-sourced clicks)
+                    if (d.source === 'grav') _sessionState.approveCount++;
+
+                    // Push realtime update to dashboard
+                    if (_dashboard) try { _dashboard.webview.postMessage({ command: 'logUpdated', log: _log }); } catch (_) {}
+
                     // Feed auto-approve clicks to learning engine
                     // When runtime clicks "Run" or "Allow", the button text often contains the command
                     if (cfg('learnEnabled', true) && d.button) {
@@ -1797,18 +1895,170 @@ function startBridge() {
             req.on('end', () => {
                 if (Date.now() - _lastQuotaMs > 60000) {
                     _lastQuotaMs = Date.now();
-                    // Silently log — no popup
                     console.log('[Grav] Quota exhaustion detected');
+                    // Push to dashboard immediately
+                    if (_dashboard) try {
+                        _dashboard.webview.postMessage({ command: 'quotaDetected', ts: Date.now() });
+                    } catch (_) {}
                 }
                 res.writeHead(200); res.end('{"notified":true}');
             });
             return;
         }
 
-        // Default: serve config
+        // ── NEW: Chat event — session intelligence + tool learning ──
+        if (u.pathname === '/api/chat-event' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const now = Date.now();
+                    _sessionState.lastActivityMs = now;
+
+                    if (d.type === 'message-start') {
+                        _sessionState.aiTyping = true;
+                    } else if (d.type === 'message-end') {
+                        _sessionState.aiTyping = false;
+                        _sessionState.msgCount++;
+                        if (d.responseMs && d.responseMs > 0) {
+                            _sessionState.responseTimes.push(d.responseMs);
+                            if (_sessionState.responseTimes.length > 50) _sessionState.responseTimes.shift();
+                        }
+                        // Wiki log
+                        const ts = new Date(now).toISOString().slice(0, 19).replace('T', ' ');
+                        _wiki.log.push({ time: ts, op: 'msg', detail: `#${_sessionState.msgCount} ${d.responseMs ? Math.round(d.responseMs/1000) + 's' : ''}` });
+                        if (_wiki.log.length > 200) _wiki.log = _wiki.log.slice(-200);
+
+                    } else if (d.type === 'tool-call') {
+                        const tool = d.tool || 'tool-call';
+                        _sessionState.toolCalls.push({ tool, startMs: now, endMs: 0, durationMs: 0 });
+                        if (_sessionState.toolCalls.length > 100) _sessionState.toolCalls.shift();
+
+                        // Feed tool call into learning engine as synthetic command
+                        if (cfg('learnEnabled', true)) {
+                            recordCommandAction('__tool:' + tool, 'approve', {
+                                project: vscode.workspace.workspaceFolders?.[0]?.name,
+                            });
+                        }
+
+                    } else if (d.type === 'tool-result') {
+                        const tool = d.tool || 'tool-call';
+                        // Update last matching pending tool call
+                        for (let i = _sessionState.toolCalls.length - 1; i >= 0; i--) {
+                            const tc = _sessionState.toolCalls[i];
+                            if (tc.tool === tool && tc.endMs === 0) {
+                                tc.endMs = now;
+                                tc.durationMs = d.durationMs || (now - tc.startMs);
+                                break;
+                            }
+                        }
+                        // Accumulate tool breakdown
+                        if (!_sessionState.toolBreakdown[tool]) _sessionState.toolBreakdown[tool] = { count: 0, totalMs: 0 };
+                        _sessionState.toolBreakdown[tool].count++;
+                        _sessionState.toolBreakdown[tool].totalMs += d.durationMs || 0;
+                    }
+
+                    // Push session update to dashboard (immediate, not waiting for tick)
+                    if (_dashboard) try {
+                        _dashboard.webview.postMessage({ command: 'sessionUpdated', session: safeSession() });
+                    } catch (_) {}
+
+                } catch (_) {}
+                res.writeHead(200); res.end('{"ok":true}');
+            });
+            return;
+        }
+
+        // ── NEW: Terminal event — UI-scan capture (dedup with VS Code API path) ──
+        if (u.pathname === '/api/terminal-event' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const cmd = (d.cmd || '').trim();
+                    if (cmd && cmd.length >= 2) {
+                        const now = Date.now();
+                        const nowStr = new Date(now).toISOString().slice(11, 19);
+                        // Dedup: skip if same cmd in last 10s
+                        const recent = _termLog.find(t => t.cmd === cmd && (now - t._ts) < 10000);
+                        if (!recent) {
+                            _termLog.unshift({ time: nowStr, cmd, source: d.source || 'ui', _ts: now });
+                            if (_termLog.length > 100) _termLog.pop();
+
+                            // Feed into learning engine (marked as ui-source — lower confidence weight)
+                            if (cfg('learnEnabled', true)) {
+                                recordCommandAction(cmd, 'approve', {
+                                    project: vscode.workspace.workspaceFolders?.[0]?.name,
+                                });
+                            }
+
+                            // Push to dashboard
+                            if (_dashboard) try {
+                                _dashboard.webview.postMessage({ command: 'termLogUpdated', termLog: _termLog.slice(0, 30) });
+                            } catch (_) {}
+                        }
+                    }
+                } catch (_) {}
+                res.writeHead(200); res.end('{"ok":true}');
+            });
+            return;
+        }
+
+        // ── GEPA-inspired: Pattern Discovery — auto-detect new approval buttons ──
+        if (u.pathname === '/api/pattern-discovered' && req.method === 'POST') {
+            let body = '';
+            req.on('data', c => body += c);
+            req.on('end', () => {
+                try {
+                    const d = JSON.parse(body);
+                    const newPatterns = d.patterns || [];
+                    if (newPatterns.length > 0) {
+                        // Store discovered patterns for user review
+                        const discovered = _ctx ? _ctx.globalState.get('discoveredPatterns', []) : [];
+                        let changed = false;
+                        for (const p of newPatterns) {
+                            if (!discovered.includes(p) && !DEFAULT_PATTERNS.includes(p)) {
+                                discovered.push(p);
+                                changed = true;
+                                console.log('[Grav] GEPA: Discovered new pattern:', p);
+                            }
+                        }
+                        if (changed && _ctx) {
+                            _ctx.globalState.update('discoveredPatterns', discovered.slice(-50));
+                            // Auto-add to active patterns if they match approval heuristics
+                            const currentPatterns = cfg('approvePatterns', DEFAULT_PATTERNS);
+                            const dp = _ctx.globalState.get('disabledPatterns', []);
+                            for (const p of newPatterns) {
+                                if (!currentPatterns.includes(p) && !dp.includes(p)) {
+                                    currentPatterns.push(p);
+                                }
+                            }
+                            vscode.workspace.getConfiguration('grav').update('approvePatterns', currentPatterns, vscode.ConfigurationTarget.Global);
+                            // Hot-update runtime with new patterns
+                            try {
+                                const wb = workbenchPath();
+                                if (wb) elevatedWrite(path.join(path.dirname(wb), RUNTIME_FILE), buildRuntime());
+                            } catch (_) {}
+                        }
+                    }
+                } catch (_) {}
+                res.writeHead(200); res.end('{"ok":true}');
+            });
+            return;
+        }
+
+        // ── NEW: Behavior stats — session + learning health for dashboard ──
+        if (u.pathname === '/api/behavior-stats') {
+            res.writeHead(200); res.end(JSON.stringify(safeSession()));
+            return;
+        }
+
+
         const dp = _ctx ? _ctx.globalState.get('disabledPatterns', []) : [];
-        const pats = cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry'])
-            .filter(p => !dp.includes(p) && p !== 'Accept');
+        const pats = cfg('approvePatterns', DEFAULT_PATTERNS)
+            .filter(p => !dp.includes(p));
         res.writeHead(200);
         res.end(JSON.stringify({
             enabled: _enabled,
@@ -1876,7 +2126,7 @@ function openDashboard() {
             pauseMs: cfg('scrollPauseMs', 7000),
             scrollMs: cfg('scrollIntervalMs', 500),
             approveMs: cfg('approveIntervalMs', 1000),
-            patterns: cfg('approvePatterns', ['Run','Allow','Always Allow','Keep Waiting','Continue','Retry']),
+            patterns: cfg('approvePatterns', DEFAULT_PATTERNS),
             disabledPatterns: dp,
             language: cfg('language', 'vi'),
             stats: _stats,
@@ -1941,11 +2191,13 @@ function openDashboard() {
         }
     }, undefined, _ctx.subscriptions);
 
-    const ticker = setInterval(() => {
-        // Stats update (simple, always works)
+    // Tier 1: Stats + click log — 1s for snappy realtime feedback
+    const statsTicker = setInterval(() => {
         try { panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); } catch (_) {}
+    }, 1000);
 
-        // Brain update (separate try-catch, safe serialization)
+    // Tier 2: Brain/Wiki — 5s, heavier serialization
+    const brainTicker = setInterval(() => {
         try {
             const msg = { command: 'brainUpdated' };
             msg.epoch = _learnEpoch || 0;
@@ -1968,17 +2220,26 @@ function openDashboard() {
             }
             msg.concepts = concepts;
 
-            // Safe log serialization
-            msg.wikiLog = ((_wiki && _wiki.log) || []).slice(-15).map(function(l) {
+            // 30 entries — consistent with init payload
+            msg.wikiLog = ((_wiki && _wiki.log) || []).slice(-30).map(function(l) {
                 return { time: l.time || '', op: l.op || '', cmd: l.cmd || '', action: l.action || '', conf: l.conf, detail: l.detail || '' };
+            });
+
+            // Session intelligence (lightweight — always include)
+            try { msg.session = safeSession(); } catch (_) { msg.session = null; }
+
+            // Terminal log (last 30 entries)
+            msg.termLog = (_termLog || []).slice(0, 30).map(function(t) {
+                return { time: t.time || '', cmd: t.cmd || '', source: t.source || 'ui' };
             });
 
             panel.webview.postMessage(msg);
         } catch (e) {
-            if (e.message && e.message.indexOf('disposed') >= 0) clearInterval(ticker);
+            if (e.message && e.message.indexOf('disposed') >= 0) clearInterval(brainTicker);
         }
-    }, 2500);
-    panel.onDidDispose(function() { clearInterval(ticker); });
+    }, 5000);
+
+    panel.onDidDispose(function() { clearInterval(statsTicker); clearInterval(brainTicker); });
 }
 
 function getDashboardHtml(c) {
@@ -2022,10 +2283,18 @@ function activate(ctx) {
     _enabled     = cfg('enabled', true);
     _scrollOn    = cfg('autoScroll', true);
 
-    // Inject runtime
+    // Inject runtime — ALWAYS re-inject on activate to ensure latest patterns
     const ver     = ctx.extension?.packageJSON?.version || '0';
     const lastVer = ctx.globalState.get('grav-version', '0');
-    if (!isInjected() || ver !== lastVer) {
+    const needsReload = !isInjected() || ver !== lastVer;
+    
+    // Always hot-update runtime file (patterns may have changed)
+    try {
+        const wb = workbenchPath();
+        if (wb) elevatedWrite(path.join(path.dirname(wb), RUNTIME_FILE), buildRuntime());
+    } catch (e) { console.error('[Grav] hot-update runtime:', e.message); }
+    
+    if (needsReload) {
         try {
             inject();
             ctx.globalState.update('grav-version', ver);
@@ -2034,11 +2303,6 @@ function activate(ctx) {
             setTimeout(() => vscode.commands.executeCommand('workbench.action.reloadWindow'), 1000);
         } catch (e) { console.error('[Grav] inject:', e.message); }
     } else {
-        // Hot-update runtime without reload
-        try {
-            const wb = workbenchPath();
-            if (wb) elevatedWrite(path.join(path.dirname(wb), RUNTIME_FILE), buildRuntime());
-        } catch (_) {}
         patchChecksums();
     }
 
@@ -2047,6 +2311,7 @@ function activate(ctx) {
     writeRuntimeConfig();
     loadLearnData();
     setupSafeApprove();
+    _sessionState.startMs = Date.now(); // mark session start
 
     // LS discovery
     setTimeout(() => discoverLS(), 8000);

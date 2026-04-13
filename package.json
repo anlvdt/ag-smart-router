@@ -2,7 +2,8 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "Autopilot cho Antigravity AI. Auto-approve, auto-scroll, quota radar, AI learning engine.",
-    "version": "1.0.0",
+    "version": "1.0.3",
+    "icon": "icons/icon.png",
     "publisher": "ANLE",
     "repository": {
         "type": "git",
@@ -43,7 +44,7 @@
                 "grav.approvePatterns": {
                     "type": "array",
                     "items": { "type": "string" },
-                    "default": ["Run", "Allow", "Always Allow", "Keep Waiting", "Continue", "Retry"],
+                    "default": ["Run", "Allow", "Always Allow", "Keep Waiting", "Continue", "Retry", "Accept all", "Allow in this Session", "Allow in this Workspace", "Always Allow Without Review", "Allow and Review", "Allow and Skip Reviewing Result", "Approve Tool Result", "Approve all", "Keep All Edits", "Keep & Continue", "Keep", "Proceed", "Trust", "Run Task", "Accept & Run", "Accept"],
                     "description": "Danh sách nút tự bấm | Button labels to auto-approve"
                 },
                 "grav.scrollPauseMs": {

@@ -105,18 +105,22 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 .risk-unknown { background: rgba(96,96,128,0.15); color: var(--text3) }
 
 /* ── Log ── */
-.log-box { max-height: 140px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px }
+.log-box { max-height: 160px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px }
 .log-item { display: flex; justify-content: space-between; padding: 3px 7px; font-size: 10px; border-bottom: 1px solid var(--bg) }
 .log-item:last-child { border: none }
 .log-empty { color: var(--text3); padding: 8px; font-size: 10px; text-align: center }
+.log-new { animation: flash 0.4s ease }
+@keyframes flash { from { background: rgba(122,162,247,0.15); } to { background: transparent; } }
 
 /* ── Wiki log ── */
-.wiki-log { max-height: 180px; overflow-y: auto }
-.wiki-log-item { padding: 4px 8px; font-size: 10px; border-bottom: 1px solid var(--bg); display: flex; gap: 6px }
-.wiki-log-item .op { font-weight: 700; min-width: 40px }
+.wiki-log { max-height: 200px; overflow-y: auto }
+.wiki-log-item { padding: 4px 8px; font-size: 10px; border-bottom: 1px solid var(--bg); display: flex; gap: 6px; align-items: baseline }
+.wiki-log-item .op { font-weight: 700; min-width: 44px }
 .wiki-log-item .op-ingest { color: var(--green) }
 .wiki-log-item .op-lint { color: var(--yellow) }
-.wiki-log-item .ts { color: var(--text3); min-width: 50px }
+.wiki-log-item .op-approve { color: var(--teal) }
+.wiki-log-item .op-reject { color: var(--red) }
+.wiki-log-item .ts { color: var(--text3); min-width: 56px; font-size: 9px }
 
 /* ── Buttons ── */
 .btn-row { display: flex; gap: 4px; justify-content: flex-end }
@@ -143,7 +147,7 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 
 <!-- ═══ HEADER ═══ -->
 <div class="hdr">
-    <div class="brand"><h1>Grav</h1><span class="v">v1.0.0 — Autopilot + AI Learning</span></div>
+    <div class="brand"><h1>Grav</h1><span class="v">v1.0.0 — Pilot · Cortex</span></div>
     <div class="hdr-right">
         <span class="chip chip-count" id="totalCount">{{TOTAL}}</span>
         <span class="chip on" id="masterChip" onclick="toggleMaster()" style="cursor:pointer"><span id="masterLabel">ON</span></span>
@@ -152,9 +156,9 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 
 <!-- ═══ TABS ═══ -->
 <div class="tabs">
-    <div class="tab active" onclick="switchTab('autopilot')">Autopilot</div>
-    <div class="tab" onclick="switchTab('brain')">Second Brain</div>
-    <div class="tab" onclick="switchTab('stats')">Stats</div>
+    <div class="tab active" onclick="switchTab('autopilot')">Điều khiển</div>
+    <div class="tab" onclick="switchTab('brain')">Bộ não</div>
+    <div class="tab" onclick="switchTab('stats')">Thống kê</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -165,24 +169,24 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
     <div class="card">
         <div class="card-title" data-i18n="sec-features">modules</div>
         <div class="row">
-            <div class="row-left" onclick="toggleFeat('chkEnabled')"><div><span class="row-name">Auto-Approve</span><div class="row-hint" data-i18n="desc-approve">Click Run, Allow, Accept automatically</div></div></div>
+            <div class="row-left" onclick="toggleFeat('chkEnabled')"><div><span class="row-name" data-i18n="feat-autoclick">Auto-Click</span><div class="row-hint" data-i18n="desc-approve">Tự động bấm nút chấp nhận (Accept All, Allow, Run...)</div></div></div>
             <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()"><span></span></label>
         </div>
         <div class="row">
-            <div class="row-left" onclick="toggleFeat('chkScroll')"><div><span class="row-name">Stick-to-Bottom</span><div class="row-hint" data-i18n="desc-scroll">Keep chat scrolled down</div></div></div>
+            <div class="row-left" onclick="toggleFeat('chkScroll')"><div><span class="row-name" data-i18n="feat-scroll">Auto-Scroll</span><div class="row-hint" data-i18n="desc-scroll">Tự cuộn chat xuống cuối trang</div></div></div>
             <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()"><span></span></label>
         </div>
     </div>
 
     <div class="card">
         <div class="card-title" data-i18n="sec-timing">timing</div>
-        <div class="slider"><label data-i18n="lbl-approve">Approve</label><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="document.getElementById('valApprove').textContent=this.value+'ms'"><span class="val" id="valApprove">{{APPROVE_MS}}ms</span></div>
-        <div class="slider"><label data-i18n="lbl-scroll">Scroll</label><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="document.getElementById('valScroll').textContent=this.value+'ms'"><span class="val" id="valScroll">{{SCROLL_MS}}ms</span></div>
-        <div class="slider"><label data-i18n="lbl-pause">Pause</label><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="document.getElementById('valPause').textContent=this.value+'ms'"><span class="val" id="valPause">{{PAUSE_MS}}ms</span></div>
+        <div class="slider"><label data-i18n="lbl-approve">Tốc độ click</label><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="document.getElementById('valApprove').textContent=this.value+'ms'"><span class="val" id="valApprove">{{APPROVE_MS}}ms</span></div>
+        <div class="slider"><label data-i18n="lbl-scroll">Tốc độ cuộn</label><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="document.getElementById('valScroll').textContent=this.value+'ms'"><span class="val" id="valScroll">{{SCROLL_MS}}ms</span></div>
+        <div class="slider"><label data-i18n="lbl-pause">Tạm dừng</label><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="document.getElementById('valPause').textContent=this.value+'ms'"><span class="val" id="valPause">{{PAUSE_MS}}ms</span></div>
     </div>
 
     <div class="card">
-        <div class="card-title" data-i18n="sec-patterns">patterns</div>
+        <div class="card-title" data-i18n="sec-patterns">Nút tự động bấm</div>
         <div class="pat-grid" id="patGrid"></div>
     </div>
 
@@ -195,41 +199,62 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 
     <!-- Hero metrics -->
     <div class="g6" style="margin-bottom:8px">
-        <div class="metric"><div class="metric-num" style="color:var(--accent)" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="metric-lbl">Epoch</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--teal)" id="brainTracking">{{LEARN_TRACKING}}</div><div class="metric-lbl">Tracking</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--green)" id="brainWhite">{{WHITE_COUNT}}</div><div class="metric-lbl">Whitelist</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--red)" id="brainBlack">{{BLACK_COUNT}}</div><div class="metric-lbl">Blacklist</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--purple)" id="brainPromoted">{{LEARN_COUNT}}</div><div class="metric-lbl">Promoted</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--peach)" id="brainPatterns">{{LEARN_PATTERNS}}</div><div class="metric-lbl">Patterns</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--accent)" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="metric-lbl">Vòng học</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--teal)" id="brainTracking">{{LEARN_TRACKING}}</div><div class="metric-lbl">Đang theo dõi</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--green)" id="brainWhite">{{WHITE_COUNT}}</div><div class="metric-lbl">Cho phép</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--red)" id="brainBlack">{{BLACK_COUNT}}</div><div class="metric-lbl">Chặn</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--purple)" id="brainPromoted">{{LEARN_COUNT}}</div><div class="metric-lbl">Đã nâng cấp</div></div>
+        <div class="metric"><div class="metric-num" style="color:var(--peach)" id="brainPatterns">{{LEARN_PATTERNS}}</div><div class="metric-lbl">Mẫu nhận diện</div></div>
+    </div>
+
+    <!-- Session Intelligence -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div class="card-title" style="margin-bottom:0">Phiên làm việc</div>
+            <span id="healthBadge" class="risk risk-unknown">—</span>
+        </div>
+        <div class="g4" style="margin-bottom:6px">
+            <div class="metric"><div class="metric-num" style="color:var(--accent)" id="sessDuration">0m</div><div class="metric-lbl">Thời lượng</div></div>
+            <div class="metric"><div class="metric-num" style="color:var(--teal)" id="sessMsg">0</div><div class="metric-lbl">Tin nhắn</div></div>
+            <div class="metric"><div class="metric-num" style="color:var(--green)" id="sessApprove">0</div><div class="metric-lbl">Đã bấm</div></div>
+            <div class="metric"><div class="metric-num" style="color:var(--yellow)" id="sessAvgResp">—</div><div class="metric-lbl">TB phản hồi</div></div>
+        </div>
+        <!-- AI typing indicator -->
+        <div id="aiTypingRow" style="display:none;align-items:center;gap:6px;padding:4px 8px;background:rgba(122,162,247,0.06);border-radius:3px;margin-bottom:6px">
+            <span style="color:var(--accent);font-size:10px;font-weight:700">● AI ĐANG SUY NGHĨ</span>
+            <span style="color:var(--text3);font-size:9px">tạm dừng auto-click khi AI đang trả lời</span>
+        </div>
+        <!-- Tool breakdown -->
+        <div id="toolBreakdown"></div>
     </div>
 
     <!-- Wiki overview -->
     <div class="card">
-        <div class="card-title">Knowledge Wiki</div>
+        <div class="card-title">Bộ nhớ</div>
         <div class="g3" style="margin-bottom:8px">
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--cyan)" id="wikiPages">{{WIKI_PAGES}}</div><div class="metric-lbl">Wiki Pages</div></div>
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--teal)" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="metric-lbl">Concepts</div></div>
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--yellow)" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</div><div class="metric-lbl">Contradictions</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--cyan)" id="wikiPages">{{WIKI_PAGES}}</div><div class="metric-lbl">Trang</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--teal)" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="metric-lbl">Tín hiệu</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--yellow)" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</div><div class="metric-lbl">Xung đột</div></div>
         </div>
         <div style="display:flex;gap:4px">
-            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Manage Commands</button>
-            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">View Full Wiki</button>
-            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Lint Wiki</button>
+            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Quản lý luật</button>
+            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Xem bộ nhớ</button>
+            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Kiểm tra</button>
         </div>
     </div>
 
     <!-- Concept map -->
     <div class="card">
-        <div class="card-title">Concept Map</div>
+        <div class="card-title">Bản đồ tín hiệu</div>
         <div id="conceptMap">
-            <div class="log-empty">Concepts will appear as commands are learned</div>
+            <div class="log-empty">Tín hiệu sẽ xuất hiện khi hệ thống học được các mẫu</div>
         </div>
     </div>
 
     <!-- Wiki activity log -->
     <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div class="card-title" style="margin-bottom:0">Activity Log</div>
+            <div class="card-title" style="margin-bottom:0">Nhật ký sự kiện</div>
         </div>
         <div class="log-box wiki-log" id="wikiLog">
             <div class="log-empty">—</div>
@@ -244,10 +269,10 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 <div id="tab-stats" class="tab-panel">
 
     <div class="card">
-        <div class="card-title" data-i18n="sec-stats">stats</div>
+        <div class="card-title" data-i18n="sec-stats">Thống kê</div>
         <div class="g2" style="margin-bottom:8px">
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--accent)" id="statTotal">{{TOTAL}}</div><div class="metric-lbl">Total Clicks</div></div>
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--green)" id="statActive">0</div><div class="metric-lbl">Active Patterns</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--accent)" id="statTotal">{{TOTAL}}</div><div class="metric-lbl">Tổng lượt bấm</div></div>
+            <div class="metric metric-lg"><div class="metric-num" style="color:var(--green)" id="statActive">0</div><div class="metric-lbl">Nút đang bật</div></div>
         </div>
         <div id="statBars" style="margin-bottom:6px"></div>
     </div>
@@ -255,12 +280,21 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
     <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div class="card-title" style="margin-bottom:0" data-i18n="lbl-log">log</div>
-            <button class="btn btn-sm btn-danger" onclick="clearLog()">Clear</button>
+            <button class="btn btn-sm btn-danger" onclick="clearLog()">Xóa</button>
         </div>
         <div class="log-box" id="logList"><div class="log-empty">—</div></div>
     </div>
 
-    <div style="margin-top:4px"><button class="btn btn-danger btn-sm" onclick="resetStats()" style="width:100%">Reset All Stats</button></div>
+    <!-- Terminal log (inline terminal capture) -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div class="card-title" style="margin-bottom:0">Terminal</div>
+            <span style="font-size:9px;color:var(--text3)">giao diện + shell</span>
+        </div>
+        <div class="log-box" id="termLogList"><div class="log-empty">—</div></div>
+    </div>
+
+    <div style="margin-top:4px"><button class="btn btn-danger btn-sm" onclick="resetStats()" style="width:100%">Xóa thống kê</button></div>
 
 </div>
 
@@ -272,8 +306,8 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
         <option value="zh" {{LANG_ZH}}>中文</option>
     </select>
     <div class="btn-row">
-        <button class="btn" onclick="vscode.postMessage({command:'reload'})">Reload</button>
-        <button class="btn btn-primary" onclick="saveAll()">Save</button>
+        <button class="btn" onclick="vscode.postMessage({command:'reload'})">Tải lại</button>
+        <button class="btn btn-primary" onclick="saveAll()">Lưu</button>
     </div>
 </div>
 
@@ -282,7 +316,7 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 
 <script>
 var vscode = acquireVsCodeApi();
-var ALL_PATTERNS = ['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Accept all'];
+var ALL_PATTERNS = ['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Accept all','Allow in this Session','Allow in this Workspace','Always Allow Without Review','Allow and Review','Allow and Skip Reviewing Result','Approve Tool Result','Approve all','Keep All Edits','Keep & Continue','Keep','Proceed','Trust','Run Task','Accept & Run'];
 var patterns = {{PATTERNS_JSON}};
 var disabledPatterns = {{DISABLED_JSON}};
 ALL_PATTERNS.forEach(function(p) { if (patterns.indexOf(p) === -1 && disabledPatterns.indexOf(p) === -1) disabledPatterns.push(p); });
@@ -291,9 +325,9 @@ var CONCEPTS_DATA = {{CONCEPTS_JSON}};
 var WIKI_LOG_DATA = {{WIKI_LOG_JSON}};
 
 var _i18n = {
-    vi: {'sec-features':'Mô-đun','sec-timing':'Thời gian','sec-patterns':'Nút bấm','sec-stats':'Thống kê','lbl-log':'Nhật ký','desc-approve':'Tự nhấn Run, Allow, Accept','desc-scroll':'Giữ chat cuộn xuống cuối','lbl-approve':'Approve','lbl-scroll':'Scroll','lbl-pause':'Pause'},
-    en: {'sec-features':'Modules','sec-timing':'Timing','sec-patterns':'Patterns','sec-stats':'Stats','lbl-log':'Log','desc-approve':'Click Run, Allow, Accept automatically','desc-scroll':'Keep chat scrolled down','lbl-approve':'Approve','lbl-scroll':'Scroll','lbl-pause':'Pause'},
-    zh: {'sec-features':'模块','sec-timing':'时间','sec-patterns':'按钮','sec-stats':'统计','lbl-log':'日志','desc-approve':'自动点击 Run、Allow、Accept','desc-scroll':'聊天面板自动滚动','lbl-approve':'审批','lbl-scroll':'滚动','lbl-pause':'暂停'}
+    vi: {'sec-features':'Chức năng','sec-timing':'Thời gian','sec-patterns':'Nút tự động bấm','sec-stats':'Thống kê','lbl-log':'Nhật ký','desc-approve':'Tự động bấm nút chấp nhận (Accept All, Allow, Run...)','desc-scroll':'Tự cuộn chat xuống cuối trang','lbl-approve':'Tốc độ click','lbl-scroll':'Tốc độ cuộn','lbl-pause':'Tạm dừng','feat-autoclick':'Auto-Click','feat-scroll':'Auto-Scroll'},
+    en: {'sec-features':'Features','sec-timing':'Timing','sec-patterns':'Auto-click buttons','sec-stats':'Stats','lbl-log':'Log','desc-approve':'Auto-clicks approval buttons (Accept All, Allow, Run...)','desc-scroll':'Auto-scrolls chat to bottom','lbl-approve':'Click speed','lbl-scroll':'Scroll speed','lbl-pause':'Pause','feat-autoclick':'Auto-Click','feat-scroll':'Auto-Scroll'},
+    zh: {'sec-features':'功能','sec-timing':'时间设置','sec-patterns':'自动点击按钮','sec-stats':'统计','lbl-log':'日志','desc-approve':'自动点击审批按钮 (Accept All, Allow, Run...)','desc-scroll':'聊天面板自动滚动到底部','lbl-approve':'点击速度','lbl-scroll':'滚动速度','lbl-pause':'暂停','feat-autoclick':'自动点击','feat-scroll':'自动滚动'}
 };
 function applyI18n(lang) { var s = _i18n[lang] || _i18n['en']; document.querySelectorAll('[data-i18n]').forEach(function(el) { var k = el.getAttribute('data-i18n'); if (s[k]) el.textContent = s[k]; }); }
 applyI18n('{{LANG}}');
@@ -304,6 +338,8 @@ function switchTab(name) {
     document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
     var el = document.getElementById('tab-' + name);
     if (el) el.classList.add('active');
+    // Refresh click log when switching to stats
+    if (name === 'stats') vscode.postMessage({ command: 'getLog' });
 }
 
 /* ── Toast ── */
@@ -354,7 +390,7 @@ function saveAll() {
         approveMs: parseInt(document.getElementById('rngApprove').value) || 1000,
         patterns: patterns, disabledPatterns: disabledPatterns,
         language: document.getElementById('selLang').value
-    }}); toast('Saved');
+    }}); toast('Đã lưu');
 }
 
 /* ── Stats bars ── */
@@ -376,22 +412,31 @@ function renderBars(stats) {
 }
 
 /* ── Click log ── */
-var _lastLogHtml = null;
+var _lastLogKey = null;
 function renderLog(log) {
     var el = document.getElementById('logList');
-    if (!log || !log.length) { var e = '<div class="log-empty">—</div>'; if (_lastLogHtml !== e) { _lastLogHtml = e; el.innerHTML = e; } return; }
+    if (!log || !log.length) { if (_lastLogKey !== '') { _lastLogKey = ''; el.innerHTML = '<div class="log-empty">—</div>'; } return; }
+    // Key = first entry time+pattern — avoids full string compare
+    var key = (log[0] && (log[0].time + log[0].pattern)) || '';
+    if (_lastLogKey === key) return;
+    var isNew = _lastLogKey !== null;
+    _lastLogKey = key;
     var colors = { Run: 'var(--green)', Allow: 'var(--accent)', Accept: 'var(--peach)', 'Always Allow': 'var(--teal)', Retry: 'var(--purple)', 'Keep Waiting': 'var(--teal)', Continue: 'var(--accent)' };
     var h = '';
-    log.forEach(function(c) { h += '<div class="log-item"><span style="color:' + (colors[c.pattern] || 'var(--text2)') + ';font-weight:700">' + c.pattern + '</span><span style="color:var(--text3)">' + c.time + '</span></div>'; });
-    if (_lastLogHtml !== h) { _lastLogHtml = h; el.innerHTML = h; }
+    log.forEach(function(c, i) {
+        var cls = (i === 0 && isNew) ? ' log-new' : '';
+        h += '<div class="log-item' + cls + '"><span style="color:' + (colors[c.pattern] || 'var(--text2)') + ';font-weight:700">' + (c.pattern || '') + '</span><span style="color:var(--text3)">' + (c.time || '') + '</span></div>';
+    });
+    el.innerHTML = h;
+    el.scrollTop = 0;
 }
-function resetStats() { vscode.postMessage({ command: 'resetStats' }); document.getElementById('totalCount').textContent = '0'; document.getElementById('statTotal').textContent = '0'; renderBars({}); toast('Reset'); }
-function clearLog() { vscode.postMessage({ command: 'clearLog' }); renderLog([]); toast('Cleared'); }
+function resetStats() { vscode.postMessage({ command: 'resetStats' }); document.getElementById('totalCount').textContent = '0'; document.getElementById('statTotal').textContent = '0'; renderBars({}); toast('Đã xóa'); }
+function clearLog() { vscode.postMessage({ command: 'clearLog' }); renderLog([]); toast('Đã xóa'); }
 
 /* ── Concept map rendering ── */
 function renderConcepts(data) {
     var el = document.getElementById('conceptMap');
-    if (!data || Object.keys(data).length === 0) { el.innerHTML = '<div class="log-empty">Concepts will appear as commands are learned</div>'; return; }
+    if (!data || Object.keys(data).length === 0) { el.innerHTML = '<div class="log-empty">Tín hiệu sẽ xuất hiện khi hệ thống học được các mẫu</div>'; return; }
     var entries = Object.entries(data).sort(function(a,b) { return b[1].commands.length - a[1].commands.length; });
     var h = '';
     var riskClass = { safe: 'risk-safe', caution: 'risk-caution', danger: 'risk-danger', unknown: 'risk-unknown' };
@@ -412,21 +457,108 @@ function renderConcepts(data) {
 }
 
 /* ── Wiki log rendering ── */
+var _lastWikiKey = null;
 function renderWikiLog(log) {
     var el = document.getElementById('wikiLog');
-    if (!log || !log.length) { el.innerHTML = '<div class="log-empty">—</div>'; return; }
+    if (!log || !log.length) { if (_lastWikiKey !== '') { _lastWikiKey = ''; el.innerHTML = '<div class="log-empty">—</div>'; } return; }
+    // Keyed on last entry — log is chronological, last = newest
+    var key = (log[log.length - 1] && (log[log.length - 1].time + log[log.length - 1].cmd)) || '';
+    if (_lastWikiKey === key) return;
+    var isNew = _lastWikiKey !== null;
+    _lastWikiKey = key;
     var h = '';
-    var opColors = { ingest: 'op-ingest', lint: 'op-lint' };
-    log.slice().reverse().slice(0, 30).forEach(function(l) {
-        h += '<div class="wiki-log-item">';
+    var opCls = { ingest: 'op-ingest', lint: 'op-lint', approve: 'op-approve', reject: 'op-reject' };
+    // Reverse for display (newest first)
+    log.slice().reverse().forEach(function(l, i) {
+        var cls = (i === 0 && isNew) ? ' log-new' : '';
+        h += '<div class="wiki-log-item' + cls + '">';
         h += '<span class="ts">' + (l.time || '').slice(11, 19) + '</span>';
-        h += '<span class="op ' + (opColors[l.op] || '') + '">' + (l.op || '') + '</span>';
-        h += '<span style="color:var(--text2)">' + (l.cmd || l.detail || '') + '</span>';
-        if (l.action) h += '<span style="color:' + (l.action === 'approve' ? 'var(--green)' : 'var(--red)') + '">' + l.action + '</span>';
-        if (l.conf !== undefined) h += '<span style="color:var(--text3)">' + l.conf + '</span>';
+        h += '<span class="op ' + (opCls[l.op] || opCls[l.action] || '') + '">' + (l.op || '') + '</span>';
+        h += '<span style="color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (l.cmd || l.detail || '') + '</span>';
+        if (l.action) h += '<span style="color:' + (l.action === 'approve' ? 'var(--green)' : 'var(--red)') + ';margin-left:auto;padding-left:4px">' + l.action + '</span>';
+        if (l.conf !== undefined) h += '<span style="color:var(--text3);min-width:32px;text-align:right">' + (Math.round(l.conf * 100)) + '%</span>';
         h += '</div>';
     });
     el.innerHTML = h;
+    el.scrollTop = 0;
+}
+
+/* ── Session rendering ── */
+var TOOL_COLORS = { 'file-edit':'var(--accent)', 'terminal':'var(--green)', 'search':'var(--teal)', 'think':'var(--purple)', 'tool-call':'var(--yellow)' };
+var HEALTH_CFG = {
+    healthy: { cls:'risk-safe', lbl:'✅ Ổn định' },
+    learning: { cls:'risk-caution', lbl:'🧠 Đang học' },
+    degrading: { cls:'risk-danger', lbl:'⚠️ Suy giảm' },
+    new: { cls:'risk-unknown', lbl:'○ Mới' }
+};
+function fmtMs(ms) {
+    if (!ms || ms <= 0) return '\u2014';
+    if (ms < 1000) return ms + 'ms';
+    if (ms < 60000) return Math.round(ms/1000) + 's';
+    return Math.floor(ms/60000) + 'm ' + Math.round((ms%60000)/1000) + 's';
+}
+function renderSession(s) {
+    if (!s) return;
+    document.getElementById('sessDuration').textContent = fmtMs(s.sessionMs);
+    document.getElementById('sessMsg').textContent = s.msgCount || 0;
+    document.getElementById('sessApprove').textContent = s.approveCount || 0;
+    document.getElementById('sessAvgResp').textContent = s.avgResponseMs ? fmtMs(s.avgResponseMs) : '\u2014';
+
+    // AI typing indicator
+    var tr = document.getElementById('aiTypingRow');
+    if (tr) tr.style.display = s.aiTyping ? 'flex' : 'none';
+
+    // Learning health badge
+    var hb = document.getElementById('healthBadge');
+    if (hb && s.learningHealth) {
+        var hc = HEALTH_CFG[s.learningHealth] || HEALTH_CFG['new'];
+        hb.className = 'risk ' + hc.cls;
+        hb.textContent = hc.lbl;
+    }
+
+    // Tool breakdown bars
+    var bd = document.getElementById('toolBreakdown');
+    if (bd && s.toolBreakdown && Object.keys(s.toolBreakdown).length > 0) {
+        var entries = Object.entries(s.toolBreakdown).sort(function(a,b){ return b[1].count - a[1].count; });
+        var maxCount = entries[0][1].count;
+        var h = '';
+        entries.forEach(function(e) {
+            var tool = e[0], td = e[1];
+            var pct = maxCount > 0 ? Math.round(td.count / maxCount * 100) : 0;
+            var col = TOOL_COLORS[tool] || 'var(--text2)';
+            var avgMs = td.count > 0 ? Math.round(td.totalMs / td.count) : 0;
+            h += '<div class="bar-row">';
+            h += '<span class="bar-lbl" style="color:' + col + '">' + tool + '</span>';
+            h += '<div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div>';
+            h += '<span class="bar-cnt" style="min-width:50px">' + td.count + (avgMs ? ' \u00b7 ' + fmtMs(avgMs) : '') + '</span>';
+            h += '</div>';
+        });
+        bd.innerHTML = h;
+    }
+}
+
+/* ── Terminal log rendering ── */
+var _lastTermKey = null;
+function renderTermLog(log) {
+    var el = document.getElementById('termLogList');
+    if (!el) return;
+    if (!log || !log.length) { if (_lastTermKey !== '') { _lastTermKey = ''; el.innerHTML = '<div class="log-empty">\u2014</div>'; } return; }
+    var key = (log[0] && (log[0].time + log[0].cmd)) || '';
+    if (_lastTermKey === key) return;
+    var isNew = _lastTermKey !== null;
+    _lastTermKey = key;
+    var h = '';
+    var srcColors = { 'shell':'var(--green)', 'agent':'var(--teal)', 'ui':'var(--text2)', 'ui-scan':'var(--text3)' };
+    log.forEach(function(t, i) {
+        var cls = (i === 0 && isNew) ? ' log-new' : '';
+        var col = srcColors[t.source] || 'var(--text2)';
+        h += '<div class="log-item' + cls + '">';
+        h += '<span style="color:' + col + ';font-family:monospace;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + (t.cmd || '').slice(0, 80) + '</span>';
+        h += '<span style="color:var(--text3);font-size:9px;white-space:nowrap;margin-left:4px">' + (t.source || '') + ' ' + (t.time || '') + '</span>';
+        h += '</div>';
+    });
+    el.innerHTML = h;
+    el.scrollTop = 0;
 }
 
 /* ── Message handler ── */
@@ -434,6 +566,12 @@ window.addEventListener('message', function(e) {
     var m = e.data;
     if (m.command === 'statsUpdated') { document.getElementById('totalCount').textContent = m.totalClicks || 0; document.getElementById('statTotal').textContent = m.totalClicks || 0; renderBars(m.stats || {}); }
     if (m.command === 'logUpdated') renderLog(m.log);
+    if (m.command === 'termLogUpdated') renderTermLog(m.termLog);
+    if (m.command === 'sessionUpdated') renderSession(m.session);
+    if (m.command === 'quotaDetected') {
+        var hb = document.getElementById('healthBadge');
+        if (hb) { hb.className = 'risk risk-danger'; hb.textContent = '\u26a0 Quota Hit'; }
+    }
     if (m.command === 'brainUpdated') {
         document.getElementById('brainEpoch').textContent = m.epoch || 0;
         document.getElementById('brainTracking').textContent = m.tracking || 0;
@@ -446,6 +584,8 @@ window.addEventListener('message', function(e) {
         document.getElementById('wikiContradictions').textContent = m.wikiContradictions || 0;
         if (m.concepts) renderConcepts(m.concepts);
         if (m.wikiLog) renderWikiLog(m.wikiLog);
+        if (m.session) renderSession(m.session);
+        if (m.termLog) renderTermLog(m.termLog);
     }
 });
 vscode.postMessage({ command: 'getStats' });
