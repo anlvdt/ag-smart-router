@@ -2,7 +2,7 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "Autopilot cho Antigravity AI. Auto-approve, auto-scroll, quota radar, AI learning engine.",
-    "version": "1.0.4",
+    "version": "2.1.0",
     "icon": "icons/icon.png",
     "publisher": "ANLE",
     "repository": {
@@ -12,21 +12,57 @@
     "engines": {
         "vscode": "^1.60.0"
     },
-    "extensionKind": ["ui"],
-    "categories": ["Other"],
-    "activationEvents": ["onStartupFinished"],
+    "extensionKind": [
+        "ui"
+    ],
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
     "main": "./src/extension.js",
     "contributes": {
         "commands": [
-            { "command": "grav.inject", "title": "Grav: Inject Runtime" },
-            { "command": "grav.eject", "title": "Grav: Eject Runtime" },
-            { "command": "grav.dashboard", "title": "Grav: Dashboard" },
-            { "command": "grav.diagnostics", "title": "Grav: Diagnostics" },
-            { "command": "grav.manageTerminal", "title": "Grav: Manage Terminal Commands (Whitelist/Blacklist)" },
-            { "command": "grav.learnStats", "title": "Grav: View Learning Stats" }
+            {
+                "command": "grav.inject",
+                "title": "Grav: Inject Runtime"
+            },
+            {
+                "command": "grav.eject",
+                "title": "Grav: Eject Runtime"
+            },
+            {
+                "command": "grav.dashboard",
+                "title": "Grav: Dashboard"
+            },
+            {
+                "command": "grav.diagnostics",
+                "title": "Grav: Diagnostics"
+            },
+            {
+                "command": "grav.manageTerminal",
+                "title": "Grav: Manage Terminal Commands (Whitelist/Blacklist)"
+            },
+            {
+                "command": "grav.learnStats",
+                "title": "Grav: View Learning Stats"
+            },
+            {
+                "command": "grav.launchCDP",
+                "title": "Grav: Launch Antigravity with CDP Mode"
+            },
+            {
+                "command": "grav.toggleCDP",
+                "title": "Grav: Toggle CDP Mode (OOPIF Reach)"
+            }
         ],
         "keybindings": [
-            { "command": "grav.dashboard", "key": "ctrl+shift+d", "mac": "cmd+shift+d" }
+            {
+                "command": "grav.dashboard",
+                "key": "ctrl+shift+d",
+                "mac": "cmd+shift+d"
+            }
         ],
         "configuration": {
             "title": "Grav",
@@ -43,8 +79,32 @@
                 },
                 "grav.approvePatterns": {
                     "type": "array",
-                    "items": { "type": "string" },
-                    "default": ["Run", "Allow", "Always Allow", "Keep Waiting", "Continue", "Retry", "Accept all", "Allow in this Session", "Allow in this Workspace", "Always Allow Without Review", "Allow and Review", "Allow and Skip Reviewing Result", "Approve Tool Result", "Approve all", "Keep All Edits", "Keep & Continue", "Keep", "Proceed", "Trust", "Run Task", "Accept & Run", "Accept"],
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "Accept all",
+                        "Accept All",
+                        "Accept",
+                        "Accept & Run",
+                        "Keep All Edits",
+                        "Keep All",
+                        "Keep & Continue",
+                        "Keep",
+                        "Continue",
+                        "Retry",
+                        "Keep Waiting",
+                        "Proceed",
+                        "Run Task",
+                        "Run",
+                        "Allow",
+                        "Allow Once",
+                        "Allow in this Session",
+                        "Allow this conversation",
+                        "Allow and Review",
+                        "Approve Tool Result",
+                        "Approve all"
+                    ],
                     "description": "Danh sách nút tự bấm | Button labels to auto-approve"
                 },
                 "grav.scrollPauseMs": {
@@ -64,19 +124,27 @@
                 },
                 "grav.language": {
                     "type": "string",
-                    "enum": ["vi", "en", "zh"],
+                    "enum": [
+                        "vi",
+                        "en",
+                        "zh"
+                    ],
                     "default": "vi",
                     "description": "Ngôn ngữ | Language"
                 },
                 "grav.terminalWhitelist": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                        "type": "string"
+                    },
                     "default": [],
                     "description": "Lệnh terminal thêm vào whitelist | Additional whitelisted terminal commands"
                 },
                 "grav.terminalBlacklist": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                        "type": "string"
+                    },
                     "default": [],
                     "description": "Lệnh terminal bị chặn | Blocked terminal commands (supports substring & /regex/)"
                 },
@@ -91,11 +159,25 @@
                     "minimum": 1,
                     "maximum": 50,
                     "description": "Số lần approve để suggest whitelist | Approvals needed to suggest whitelisting"
+                },
+                "grav.cdpEnabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Bật CDP mode để reach OOPIF buttons (cần --remote-debugging-port) | Enable CDP for OOPIF reach"
+                },
+                "grav.cdpPort": {
+                    "type": "number",
+                    "default": 9333,
+                    "description": "CDP debug port (mặc định 9333, tránh conflict với Antigravity Browser Control 9222)"
                 }
             }
         }
     },
     "scripts": {
-        "vscode:prepublish": "echo ok"
+        "vscode:prepublish": "echo ok",
+        "test": "node test/run-all.js"
+    },
+    "dependencies": {
+        "ws": "^8.20.0"
     }
 }

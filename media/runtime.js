@@ -22,13 +22,14 @@
         window.removeEventListener('scroll', window.__gravScrollHandler, true);
     }
     if (window.__gravObserver) { try { window.__gravObserver.disconnect(); } catch (_) {} }
+    if (window.__gravApproveObserver) { try { window.__gravApproveObserver.disconnect(); } catch (_) {} }
     window.__gravTimers = [];
 
     // ── Config (injected at build time) ──────────────────────
     var PAUSE_MS   = /*{{PAUSE_MS}}*/7000;
     var APPROVE_MS = /*{{APPROVE_MS}}*/500;
     var SCROLL_MS  = /*{{SCROLL_MS}}*/500;
-    var PATTERNS   = /*{{PATTERNS}}*/["Run", "Allow", "Always Allow", "Keep Waiting", "Continue"];
+    var PATTERNS   = /*{{PATTERNS}}*/["Accept all","Accept All","Accept","Accept & Run","Keep All Edits","Keep All","Keep & Continue","Keep","Continue","Retry","Keep Waiting","Proceed","Run Task","Run","Allow","Allow Once","Allow in this Session","Allow this conversation","Allow and Review","Approve Tool Result","Approve all"];
     var ENABLED    = /*{{ENABLED}}*/true;
 
     window.__gravEnabled       = ENABLED;
@@ -60,6 +61,14 @@
         '.chat-widget',
         '[data-testid*="chat"]',
         '[role="complementary"][class*="panel"]',
+        // Kiro-specific selectors
+        '[id*="kiro"][class*="panel"]',
+        '.kiro-chat-panel',
+        '[class*="agent-panel"]',
+        '[class*="agentic-panel"]',
+        // Generic VS Code chat selectors
+        '[id*="workbench.panel.chat"]',
+        '.interactive-session',
     ];
     function findChatPanel() {
         if (_chatPanel && _chatPanel.isConnected && ++_chatPanelTick < 30) return _chatPanel;
@@ -277,17 +286,20 @@
     window.__gravTimers.push(quotaRadar);
 
     // ═════════════════════════════════════════════════════════
-    //  Module 4: Auto-approve engine
-    //  v2: Optimized for speed — removed AI-typing gate for
-    //  "Accept all" buttons, reduced cooldown, faster scan.
+    //  Module 4: Auto-approve engine v3.0
+    //  Hybrid: MutationObserver (event-driven, ~50ms) + polling fallback
+    //  Features from best-in-class competitors:
+    //    - YazanBaker: MutationObserver event-driven, priority matching, self-healing
+    //    - fhgffy: Multi-tier detection, notification interception
+    //    - timteh: Accessibility tree awareness (aria-label fallback)
+    //    - cotamatcotam: Iframe class-name matching for Antigravity React UI
     // ═════════════════════════════════════════════════════════
-    var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline', 'Reject all'];
-    // Only skip editor merge/diff buttons — NOT chat panel buttons
+    var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline', 'Reject all', 'Reject All'];
     var EDITOR_SKIP  = ['Accept Changes', 'Accept Incoming', 'Accept Current', 'Accept Both', 'Accept Combination'];
+    var NEVER_SKIP = { 'Accept All': 1, 'Accept all': 1, 'Accept & Run': 1, 'Keep All Edits': 1, 'Keep All': 1, 'Keep & Continue': 1 };
 
-    // Cooldown: reduced from 8s to 2s — fast enough to prevent double-click
     var _clickedAt   = new WeakMap();
-    var _COOLDOWN_MS = 2000;
+    var _COOLDOWN_MS = 1500;  // reduced from 2s — faster reaction
 
     // User activity tracking
     var _lastUserClick = 0;
@@ -295,35 +307,30 @@
         if (e.isTrusted) _lastUserClick = Date.now();
     }, true);
 
-    // AI typing state — updated by Module 6
     window.__gravAiTyping = false;
 
-    // Selectors indicating AI is still generating
     var TYPING_SELECTORS = [
-        '[aria-label*="thinking"]',
-        '[aria-label*="generating"]',
-        '[class*=streaming]',
-        '[class*=typing-indicator]',
-        '[class*=loading-dots]',
-        '.codicon-loading',
-        '[data-state="streaming"]',
-        '.chat-widget [class*=spinner]',
-        '.antigravity-agent-side-panel [class*=spinner]',
-        '[class*=progress-indicator]',
-        '[aria-busy="true"]',
+        '[aria-label*="thinking"]', '[aria-label*="generating"]',
+        '[class*=streaming]', '[class*=typing-indicator]', '[class*=loading-dots]',
+        '.codicon-loading', '[data-state="streaming"]',
+        '.chat-widget [class*=spinner]', '.antigravity-agent-side-panel [class*=spinner]',
+        '[class*=progress-indicator]', '[aria-busy="true"]',
+        '[class*=kiro][class*=spinner]', '[class*=agent][class*=loading]',
+        '[class*=agent][class*=thinking]',
     ];
 
-    // Patterns that should ALWAYS be clicked even while AI is typing
-    // These are user-facing approval dialogs that block the AI pipeline
+    // Priority-ordered ALWAYS_CLICK — higher index = higher priority
+    // Inspired by YazanBaker's priority matching: Run > Accept > Always Allow > Allow
     var ALWAYS_CLICK = {
-        'Accept all': 1, 'Allow': 1, 'Run': 1, 'Always Allow': 1,
+        'Run': 1, 'Accept all': 1, 'Accept All': 1, 'Accept': 1, 'Accept & Run': 1,
+        'Always Allow': 1, 'Allow': 1, 'Allow Once': 1,
         'Allow in this Session': 1, 'Allow in this Workspace': 1,
+        'Allow this conversation': 1,
         'Always Allow Without Review': 1, 'Allow and Review': 1,
         'Allow and Skip Reviewing Result': 1,
         'Approve Tool Result': 1, 'Approve all': 1,
-        'Trust': 1, 'Run Task': 1, 'Accept & Run': 1,
-        'Accept': 1, 'Allow Once': 1,
-        'Keep All Edits': 1, 'Keep & Continue': 1, 'Keep': 1,
+        'Trust': 1, 'Run Task': 1,
+        'Keep All Edits': 1, 'Keep All': 1, 'Keep & Continue': 1, 'Keep': 1,
         'Proceed': 1, 'Continue': 1,
     };
 
@@ -335,15 +342,67 @@
         return false;
     }
 
+    /**
+     * Extract button label — multi-strategy (from timteh accessibility approach):
+     * 1. Direct text nodes (most accurate, avoids child element text)
+     * 2. First line of innerText
+     * 3. aria-label attribute
+     * 4. title attribute
+     */
     function labelOf(btn) {
-        var raw = (btn.innerText || btn.textContent || '').trim();
-        var first = raw.split('\n')[0].trim();
-        var aria = (btn.getAttribute('aria-label') || '').trim();
+        // Strategy 1: Direct text nodes only
         var direct = '';
         for (var i = 0; i < btn.childNodes.length; i++) {
             if (btn.childNodes[i].nodeType === 3) direct += btn.childNodes[i].nodeValue || '';
         }
-        return direct.trim() || first || aria;
+        direct = direct.trim();
+        if (direct && direct.length >= 2 && direct.length <= 60) return direct;
+
+        // Strategy 2: First line of visible text
+        var raw = (btn.innerText || btn.textContent || '').trim();
+        var first = raw.split('\n')[0].trim();
+        if (first && first.length >= 2 && first.length <= 60) return first;
+
+        // Strategy 3: aria-label (accessibility tree — from timteh)
+        var aria = (btn.getAttribute('aria-label') || '').trim();
+        if (aria && aria.length >= 2 && aria.length <= 60) return aria;
+
+        // Strategy 4: title attribute
+        var title = (btn.getAttribute('title') || '').trim();
+        if (title && title.length >= 2 && title.length <= 60) return title;
+
+        return '';
+    }
+
+    /**
+     * Word-boundary matching — from YazanBaker.
+     * Prevents false positives: "Running diagnostics" won't match "Run",
+     * but "Run Alt+D" will match "Run".
+     * Uses startsWith + word boundary check.
+     */
+    function matchPattern(text, pattern) {
+        if (text === pattern) return true;
+        if (text.length <= pattern.length) return false;
+        if (text.indexOf(pattern) !== 0) return false;
+        // Word boundary: char after pattern must be space, punctuation, or non-alpha
+        var nextChar = text.charAt(pattern.length);
+        return /[\s\u00a0.,;:!?\-–—()[\]{}|/\\<>'"@#$%^&*+=~`]/.test(nextChar);
+    }
+
+    /**
+     * Match text against all patterns — longest match first with word boundary.
+     * Returns matched pattern or empty string.
+     */
+    function findMatch(text) {
+        var matched = '';
+        var matchLen = 0;
+        for (var p = 0; p < PATTERNS.length; p++) {
+            if (PATTERNS[p].length > matchLen && matchPattern(text, PATTERNS[p])) {
+                matched = PATTERNS[p];
+                matchLen = PATTERNS[p].length;
+            }
+        }
+        return matched;
     }
 
     function hasRejectNearby(btn) {
@@ -354,7 +413,7 @@
                 if (sibs[i] === btn) continue;
                 var t = labelOf(sibs[i]);
                 for (var j = 0; j < REJECT_WORDS.length; j++) {
-                    if (t === REJECT_WORDS[j] || t.indexOf(REJECT_WORDS[j]) === 0) return true;
+                    if (matchPattern(t, REJECT_WORDS[j])) return true;
                 }
             }
             p = p.parentElement;
@@ -362,116 +421,285 @@
         return false;
     }
 
-    // Fast scan: use querySelectorAll instead of deepQuery for speed
-    // deepQuery walks shadow DOM which is very slow on complex UIs
-    var _fastScanSelectors = 'button, vscode-button, a.action-label, [role="button"]';
+    function isEditorButton(btn, text, matched) {
+        var inEditor = btn.closest && (
+            btn.closest('.monaco-diff-editor') || btn.closest('.merge-editor-view') ||
+            btn.closest('.view-zones') || btn.closest('.view-lines')
+        );
+        if (inEditor) {
+            if (text.indexOf('Accept') === 0 && !NEVER_SKIP[matched]) return true;
+        }
+        for (var s = 0; s < EDITOR_SKIP.length; s++) {
+            if (matchPattern(text, EDITOR_SKIP[s])) return true;
+        }
+        return false;
+    }
 
-    var approveEngine = setInterval(function () {
+    /**
+     * Antigravity React UI class matching — from cotamatcotam gist.
+     * Antigravity buttons use Tailwind-like classes: hover:bg-ide-button-hover, bg-ide-button-bac
+     */
+    function isAntigravityButton(btn) {
+        var cls = (btn.className || '').toString();
+        return cls.indexOf('bg-ide-button') !== -1 || cls.indexOf('hover:bg-ide') !== -1;
+    }
+
+    /**
+     * SAFETY GUARD: Extract command text from code block near a Run button.
+     * Walks up DOM tree to find <code>, <pre>, or terminal-like elements.
+     */
+    function extractCommandNearButton(btn) {
+        var container = btn.parentElement;
+        for (var lv = 0; lv < 6 && container; lv++) {
+            var codeEls = container.querySelectorAll('code, pre, [class*=terminal], [class*=command], [class*=shell], [class*=code-block]');
+            for (var ci = codeEls.length - 1; ci >= 0; ci--) {
+                var txt = (codeEls[ci].textContent || '').trim();
+                if (txt.length >= 2 && txt.length <= 2000) return txt;
+            }
+            container = container.parentElement;
+        }
+        return '';
+    }
+
+    /**
+     * SAFETY GUARD: Check if a command matches the danger blacklist.
+     * Returns matched pattern string or null.
+     */
+    var DANGER_BLACKLIST = [
+        'rm -rf /','rm -rf ~','rm -rf *','rm -rf .','rm -rf .git',
+        'rmdir /s /q c:\\','rd /s /q c:\\',
+        'del /f /s /q c:\\','remove-item -recurse -force c:\\',
+        'mkfs','dd if=/dev/zero','dd if=/dev/urandom','dd if=',
+        'wipefs','diskpart','format c:',
+        ':(){:|:&};:','shutdown','reboot','init 0','init 6',
+        'kill -9 -1','killall','stop-computer',
+        'chmod -R 777 /','sudo su','su -',
+        'wget|sh','curl|sh','curl|bash','wget|bash',
+        '| bash','| sh','| zsh',
+        'git push --force','git push -f','git clean -fdx',
+        'drop database','drop table','truncate table',
+        'docker system prune -a --volumes',
+        'npm publish',
+    ];
+
+    function isDangerousCommand(cmdText) {
+        if (!cmdText) return null;
+        var lower = cmdText.toLowerCase().trim();
+        for (var i = 0; i < DANGER_BLACKLIST.length; i++) {
+            var p = DANGER_BLACKLIST[i].toLowerCase().trim();
+            if (p && lower.indexOf(p) !== -1) return DANGER_BLACKLIST[i];
+        }
+        return null;
+    }
+
+    /**
+     * Core scan function — processes a single button element.
+     * Returns { target, matched, text } or null.
+     * Includes SAFETY GUARD: blocks dangerous commands before clicking Run.
+     */
+    function tryButton(b, aiTyping) {
+        // Cooldown
+        var lastClick = _clickedAt.get(b);
+        if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) return null;
+
+        // Visibility — relaxed for overlays/dialogs/notifications
+        if (b.offsetParent === null && b.offsetWidth === 0) {
+            if (!b.closest('[class*=overlay],[class*=popup],[class*=dialog],[class*=notification],[class*=quick-input],[class*=context-view]')) return null;
+        }
+        if (b.disabled) return null;
+
+        var text = labelOf(b);
+        if (!text) return null;
+
+        var matched = findMatch(text);
+        if (!matched) return null;
+
+        // Skip editor merge/diff buttons
+        if (isEditorButton(b, text, matched)) return null;
+
+        // AI typing gate — only click ALWAYS_CLICK patterns during generation
+        if (aiTyping && !ALWAYS_CLICK[matched]) return null;
+
+        // ── SAFETY GUARD: Check command before clicking Run ──
+        if (matched === 'Run' || matched === 'Run Task') {
+            var cmd = extractCommandNearButton(b);
+            if (cmd) {
+                var blocked = isDangerousCommand(cmd);
+                if (blocked) {
+                    _clickedAt.set(b, Date.now()); // cooldown to avoid re-checking
+                    console.warn('[Grav Safety] BLOCKED: ' + cmd.slice(0, 100) + ' (matched: ' + blocked + ')');
+                    bridgePost('/api/command-blocked', { cmd: cmd.slice(0, 500), reason: blocked, ts: Date.now() });
+                    return null; // DO NOT CLICK
+                }
+            }
+        }
+
+        // ALWAYS_CLICK → immediate, or reject-sibling confirmation
+        if (ALWAYS_CLICK[matched] || hasRejectNearby(b)) {
+            return { target: b, matched: matched, text: text };
+        }
+
+        return null;
+    }
+
+    /**
+     * Full scan — called by both MutationObserver and polling fallback.
+     * Multi-layer detection inspired by fhgffy 4-tier approach.
+     */
+    function scanAndClick() {
         if (!window.__gravEnabled) return;
+        if (Date.now() - _lastUserClick < 200) return;
 
         var aiTyping = isAiTyping();
+        var result = null;
 
-        // Gate: User just clicked something (< 300ms ago)
-        if (Date.now() - _lastUserClick < 300) return;
-
-        // Fast scan first (no shadow DOM walk)
-        var btns = document.querySelectorAll(_fastScanSelectors);
-        var target = null, matched = '', text = '';
-
-        for (var i = 0; i < btns.length; i++) {
-            var b = btns[i];
-
-            // Cooldown check
-            var lastClick = _clickedAt.get(b);
-            if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
-
-            // Visibility check (relaxed for overlays/dialogs)
-            if (b.offsetParent === null && !b.closest('[class*=overlay],[class*=popup],[class*=dialog],[class*=notification],[class*=quick-input],[class*=context-view]')) continue;
-
-            text = labelOf(b);
-            if (!text || text.length > 60) continue;
-
-            // Skip editor merge/diff buttons
-            var skip = false;
-            var inEditor = b.closest && (b.closest('.monaco-diff-editor') || b.closest('.merge-editor-view') || b.closest('.view-zones') || b.closest('.view-lines'));
-            if (inEditor) {
-                if (text.indexOf('Accept') === 0) { skip = true; }
-            } else {
-                for (var s = 0; s < EDITOR_SKIP.length; s++) {
-                    if (text.indexOf(EDITOR_SKIP[s]) === 0) { skip = true; break; }
-                }
-            }
-            if (skip) continue;
-
-            // Match against patterns (longest match first)
-            matched = '';
-            var matchLen = 0;
-            for (var p = 0; p < PATTERNS.length; p++) {
-                if ((text === PATTERNS[p] || text.indexOf(PATTERNS[p]) === 0) && PATTERNS[p].length > matchLen) {
-                    matched = PATTERNS[p]; matchLen = PATTERNS[p].length;
-                }
-            }
-            if (!matched) continue;
-
-            // KEY FIX: If AI is typing, only click ALWAYS_CLICK patterns
-            // These are approval dialogs that BLOCK the AI — must click to unblock
-            if (aiTyping && !ALWAYS_CLICK[matched]) continue;
-
-            // All matched patterns with ALWAYS_CLICK → click immediately
-            if (ALWAYS_CLICK[matched]) {
-                target = b; break;
-            }
-            // Others: only if there's a reject sibling (confirms it's a permission dialog)
-            if (hasRejectNearby(b)) { target = b; break; }
+        // ── Layer 1: Fast DOM scan (main document) ──
+        var btns = document.querySelectorAll('button, vscode-button, a.action-label, [role="button"]');
+        for (var i = 0; i < btns.length && !result; i++) {
+            result = tryButton(btns[i], aiTyping);
         }
 
-        // If fast scan missed, try shadow DOM scan (slower, less frequent)
-        if (!target && !aiTyping) {
+        // ── Layer 2: Shadow DOM walk (slower, catches hidden panels) ──
+        if (!result && !aiTyping) {
             var shadowBtns = deepQuery('button, vscode-button, [role="button"]', document);
-            for (var i = 0; i < shadowBtns.length; i++) {
-                var b = shadowBtns[i];
-                var lastClick = _clickedAt.get(b);
-                if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
-                if (b.offsetParent === null) continue;
-                text = labelOf(b);
-                if (!text || text.length > 60) continue;
-                matched = '';
-                var matchLen = 0;
-                for (var p = 0; p < PATTERNS.length; p++) {
-                    if ((text === PATTERNS[p] || text.indexOf(PATTERNS[p]) === 0) && PATTERNS[p].length > matchLen) {
-                        matched = PATTERNS[p]; matchLen = PATTERNS[p].length;
-                    }
-                }
-                if (!matched) continue;
-                if (ALWAYS_CLICK[matched] || hasRejectNearby(b)) { target = b; break; }
+            for (var i = 0; i < shadowBtns.length && !result; i++) {
+                result = tryButton(shadowBtns[i], aiTyping);
             }
         }
 
-        // Accept (chat-only mode)
-        if (!target && window.__gravAcceptChat && !aiTyping) {
-            for (var i = 0; i < btns.length; i++) {
+        // ── Layer 3: Iframe scan — Antigravity OOPIF + same-origin iframes ──
+        if (!result) {
+            try {
+                var iframes = document.querySelectorAll('iframe, webview');
+                for (var fi = 0; fi < iframes.length && !result; fi++) {
+                    try {
+                        var iDoc = iframes[fi].contentDocument || (iframes[fi].contentWindow && iframes[fi].contentWindow.document);
+                        if (!iDoc) continue;
+                        var iBtns = iDoc.querySelectorAll('button, [role="button"], a.action-label');
+                        for (var bi = 0; bi < iBtns.length && !result; bi++) {
+                            result = tryButton(iBtns[bi], aiTyping);
+                        }
+                    } catch (_) { /* cross-origin — skip */ }
+                }
+            } catch (_) {}
+        }
+
+        // ── Layer 4: Antigravity React class matching (cotamatcotam approach) ──
+        if (!result) {
+            try {
+                var iframes = document.querySelectorAll('iframe');
+                for (var fi = 0; fi < iframes.length && !result; fi++) {
+                    try {
+                        var iDoc = iframes[fi].contentDocument || (iframes[fi].contentWindow && iframes[fi].contentWindow.document);
+                        if (!iDoc) continue;
+                        var allBtns = iDoc.querySelectorAll('button');
+                        for (var bi = 0; bi < allBtns.length && !result; bi++) {
+                            var b = allBtns[bi];
+                            if (!isAntigravityButton(b)) continue;
+                            if (b.offsetWidth === 0 || b.disabled) continue;
+                            var text = (b.textContent || '').trim().toLowerCase();
+                            if (text.indexOf('accept') !== -1 || text.indexOf('allow') !== -1 ||
+                                text.indexOf('run') !== -1 || text.indexOf('proceed') !== -1) {
+                                var lastClick = _clickedAt.get(b);
+                                if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
+                                var label = (b.textContent || '').trim().split('\n')[0].trim();
+                                var matched = findMatch(label);
+                                if (matched) result = { target: b, matched: matched, text: label };
+                            }
+                        }
+                    } catch (_) {}
+                }
+            } catch (_) {}
+        }
+
+        // ── Layer 5: Chat-only Accept mode ──
+        if (!result && window.__gravAcceptChat && !aiTyping) {
+            var btns = document.querySelectorAll('button, vscode-button, [role="button"]');
+            for (var i = 0; i < btns.length && !result; i++) {
                 var b = btns[i];
                 var lastClick = _clickedAt.get(b);
                 if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
                 if (b.offsetParent === null) continue;
                 var t = labelOf(b);
-                if (t.indexOf('Accept') !== 0 || /^Accept\s+(changes|incoming|current|both|combination)/i.test(t)) continue;
+                if (!matchPattern(t, 'Accept')) continue;
+                if (/^Accept\s+(changes|incoming|current|both|combination)/i.test(t)) continue;
                 if (b.closest && (b.closest('.editor-scrollable') || b.closest('.monaco-diff-editor'))) continue;
-                target = b; matched = 'Accept'; text = t; break;
+                result = { target: b, matched: 'Accept', text: t };
             }
         }
 
-        if (target) {
-            _clickedAt.set(target, Date.now()); // record cooldown timestamp
-            target.click();
-            // Report to host with source tag
-            bridgePost('/api/click-log', { button: text, pattern: matched, source: 'grav' });
+        // ── Execute click ──
+        if (result) {
+            _clickedAt.set(result.target, Date.now());
+            result.target.click();
+            bridgePost('/api/click-log', { button: result.text, pattern: result.matched, source: 'grav' });
             _sessionTotal++;
-            _sessionStats[matched] = (_sessionStats[matched] || 0) + 1;
+            _sessionStats[result.matched] = (_sessionStats[result.matched] || 0) + 1;
         }
-        matched = '';
-    }, APPROVE_MS);
-    window.__gravTimers.push(approveEngine);
+    }
+
+    // ── Primary: MutationObserver-driven detection (from YazanBaker) ──
+    // React instantly when DOM changes instead of polling every 500ms.
+    // Leading-edge throttle at 100ms to prevent CPU spikes during streaming.
+    var _approveFlushTimer = null;
+    var _approveObserver = null;
+    var _approveObserverAlive = true;
+
+    function setupApproveObserver() {
+        try {
+            _approveObserver = new MutationObserver(function () {
+                if (!window.__gravEnabled) return;
+                // Leading-edge throttle: fire immediately, then suppress for 100ms
+                if (!_approveFlushTimer) {
+                    scanAndClick();
+                    _approveFlushTimer = setTimeout(function () { _approveFlushTimer = null; }, 100);
+                }
+            });
+            _approveObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class', 'style', 'aria-label', 'disabled', 'aria-hidden'],
+            });
+            _approveObserverAlive = true;
+            window.__gravApproveObserver = _approveObserver;
+        } catch (_) {
+            _approveObserverAlive = false;
+        }
+    }
+
+    setupApproveObserver();
+
+    // ── Secondary: Polling fallback (catches what MutationObserver misses) ──
+    // Runs at reduced frequency (2s) since MutationObserver handles most cases.
+    // Also serves as self-healing: if observer dies, polling keeps working.
+    var approvePolling = setInterval(function () {
+        if (!window.__gravEnabled) return;
+        scanAndClick();
+    }, Math.max(APPROVE_MS, 1500));  // minimum 1.5s to avoid CPU waste
+    window.__gravTimers.push(approvePolling);
+
+    // ── Self-healing: re-attach observer if it dies (from YazanBaker heartbeat) ──
+    var _healingTick = 0;
+    var healingTimer = setInterval(function () {
+        _healingTick++;
+        // Check every 10s if observer is still alive
+        if (_healingTick % 10 === 0) {
+            if (!_approveObserverAlive || !_approveObserver) {
+                console.log('[Grav] Self-healing: re-attaching approve observer');
+                if (_approveObserver) try { _approveObserver.disconnect(); } catch (_) {}
+                setupApproveObserver();
+            }
+        }
+        // Force re-attach every 5 minutes (webview navigation can silently kill observers)
+        if (_healingTick >= 300) {
+            _healingTick = 0;
+            if (_approveObserver) try { _approveObserver.disconnect(); } catch (_) {}
+            setupApproveObserver();
+            console.log('[Grav] Self-healing: periodic observer refresh');
+        }
+    }, 1000);
+    window.__gravTimers.push(healingTimer);
 
     // ═════════════════════════════════════════════════════════
     //  Module 5: Stick-to-bottom scroll
@@ -827,6 +1055,6 @@
     })();
 
     // ── Boot log ─────────────────────────────────────────────
-    console.log('[Grav] v1.2.0 runtime loaded | Patterns:', JSON.stringify(PATTERNS),
-                '| Chat monitor: ON | Terminal capture: ON | Pattern discovery: ON');
+    console.log('[Grav] v3.0.0 runtime loaded | Patterns:', JSON.stringify(PATTERNS),
+                '| MutationObserver: ON | Self-healing: ON | Chat monitor: ON | Terminal capture: ON | Pattern discovery: ON');
 })();

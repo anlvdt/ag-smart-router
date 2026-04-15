@@ -316,7 +316,7 @@ body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; backgr
 
 <script>
 var vscode = acquireVsCodeApi();
-var ALL_PATTERNS = ['Run','Allow','Accept','Always Allow','Keep Waiting','Retry','Continue','Allow Once','Accept all','Allow in this Session','Allow in this Workspace','Always Allow Without Review','Allow and Review','Allow and Skip Reviewing Result','Approve Tool Result','Approve all','Keep All Edits','Keep & Continue','Keep','Proceed','Trust','Run Task','Accept & Run'];
+var ALL_PATTERNS = ['Accept all','Accept All','Accept','Accept & Run','Keep All Edits','Keep All','Keep & Continue','Keep','Continue','Retry','Keep Waiting','Proceed','Run Task','Run','Allow','Allow Once','Allow in this Session','Allow this conversation','Allow and Review','Approve Tool Result','Approve all','Always Allow','Allow in this Workspace','Always Allow Without Review','Allow and Skip Reviewing Result','Trust','OK','Confirm','Enable Overages'];
 var patterns = {{PATTERNS_JSON}};
 var disabledPatterns = {{DISABLED_JSON}};
 ALL_PATTERNS.forEach(function(p) { if (patterns.indexOf(p) === -1 && disabledPatterns.indexOf(p) === -1) disabledPatterns.push(p); });
@@ -462,12 +462,12 @@ function renderWikiLog(log) {
     var el = document.getElementById('wikiLog');
     if (!log || !log.length) { if (_lastWikiKey !== '') { _lastWikiKey = ''; el.innerHTML = '<div class="log-empty">—</div>'; } return; }
     // Keyed on last entry — log is chronological, last = newest
-    var key = (log[log.length - 1] && (log[log.length - 1].time + log[log.length - 1].cmd)) || '';
+    var key = (log[log.length - 1] && (log[log.length - 1].time + (log[log.length - 1].cmd || log[log.length - 1].op || log[log.length - 1].detail || ''))) || '';
     if (_lastWikiKey === key) return;
     var isNew = _lastWikiKey !== null;
     _lastWikiKey = key;
     var h = '';
-    var opCls = { ingest: 'op-ingest', lint: 'op-lint', approve: 'op-approve', reject: 'op-reject' };
+    var opCls = { ingest: 'op-ingest', lint: 'op-lint', approve: 'op-approve', reject: 'op-reject', msg: 'op-approve' };
     // Reverse for display (newest first)
     log.slice().reverse().forEach(function(l, i) {
         var cls = (i === 0 && isNew) ? ' log-new' : '';
