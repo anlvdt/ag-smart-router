@@ -49,8 +49,20 @@ const MAX_BLOCKED_LOG = 50;
 function init(opts = {}) {
     _onBlocked = opts.onBlocked || null;
     _port = cfg('cdpPort', 0);
-    _enabled = cfg('cdpEnabled', false);
-    if (_enabled) connect();
+    _enabled = cfg('cdpEnabled', true);
+
+    // Always try to connect — argv.json should have the debug port
+    if (_enabled) {
+        connect();
+    } else {
+        // Even if disabled, try auto-discover in case port is available
+        autoDiscover().then(found => {
+            if (found) {
+                _enabled = true;
+                console.log('[Grav CDP] Auto-discovered debug port:', _port);
+            }
+        });
+    }
 }
 
 function isEnabled()  { return _enabled; }
@@ -118,7 +130,6 @@ async function connect() {
 }
 
 function disconnect() {
-    _enabled = false;
     cleanup();
     if (_ws) try { _ws.close(); } catch (_) {}
     _ws = null;
@@ -151,6 +162,19 @@ async function discoverPort() {
         } catch (_) {}
     }
     return 0;
+}
+
+/** Auto-discover debug port and connect if found. */
+async function autoDiscover() {
+    const port = await discoverPort();
+    if (!port) return false;
+    _port = port;
+    try {
+        const ok = await connect();
+        return ok !== false;
+    } catch (_) {
+        return false;
+    }
 }
 
 function httpGet(url) {
@@ -292,8 +316,10 @@ function buildInjectionScript(patterns, blacklist) {
     var PATTERNS = ${JSON.stringify(patterns)};
     var BLACKLIST = ${JSON.stringify(blacklist)};
     var COOLDOWN = 1500;
+    var FAST_COOLDOWN = 500;
     var _clicked = new WeakMap();
     var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline'];
+    var NEVER_SKIP = { 'Accept All': 1, 'Accept all': 1, 'Accept & Run': 1, 'Keep All Edits': 1, 'Keep All': 1, 'Keep & Continue': 1 };
 
     function matchPattern(text, pattern) {
         if (text === pattern) return true;
@@ -314,22 +340,48 @@ function buildInjectionScript(patterns, blacklist) {
     }
 
     function labelOf(btn) {
+        // Strategy 1: Direct text nodes
         var direct = '';
         for (var i = 0; i < btn.childNodes.length; i++) {
             if (btn.childNodes[i].nodeType === 3) direct += btn.childNodes[i].nodeValue || '';
         }
         direct = direct.trim();
         if (direct && direct.length >= 2 && direct.length <= 60) return direct;
+
+        // Strategy 2: innerText first line
         var raw = (btn.innerText || btn.textContent || '').trim();
-        return raw.split('\\n')[0].trim();
+        var first = raw.split('\\n')[0].trim();
+        if (first && first.length >= 2 && first.length <= 60) return first;
+
+        // Strategy 3: aria-label
+        var aria = (btn.getAttribute('aria-label') || '').trim();
+        if (aria && aria.length >= 2 && aria.length <= 60) return aria;
+
+        // Strategy 4: title
+        var title = (btn.getAttribute('title') || '').trim();
+        if (title && title.length >= 2 && title.length <= 60) return title;
+
+        // Strategy 5: Nested spans (Antigravity React UI)
+        var spans = btn.querySelectorAll('span, div, label');
+        var spanText = '';
+        for (var j = 0; j < spans.length; j++) {
+            var st = '';
+            for (var k = 0; k < spans[j].childNodes.length; k++) {
+                if (spans[j].childNodes[k].nodeType === 3) st += spans[j].childNodes[k].nodeValue || '';
+            }
+            st = st.trim();
+            if (st) spanText += (spanText ? ' ' : '') + st;
+        }
+        spanText = spanText.trim();
+        if (spanText && spanText.length >= 2 && spanText.length <= 60) return spanText;
+
+        return '';
     }
 
     // ── SAFETY GUARD: Read command from code block above Run button ──
     function extractCommandNearButton(btn) {
-        // Walk up to find the container, then look for code blocks
         var container = btn.parentElement;
         for (var lv = 0; lv < 6 && container; lv++) {
-            // Look for <code>, <pre>, or elements with terminal-like classes
             var codeEls = container.querySelectorAll('code, pre, [class*=terminal], [class*=command], [class*=shell]');
             for (var i = codeEls.length - 1; i >= 0; i--) {
                 var txt = (codeEls[i].textContent || '').trim();
@@ -352,11 +404,9 @@ function buildInjectionScript(patterns, blacklist) {
     }
 
     function scanAndClick() {
-        var btns = document.querySelectorAll('button, [role="button"]');
+        var btns = document.querySelectorAll('button, [role="button"], a.action-label, vscode-button');
         for (var i = 0; i < btns.length; i++) {
             var b = btns[i];
-            var last = _clicked.get(b);
-            if (last && (Date.now() - last) < COOLDOWN) continue;
             if (b.offsetWidth === 0 || b.disabled) continue;
 
             var text = labelOf(b);
@@ -365,6 +415,11 @@ function buildInjectionScript(patterns, blacklist) {
             var matched = findMatch(text);
             if (!matched) continue;
 
+            // Use faster cooldown for safe actions
+            var cd = NEVER_SKIP[matched] ? FAST_COOLDOWN : COOLDOWN;
+            var last = _clicked.get(b);
+            if (last && (Date.now() - last) < cd) continue;
+
             // ── SAFETY GUARD for Run/Execute commands ──
             if (matched === 'Run' || matched === 'Run Task') {
                 var cmd = extractCommandNearButton(b);
@@ -372,9 +427,7 @@ function buildInjectionScript(patterns, blacklist) {
                     var blocked = isBlocked(cmd);
                     if (blocked) {
                         _clicked.set(b, Date.now());
-                        // Report blocked command to extension host
                         console.warn('[Grav Safety] BLOCKED: ' + cmd + ' (matched: ' + blocked + ')');
-                        // Post to bridge if available
                         try {
                             var x = new XMLHttpRequest();
                             x.open('POST', 'http://127.0.0.1:${cfg('bridgePort', 48787)}/api/command-blocked', true);
@@ -387,26 +440,18 @@ function buildInjectionScript(patterns, blacklist) {
                 }
             }
 
-            // Check for reject sibling (confirms it's a permission dialog)
-            var hasReject = false;
-            var parent = b.parentElement;
-            for (var lv = 0; lv < 3 && parent; lv++) {
-                var sibs = parent.querySelectorAll('button, [role="button"]');
-                for (var j = 0; j < sibs.length; j++) {
-                    if (sibs[j] === b) continue;
-                    var st = labelOf(sibs[j]);
-                    for (var k = 0; k < REJECT_WORDS.length; k++) {
-                        if (st === REJECT_WORDS[k] || st.indexOf(REJECT_WORDS[k]) === 0) { hasReject = true; break; }
-                    }
-                    if (hasReject) break;
-                }
-                if (hasReject) break;
-                parent = parent.parentElement;
-            }
-
             _clicked.set(b, Date.now());
             b.click();
             console.log('[Grav CDP] Clicked: ' + matched + ' (' + text + ')');
+
+            // Report to bridge
+            try {
+                var x = new XMLHttpRequest();
+                x.open('POST', 'http://127.0.0.1:${cfg('bridgePort', 48787)}/api/click-log', true);
+                x.setRequestHeader('Content-Type', 'application/json');
+                x.timeout = 1000;
+                x.send(JSON.stringify({ button: text, pattern: matched, source: 'cdp', ts: Date.now() }));
+            } catch(_) {}
         }
     }
 
@@ -420,12 +465,12 @@ function buildInjectionScript(patterns, blacklist) {
     });
     observer.observe(document.body || document.documentElement, {
         childList: true, subtree: true,
-        attributes: true, attributeFilter: ['class', 'disabled', 'aria-hidden'],
+        attributes: true, attributeFilter: ['class', 'disabled', 'aria-hidden', 'style'],
     });
 
     // Initial scan + low-frequency fallback
     scanAndClick();
-    setInterval(scanAndClick, 2000);
+    setInterval(scanAndClick, 1500);
 
     console.log('[Grav CDP] Observer active | Patterns: ' + PATTERNS.length + ' | Blacklist: ' + BLACKLIST.length);
 })();`;

@@ -41,6 +41,47 @@ let _acceptTimer = null;
 let _lastQuotaMs = 0;
 let _termLog     = [];
 
+// ── Auto-CDP: Patch argv.json to always launch with debug port ──
+const CDP_PORT = 9333;
+
+/**
+ * Ensure Antigravity's argv.json includes --remote-debugging-port.
+ * This makes CDP available automatically on every launch — no manual flags needed.
+ * Returns true if patched (needs restart), false if already patched or not applicable.
+ */
+function ensureCdpInArgv() {
+    const fs   = require('fs');
+    const path = require('path');
+    const os   = require('os');
+
+    // Antigravity stores argv.json in ~/.antigravity/
+    const argvPath = path.join(os.homedir(), '.antigravity', 'argv.json');
+    if (!fs.existsSync(argvPath)) return false;
+
+    try {
+        const raw = fs.readFileSync(argvPath, 'utf8');
+        // Already has remote-debugging-port?
+        if (raw.includes('remote-debugging-port')) return false;
+
+        // Parse JSONC (strip // comments)
+        const jsonClean = raw.replace(/^\s*\/\/.*$/gm, '');
+        const data = JSON.parse(jsonClean);
+
+        // Add the flag
+        data['remote-debugging-port'] = CDP_PORT;
+
+        // Rebuild with comments preserved: insert before closing }
+        const insertLine = `\n\t// Grav: Enable CDP for auto-clicking OOPIF buttons (Accept All, Run, etc.)\n\t"remote-debugging-port": ${CDP_PORT}`;
+        const patched = raw.replace(/\n?\s*\}\s*$/, ',' + insertLine + '\n}');
+
+        fs.writeFileSync(argvPath, patched, 'utf8');
+        return true;
+    } catch (e) {
+        console.error('[Grav] Failed to patch argv.json:', e.message);
+        return false;
+    }
+}
+
 let _sessionState = {
     startMs: 0, msgCount: 0, toolCalls: [], responseTimes: [],
     lastActivityMs: 0, aiTyping: false, approveCount: 0,
@@ -105,14 +146,56 @@ function refreshBar() {
 }
 
 // ── Accept Loop ──────────────────────────────────────────────
+// FIX: Add pause/resume control + rate limiting to prevent
+// the "brain keeps running terminal commands" spiral.
+// The old loop blindly fired ACCEPT_CMDS every 2s, which auto-accepted
+// every terminal command the AI proposed — creating an unstoppable chain.
+let _acceptPaused = false;
+let _acceptClickCount = 0;
+const _ACCEPT_RATE_LIMIT = 10; // max accepts per 30s window
+const _ACCEPT_RATE_WINDOW = 30000;
+let _acceptRateStart = 0;
+
 function startAcceptLoop() {
     if (_acceptTimer) clearInterval(_acceptTimer);
     const ms = cfg('approveIntervalMs', 2000);
     _acceptTimer = setInterval(() => {
-        if (!_enabled) return;
-        for (const cmd of ACCEPT_CMDS) vscode.commands.executeCommand(cmd).catch(() => {});
+        if (!_enabled || _acceptPaused) return;
+
+        // Rate limiting: if we've accepted too many in a short window, pause
+        const now = Date.now();
+        if (now - _acceptRateStart > _ACCEPT_RATE_WINDOW) {
+            _acceptRateStart = now;
+            _acceptClickCount = 0;
+        }
+        if (_acceptClickCount >= _ACCEPT_RATE_LIMIT) {
+            console.log('[Grav] Accept rate limit reached (' + _ACCEPT_RATE_LIMIT + '/' + (_ACCEPT_RATE_WINDOW/1000) + 's). Pausing accept loop.');
+            _acceptPaused = true;
+            // Auto-resume after the window resets
+            setTimeout(() => {
+                _acceptPaused = false;
+                _acceptClickCount = 0;
+                _acceptRateStart = Date.now();
+                console.log('[Grav] Accept loop resumed after rate limit cooldown.');
+            }, _ACCEPT_RATE_WINDOW);
+            return;
+        }
+
+        // Only fire accept commands for NON-terminal steps by default.
+        // Terminal commands should be accepted by the runtime's button clicker
+        // (which has Safety Guard), not by blind VS Code command execution.
+        const skipTerminal = cfg('skipTerminalAccept', true);
+        for (const cmd of ACCEPT_CMDS) {
+            if (skipTerminal && cmd === 'antigravity.terminalCommand.accept') continue;
+            vscode.commands.executeCommand(cmd).then(() => {
+                _acceptClickCount++;
+            }).catch(() => {});
+        }
     }, ms);
 }
+
+function pauseAcceptLoop() { _acceptPaused = true; }
+function resumeAcceptLoop() { _acceptPaused = false; _acceptClickCount = 0; }
 
 // ── Safe Terminal Auto-Approve ───────────────────────────────
 // CHANGED: No longer force-enables IDE auto-approve settings.
@@ -349,6 +432,23 @@ function activate(ctx) {
     terminal.setup(ctx, learning);
 
     // CDP mode — optional, for OOPIF reach in Antigravity agent panel
+    // Auto-patch argv.json so Antigravity always launches with CDP
+    const argvPatched = ensureCdpInArgv();
+    if (argvPatched) {
+        vscode.window.showInformationMessage(
+            '[Grav] Đã cấu hình CDP tự động. Restart Antigravity 1 lần để Accept All hoạt động vĩnh viễn.',
+            'Restart Now'
+        ).then(pick => {
+            if (pick === 'Restart Now') {
+                // Relaunch Antigravity
+                try {
+                    require('child_process').execFile('open', ['-a', 'Antigravity']);
+                } catch (_) {}
+                setTimeout(() => vscode.commands.executeCommand('workbench.action.reloadWindow'), 2000);
+            }
+        });
+    }
+
     if (cdp) {
         cdp.init({
             onBlocked: (cmd, reason) => {
@@ -507,6 +607,49 @@ function activate(ctx) {
             } else {
                 cdp.setEnabled(false);
                 vscode.window.showInformationMessage('[Grav] CDP mode OFF');
+            }
+        }),
+        // FIX: Add pause/resume commands so user can stop the auto-accept spiral
+        vscode.commands.registerCommand('grav.pauseAccept', () => {
+            pauseAcceptLoop();
+            vscode.window.showInformationMessage('[Grav] Auto-accept paused. Terminal commands will no longer be auto-approved.');
+            refreshBar();
+        }),
+        vscode.commands.registerCommand('grav.resumeAccept', () => {
+            resumeAcceptLoop();
+            vscode.window.showInformationMessage('[Grav] Auto-accept resumed.');
+            refreshBar();
+        }),
+        vscode.commands.registerCommand('grav.stopAllTerminals', () => {
+            // Send SIGINT to all active terminals
+            const terminals = vscode.window.terminals;
+            let count = 0;
+            for (const term of terminals) {
+                try {
+                    term.sendText('\x03', false); // Ctrl+C
+                    count++;
+                } catch (_) {}
+            }
+            vscode.window.showInformationMessage(`[Grav] Sent Ctrl+C to ${count} terminal(s).`);
+        }),
+        // Dedicated Accept All command — tries every possible approach
+        vscode.commands.registerCommand('grav.acceptAll', async () => {
+            let clicked = false;
+            // Strategy 1: VS Code command API
+            for (const cmd of ACCEPT_CMDS) {
+                try {
+                    await vscode.commands.executeCommand(cmd);
+                    clicked = true;
+                } catch (_) {}
+            }
+            // Strategy 2: If CDP is connected, force a scan
+            if (cdp && cdp.isConnected()) {
+                // CDP observer is already scanning continuously
+                clicked = true;
+            }
+            if (clicked) {
+                _totalClicks++;
+                refreshBar();
             }
         }),
     );

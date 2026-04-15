@@ -55,6 +55,22 @@
             {
                 "command": "grav.toggleCDP",
                 "title": "Grav: Toggle CDP Mode (OOPIF Reach)"
+            },
+            {
+                "command": "grav.pauseAccept",
+                "title": "Grav: Pause Auto-Accept (Dừng tự bấm)"
+            },
+            {
+                "command": "grav.resumeAccept",
+                "title": "Grav: Resume Auto-Accept (Tiếp tục tự bấm)"
+            },
+            {
+                "command": "grav.stopAllTerminals",
+                "title": "Grav: Stop All Terminals (Ctrl+C tất cả)"
+            },
+            {
+                "command": "grav.acceptAll",
+                "title": "Grav: Force Accept All"
             }
         ],
         "keybindings": [
@@ -62,6 +78,17 @@
                 "command": "grav.dashboard",
                 "key": "ctrl+shift+d",
                 "mac": "cmd+shift+d"
+            },
+            {
+                "command": "grav.pauseAccept",
+                "key": "ctrl+shift+p",
+                "mac": "cmd+shift+p",
+                "when": "false"
+            },
+            {
+                "command": "grav.stopAllTerminals",
+                "key": "ctrl+shift+q",
+                "mac": "cmd+shift+q"
             }
         ],
         "configuration": {
@@ -162,13 +189,18 @@
                 },
                 "grav.cdpEnabled": {
                     "type": "boolean",
-                    "default": false,
-                    "description": "Bật CDP mode để reach OOPIF buttons (cần --remote-debugging-port) | Enable CDP for OOPIF reach"
+                    "default": true,
+                    "description": "Bật CDP mode để reach OOPIF buttons (tự động cấu hình) | Enable CDP for OOPIF reach (auto-configured)"
                 },
                 "grav.cdpPort": {
                     "type": "number",
                     "default": 9333,
                     "description": "CDP debug port (mặc định 9333, tránh conflict với Antigravity Browser Control 9222)"
+                },
+                "grav.skipTerminalAccept": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Bỏ qua auto-accept terminal commands qua VS Code API (để Safety Guard xử lý) | Skip blind terminal accept via API, let runtime Safety Guard handle it"
                 }
             }
         }

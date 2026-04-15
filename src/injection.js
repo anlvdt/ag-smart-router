@@ -155,6 +155,7 @@ function writeRuntimeConfig(ctx) {
         const pats = cfg('approvePatterns', DEFAULT_PATTERNS).filter(p => !dp.includes(p));
         elevatedWrite(path.join(path.dirname(wb), CONFIG_FILE), JSON.stringify({
             enabled: cfg('enabled', true),
+            scrollEnabled: cfg('autoScroll', true),
             patterns: pats,
             acceptInChatOnly: cfg('approvePatterns', []).includes('Accept') && !dp.includes('Accept'),
             pauseMs: cfg('scrollPauseMs', 7000),

@@ -300,6 +300,7 @@
 
     var _clickedAt   = new WeakMap();
     var _COOLDOWN_MS = 1500;  // reduced from 2s — faster reaction
+    var _FAST_COOLDOWN_MS = 500; // faster cooldown for safe actions like Accept All
 
     // User activity tracking
     var _lastUserClick = 0;
@@ -348,6 +349,7 @@
      * 2. First line of innerText
      * 3. aria-label attribute
      * 4. title attribute
+     * 5. Deep text from nested spans (Antigravity React UI)
      */
     function labelOf(btn) {
         // Strategy 1: Direct text nodes only
@@ -370,6 +372,21 @@
         // Strategy 4: title attribute
         var title = (btn.getAttribute('title') || '').trim();
         if (title && title.length >= 2 && title.length <= 60) return title;
+
+        // Strategy 5: Concatenate text from all nested spans/divs
+        // Antigravity React UI often wraps button text in <span> inside <span>
+        var spans = btn.querySelectorAll('span, div, label');
+        var spanText = '';
+        for (var j = 0; j < spans.length; j++) {
+            var st = '';
+            for (var k = 0; k < spans[j].childNodes.length; k++) {
+                if (spans[j].childNodes[k].nodeType === 3) st += spans[j].childNodes[k].nodeValue || '';
+            }
+            st = st.trim();
+            if (st) spanText += (spanText ? ' ' : '') + st;
+        }
+        spanText = spanText.trim();
+        if (spanText && spanText.length >= 2 && spanText.length <= 60) return spanText;
 
         return '';
     }
@@ -422,12 +439,16 @@
     }
 
     function isEditorButton(btn, text, matched) {
+        // NEVER skip buttons that are explicitly in NEVER_SKIP
+        // (Accept All, Accept & Run, Keep All Edits, etc.)
+        if (NEVER_SKIP[matched]) return false;
+
         var inEditor = btn.closest && (
             btn.closest('.monaco-diff-editor') || btn.closest('.merge-editor-view') ||
             btn.closest('.view-zones') || btn.closest('.view-lines')
         );
         if (inEditor) {
-            if (text.indexOf('Accept') === 0 && !NEVER_SKIP[matched]) return true;
+            if (text.indexOf('Accept') === 0) return true;
         }
         for (var s = 0; s < EDITOR_SKIP.length; s++) {
             if (matchPattern(text, EDITOR_SKIP[s])) return true;
@@ -498,10 +519,6 @@
      * Includes SAFETY GUARD: blocks dangerous commands before clicking Run.
      */
     function tryButton(b, aiTyping) {
-        // Cooldown
-        var lastClick = _clickedAt.get(b);
-        if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) return null;
-
         // Visibility — relaxed for overlays/dialogs/notifications
         if (b.offsetParent === null && b.offsetWidth === 0) {
             if (!b.closest('[class*=overlay],[class*=popup],[class*=dialog],[class*=notification],[class*=quick-input],[class*=context-view]')) return null;
@@ -513,6 +530,11 @@
 
         var matched = findMatch(text);
         if (!matched) return null;
+
+        // Use faster cooldown for safe actions (Accept All, Keep All, etc.)
+        var cooldown = NEVER_SKIP[matched] ? _FAST_COOLDOWN_MS : _COOLDOWN_MS;
+        var lastClick = _clickedAt.get(b);
+        if (lastClick && (Date.now() - lastClick) < cooldown) return null;
 
         // Skip editor merge/diff buttons
         if (isEditorButton(b, text, matched)) return null;
@@ -560,7 +582,9 @@
         }
 
         // ── Layer 2: Shadow DOM walk (slower, catches hidden panels) ──
-        if (!result && !aiTyping) {
+        // FIX: Don't skip shadow DOM during AI typing — Accept All buttons
+        // can appear in shadow DOM while AI is still generating
+        if (!result) {
             var shadowBtns = deepQuery('button, vscode-button, [role="button"]', document);
             for (var i = 0; i < shadowBtns.length && !result; i++) {
                 result = tryButton(shadowBtns[i], aiTyping);
@@ -703,45 +727,104 @@
 
     // ═════════════════════════════════════════════════════════
     //  Module 5: Stick-to-bottom scroll
+    //  FIX: Only scroll the PRIMARY chat message container,
+    //  not every scrollable element (code blocks, sidebars, etc.)
     // ═════════════════════════════════════════════════════════
     var _wasBottom    = new WeakMap();
     var _justScrolled = new WeakSet();
     var _autoScrolling = false;
+
+    // Selectors for the actual message list / conversation container
+    // These are the ONLY elements we should auto-scroll
+    var MSG_CONTAINER_SELECTORS = [
+        '[class*=messages-container]',
+        '[class*=message-list]',
+        '[class*=conversation-list]',
+        '[class*=chat-messages]',
+        '[class*=interactive-list]',
+        '.interactive-session .monaco-scrollable-element',
+        '[class*=scroller][class*=chat]',
+        '[class*=agent-panel] > [class*=scroll]',
+        '[class*=chat-widget] > [class*=scroll]',
+    ];
+
+    // Elements we should NEVER auto-scroll
+    var SCROLL_BLACKLIST_SELECTORS = [
+        'code', 'pre', '.monaco-editor', '.view-lines',
+        '[class*=code-block]', '[class*=codeBlock]',
+        '[class*=terminal]', '.xterm', '[class*=diff]',
+        '[class*=sidebar]', '[class*=tree-container]',
+        '[class*=explorer]', '[class*=outline]',
+    ];
+
+    function isScrollBlacklisted(el) {
+        for (var i = 0; i < SCROLL_BLACKLIST_SELECTORS.length; i++) {
+            try {
+                if (el.matches && el.matches(SCROLL_BLACKLIST_SELECTORS[i])) return true;
+                if (el.closest && el.closest(SCROLL_BLACKLIST_SELECTORS[i])) return true;
+            } catch (_) {}
+        }
+        return false;
+    }
+
+    function findMainScrollContainer(panel) {
+        // Strategy 1: Try specific message container selectors
+        for (var i = 0; i < MSG_CONTAINER_SELECTORS.length; i++) {
+            try {
+                var el = panel.querySelector(MSG_CONTAINER_SELECTORS[i]);
+                if (el && el.scrollHeight > el.clientHeight) return el;
+            } catch (_) {}
+        }
+        // Strategy 2: Find the LARGEST scrollable child (likely the message area)
+        // but exclude code blocks, terminals, editors, etc.
+        var best = null, bestHeight = 0;
+        var candidates = Array.from(panel.querySelectorAll('*')).filter(function (el) {
+            var s = window.getComputedStyle(el);
+            return el.scrollHeight > el.clientHeight + 50
+                && (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                && el.tagName !== 'TEXTAREA'
+                && !isScrollBlacklisted(el);
+        });
+        for (var j = 0; j < candidates.length; j++) {
+            if (candidates[j].clientHeight > bestHeight) {
+                bestHeight = candidates[j].clientHeight;
+                best = candidates[j];
+            }
+        }
+        return best;
+    }
 
     var scrollEngine = setInterval(function () {
         if (!window.__gravEnabled || !window.__gravScrollEnabled) return;
         var panel = findChatPanel();
         if (!panel) return;
 
-        var scrollables = Array.from(panel.querySelectorAll('*')).filter(function (el) {
-            var s = window.getComputedStyle(el);
-            return el.scrollHeight > el.clientHeight
-                && (s.overflowY === 'auto' || s.overflowY === 'scroll')
-                && el.tagName !== 'TEXTAREA';
-        });
+        var mainScroller = findMainScrollContainer(panel);
+        if (!mainScroller) return;
 
-        if (scrollables.length > 0) {
-            _autoScrolling = true;
-            scrollables.forEach(function (el) {
-                var gap = el.scrollHeight - el.scrollTop - el.clientHeight;
-                var was = _wasBottom.get(el);
-                if (was === undefined) { was = gap <= 150; _wasBottom.set(el, was); }
-                if (was && gap > 5) { _justScrolled.add(el); el.scrollTop = el.scrollHeight; }
-            });
-            setTimeout(function () { _autoScrolling = false; }, 200);
+        _autoScrolling = true;
+        var gap = mainScroller.scrollHeight - mainScroller.scrollTop - mainScroller.clientHeight;
+        var was = _wasBottom.get(mainScroller);
+        if (was === undefined) { was = gap <= 150; _wasBottom.set(mainScroller, was); }
+        if (was && gap > 5) {
+            _justScrolled.add(mainScroller);
+            mainScroller.scrollTop = mainScroller.scrollHeight;
         }
+        setTimeout(function () { _autoScrolling = false; }, 200);
     }, SCROLL_MS);
     window.__gravTimers.push(scrollEngine);
 
     window.__gravScrollHandler = function (e) {
         var el = e.target;
         if (!el || el.nodeType !== 1) return;
-        // Check against all known chat panel selectors
+        // Only track scroll state for elements inside chat panels
         var inPanel = false;
         for (var i = 0; i < CHAT_SELECTORS.length; i++) {
             if (el.closest && el.closest(CHAT_SELECTORS[i])) { inPanel = true; break; }
         }
         if (!inPanel) return;
+        // Ignore scroll events on blacklisted elements (code blocks, etc.)
+        if (isScrollBlacklisted(el)) return;
         if (_justScrolled.has(el)) { _justScrolled.delete(el); return; }
         if (_autoScrolling) return;
         _wasBottom.set(el, (el.scrollHeight - el.scrollTop - el.clientHeight) <= 150);
