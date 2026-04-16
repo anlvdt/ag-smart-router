@@ -21,17 +21,10 @@ const CONFIG_FILE    = 'grav-config.json';
 const PORT_START     = 48787;
 const PORT_END       = 48850;
 
-const ACCEPT_CMDS = Object.freeze([
-    // ── Antigravity native accept commands (chat-safe ONLY) ──
-    // Source: zixfel/ag-auto-click-scroll v8.7 + YazanBaker decompile
-    // ONLY these 2 commands are safe — they only affect the chat panel:
-    'antigravity.agent.acceptAgentStep',          // Chat panel: accept agent step
-    'antigravity.terminalCommand.accept',          // Terminal command accept
-    // REMOVED: 'antigravity.prioritized.supercompleteAccept' — may trigger editor accept
-    // REMOVED: 'antigravity.acceptCompletion' — may trigger editor accept
-    // REMOVED: 'antigravity.prioritized.agentAcceptAllInFile' — EDITOR accept!
-    // REMOVED: 'antigravity.prioritized.agentAcceptFocusedHunk' — EDITOR accept!
-]);
+// Accept commands are now discovered DYNAMICALLY at runtime
+// via vscode.commands.getCommands() — see extension.js discoverAcceptCommands()
+// This ensures compatibility across all Antigravity versions.
+const ACCEPT_CMDS = Object.freeze([]);
 
 const DEFAULT_PATTERNS = Object.freeze([
     // ── Antigravity Agent Panel — Button Labels ──

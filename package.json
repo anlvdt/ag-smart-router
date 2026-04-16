@@ -1,8 +1,8 @@
 {
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
-    "description": "Autopilot cho Antigravity AI. Auto-approve, auto-scroll, quota radar, AI learning engine.",
-    "version": "2.3.1",
+    "description": "Autopilot cho Antigravity AI. CDP-first auto-approve, auto-scroll, safety guard, AI learning engine. Just install and use.",
+    "version": "3.0.1",
     "icon": "icons/icon.png",
     "publisher": "ANLE",
     "repository": {
@@ -48,11 +48,7 @@
                 "command": "grav.learnStats",
                 "title": "Grav: View Learning Stats"
             },
-            {
-                "command": "grav.launchCDP",
-                "title": "Grav: Launch Antigravity with CDP Mode"
-            },
-            {
+{
                 "command": "grav.toggleCDP",
                 "title": "Grav: Toggle CDP Mode (OOPIF Reach)"
             },
