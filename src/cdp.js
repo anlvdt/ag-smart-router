@@ -310,17 +310,13 @@ function isAgentTarget(info) {
     if (type !== 'page' && type !== 'iframe' && type !== 'other'
         && type !== 'webview') return false;
 
-    // ── SKIP: known non-agent webviews (settings, extensions, docs, etc.) ──
-    if (url.startsWith('vscode-file://'))      return false;
-    if (url.startsWith('chrome-extension://')) return false;
-    if (url.startsWith('devtools://'))         return false;
-    if (url.startsWith('http://'))             return false;
-    if (url.startsWith('https://'))            return false;
-    if (url === '' || url === 'about:blank')   return false;
+    // ── Positive match: ANY Antigravity workbench page ──
+    // Agent buttons (Accept All, Run, etc.) live in the main workbench.html,
+    // not in a separate webview. Match all Antigravity workbench pages.
+    if (url.includes('antigravity.app') && url.includes('workbench')) return true;
+    if (url.includes('antigravity') && url.includes('workbench'))    return true;
 
-    // ── SKIP: vscode-webview:// that are NOT agent/chat panels ──
-    // Settings, Extensions, Welcome, Release Notes, etc. all use vscode-webview://
-    // but their URLs contain identifiable keywords we can filter out
+    // ── Positive match: vscode-webview:// inside Antigravity ──
     if (url.startsWith('vscode-webview://')) {
         // Skip known non-agent webviews
         if (url.includes('settings') || url.includes('preferences'))  return false;
@@ -329,31 +325,33 @@ function isAgentTarget(info) {
         if (url.includes('release-notes') || url.includes('releasenotes')) return false;
         if (url.includes('output') || url.includes('terminal'))       return false;
         if (url.includes('markdown') || url.includes('preview'))      return false;
-        if (url.includes('webview-panel') && !url.includes('agent') && !url.includes('chat')) return false;
-
-        // Positive match: agent/chat related webviews
-        if (url.includes('agent') || url.includes('chat') || url.includes('antigravity')) return true;
-
-        // For other vscode-webview:// URLs, accept cautiously
-        // (new Antigravity versions may use different webview IDs)
         return true;
     }
 
     // ── Positive match: Antigravity-specific internal URLs ──
-    if (url.includes('antigravity') && url.includes('webview')) return true;
     if (url.includes('antigravity') && url.includes('agent'))   return true;
     if (url.includes('antigravity') && url.includes('chat'))    return true;
 
-    // Default: reject unknown schemes (safer than accepting everything)
-    return false;
+    // ── SKIP: everything else ──
+    if (url.startsWith('chrome-extension://')) return false;
+    if (url.startsWith('devtools://'))         return false;
+    if (url.startsWith('http://'))             return false;
+    if (url.startsWith('https://'))            return false;
+    if (url === '' || url === 'about:blank')   return false;
+
+    // Default: accept unknown URLs (future-proof for new Antigravity versions)
+    return true;
 }
 
 async function discoverTargets() {
     try {
         await send('Target.setDiscoverTargets', { discover: true });
         const { targetInfos } = await send('Target.getTargets');
+        console.log('[Grav CDP] Found', targetInfos.length, 'targets');
         for (const info of targetInfos) {
-            if (isAgentTarget(info) && !_sessions.has(info.targetId)) {
+            const match = isAgentTarget(info);
+            console.log('[Grav CDP] Target:', info.type, '|', (info.url || '').substring(0, 100), '| match:', match, '| attached:', _sessions.has(info.targetId));
+            if (match && !_sessions.has(info.targetId)) {
                 await attachToTarget(info.targetId, info.url);
             }
         }
@@ -587,27 +585,24 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
         if (!btn.closest) return false;
         // SKIP: Settings, Extensions, and other non-agent panels
         if (btn.closest('[class*=settings]') ||
-            btn.closest('[class*=preference]') ||
-            btn.closest('[class*=extension]') ||
-            btn.closest('[class*=welcome]') ||
-            btn.closest('[class*=walkthrough]') ||
-            btn.closest('[class*=explorer]') ||
-            btn.closest('[class*=search-view]') ||
-            btn.closest('[class*=scm-view]') ||
-            btn.closest('[class*=debug-view]') ||
-            btn.closest('[class*=markers-panel]') ||
-            btn.closest('[class*=output-view]')) {
+            btn.closest('[class*=preference]')) {
             return false;
         }
-        // Check if button is inside something that looks like an agent/chat panel
+        // Since this observer only runs inside agent webviews (OOPIF),
+        // most elements are in agent context. Be permissive here.
         return !!(
             btn.closest('[class*=agent]') ||
             btn.closest('[class*=chat]') ||
+            btn.closest('[class*=panel]') ||
             btn.closest('[class*=dialog]') ||
             btn.closest('[class*=notification]') ||
             btn.closest('[class*=overlay]') ||
             btn.closest('[class*=popup]') ||
-            btn.closest('.react-app-container')
+            btn.closest('[class*=action]') ||
+            btn.closest('[class*=toolbar]') ||
+            btn.closest('[class*=container]') ||
+            btn.closest('.react-app-container') ||
+            btn.closest('body')
         );
     }
 
@@ -661,11 +656,18 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
             // ── VALIDATION: Must prove this is an approval dialog ──
             // Strategy 1: Has a Reject/Cancel sibling nearby (strongest signal)
             var hasReject = hasRejectNearby(b);
-            // Strategy 2: High-confidence pattern + inside agent-like container
-            var isHighConf = HIGH_CONF[matched] && inAgentContext(b);
+            // Strategy 2: High-confidence pattern (these ONLY appear in agent approval contexts)
+            // Since CDP observer only runs inside agent webviews (filtered by isAgentTarget),
+            // we don't need strict container checks — the webview itself IS the agent context.
+            var isHighConf = !!HIGH_CONF[matched];
+            // Strategy 3: Inside an agent-like container (for non-high-conf patterns)
+            var isAgent = inAgentContext(b);
 
             // Must pass at least one validation
-            if (!hasReject && !isHighConf) continue;
+            if (!hasReject && !isHighConf && !isAgent) {
+                report('DEBUG', { skip: matched, text: text, hasReject: hasReject, isHighConf: isHighConf, isAgent: isAgent });
+                continue;
+            }
 
             // ── CLICK ──
             _clicked.add(b);
@@ -824,7 +826,18 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
         var t = setInterval(function() { dismiss(); if (++c > 30) clearInterval(t); }, 1000);
     })();
 
-    report('BOOT', { patterns: PATTERNS.length, blacklist: BLACKLIST.length, scroll: SCROLL_ON });
+    report('BOOT', { patterns: PATTERNS.length, blacklist: BLACKLIST.length, scroll: SCROLL_ON, url: location.href.substring(0, 100) });
+
+    // Debug: log all buttons found on first scan
+    setTimeout(function() {
+        var allBtns = document.querySelectorAll('button, [role="button"], a.action-label, vscode-button');
+        var labels = [];
+        for (var i = 0; i < allBtns.length && i < 30; i++) {
+            var l = labelOf(allBtns[i]);
+            if (l) labels.push(l);
+        }
+        report('DEBUG', { buttonCount: allBtns.length, labels: labels });
+    }, 3000);
 })();`;
 }
 
