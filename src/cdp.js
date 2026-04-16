@@ -235,10 +235,12 @@ function handleMessage(msg) {
 function isAgentTarget(info) {
     if (!info || !info.url) return false;
     const url = info.url.toLowerCase();
-    // Only attach to vscode-webview:// targets — never to external pages
+    // Antigravity agent panel runs in vscode-webview:// OOPIF targets
+    // Only attach to these — never to external pages or browser sub-agent targets
     if (!url.startsWith('vscode-webview://')) return false;
     if (info.type !== 'page') return false;
     // Reject targets that look like external URLs embedded in webviews
+    // (e.g. Antigravity Browser Control opens real web pages)
     if (url.includes('http://') || url.includes('https://')) return false;
     return true;
 }
@@ -318,6 +320,7 @@ function buildInjectionScript(patterns, blacklist) {
     var COOLDOWN = 1500;
     var FAST_COOLDOWN = 500;
     var _clicked = new WeakMap();
+    var _expandedOnce = new WeakSet();  // Expand button loop prevention (YazanBaker v3.5.1)
     var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline'];
     var NEVER_SKIP = { 'Accept All': 1, 'Accept all': 1, 'Accept & Run': 1, 'Keep All Edits': 1, 'Keep All': 1, 'Keep & Continue': 1 };
 
@@ -404,6 +407,14 @@ function buildInjectionScript(patterns, blacklist) {
     }
 
     function scanAndClick() {
+        // ── Antigravity Webview Guard (from YazanBaker) ──
+        // Antigravity agent panel uses React — check .react-app-container exists
+        // This avoids clicking buttons in non-agent webviews (settings, extensions, etc.)
+        // Check is deferred (not at injection time) to handle React hydration race
+        if (!document.querySelector('.react-app-container') &&
+            !document.querySelector('[class*=agent-panel]') &&
+            !document.querySelector('[class*=chat-panel]')) return;
+
         var btns = document.querySelectorAll('button, [role="button"], a.action-label, vscode-button');
         for (var i = 0; i < btns.length; i++) {
             var b = btns[i];
@@ -419,6 +430,13 @@ function buildInjectionScript(patterns, blacklist) {
             var cd = NEVER_SKIP[matched] ? FAST_COOLDOWN : COOLDOWN;
             var last = _clicked.get(b);
             if (last && (Date.now() - last) < cd) continue;
+
+            // ── Expand Button Loop Prevention (from YazanBaker v3.5.1) ──
+            // Expand buttons use click-once-per-session to prevent infinite overlay re-open
+            if (matched === 'Expand') {
+                if (_expandedOnce.has(b)) continue;
+                _expandedOnce.add(b);
+            }
 
             // ── SAFETY GUARD for Run/Execute commands ──
             if (matched === 'Run' || matched === 'Run Task') {
@@ -441,7 +459,22 @@ function buildInjectionScript(patterns, blacklist) {
             }
 
             _clicked.set(b, Date.now());
-            b.click();
+            // Primary: standard .click()
+            try { b.click(); } catch(_) {}
+            // Fallback: dispatch full mouse event sequence for Antigravity React UI
+            // React uses SyntheticEvent system — sometimes ignores bare .click()
+            try {
+                var rect = b.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 2;
+                ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(function(type) {
+                    var Ctor = type.indexOf('pointer') === 0 ? PointerEvent : MouseEvent;
+                    b.dispatchEvent(new Ctor(type, {
+                        bubbles: true, cancelable: true, view: window,
+                        clientX: cx, clientY: cy, button: 0, isPrimary: true
+                    }));
+                });
+            } catch(_) {}
             console.log('[Grav CDP] Clicked: ' + matched + ' (' + text + ')');
 
             // Report to bridge

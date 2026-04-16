@@ -319,11 +319,52 @@ Thay đổi: Settings → `grav.language` hoặc trong Dashboard footer.
 
 ---
 
-## Credits
+## Credits & Tham khảo mã nguồn
 
-- AI Learning Engine lấy cảm hứng từ [Andrej Karpathy](https://karpathy.ai):
-  - "A Recipe for Training Neural Networks" (2019)
-  - "LLM Wiki" / Second Brain pattern (2026)
+Grav được xây dựng dựa trên nghiên cứu và tham khảo từ nhiều dự án mã nguồn mở trong cộng đồng Antigravity auto-accept. Dưới đây là danh sách đầy đủ:
+
+### Mã nguồn tham khảo chính
+
+- **[zixfel/ag-auto-click-scroll](https://github.com/zixfelw/ag-auto-click-scroll)** (MIT) — by Zixfel
+  - "Safe Click" pattern: chỉ click button khi có nút Reject/Deny/Cancel bên cạnh (`isApprovalButton()`)
+  - WeakSet one-shot click tracking (mỗi button chỉ click 1 lần, không re-click)
+  - Tách rõ chat-only commands: chỉ dùng `acceptAgentStep` + `terminalCommand.accept`, loại bỏ editor accept commands
+  - `span.cursor-pointer` selector cho Antigravity React buttons
+  - Smart Auto Scroll với MutationObserver + content activity detection
+  - Editor protection: block list `['Accept Changes', 'Accept All', 'Accept Incoming', ...]`
+  - HTTP bridge port discovery (48787-48850) + live config sync
+
+- **[YazanBaker/AntiGravity-AutoAccept](https://github.com/yazanbaker94/AntiGravity-AutoAccept)** (40k+ installs) — by Yazan Baker
+  - CDP (Chrome DevTools Protocol) architecture: WebSocket → Target discovery → MutationObserver injection
+  - Antigravity command IDs từ decompiled source: `antigravity.agent.acceptAgentStep`, `antigravity.terminalCommand.accept`
+  - Priority matching: Run > Accept > Always Allow > Allow
+  - Word-boundary matching (`startsWith` + next char check) tránh false positive
+  - `.react-app-container` Webview Guard — chỉ click trong agent panel React app
+  - Heartbeat self-healing (10s) — tự re-inject observer khi bị kill
+  - Expand button loop prevention (`expandedOnce` Set)
+  - Phát hiện limitation: Antigravity Agent Manager dùng single shared webview, background conversations bị unmount
+
+- **[cotamatcotam/auto-accept.js](https://gist.github.com/cotamatcotam/2b080b7c34a5d07c314a4c2978d7f0cd)** — by cotamatcotam
+  - Antigravity React UI class matching: `hover:bg-ide-button-hover`, `bg-ide-button-bac`
+  - Iframe scanning approach cho Antigravity OOPIF buttons
+
+- **[avilum/antigravity-reverse-engineering](https://gist.github.com/avilum/ae9e694e97a2575a19878a879d72ca07)** — by Avi Lumelsky
+  - Reverse engineering Antigravity binary: ParseToolArgs structs, Cortex state machine
+  - Tool definitions: browser.*, terminal.*, fs.*, search.*, memory.* tools
+  - Cortex step states: GENERATING, PENDING, RUNNING, WAITING, DONE, HALTED, etc.
+
+- **[Ricco6/always-accept-antigravity](https://github.com/Ricco6/always-accept-antigravity)** — by Ricco6
+  - Minimal approach: auto-proceed cho Antigravity terminal commands
+
+- **[timteh/antigravity-autopilot-os](https://marketplace.visualstudio.com/items?itemName=timteh.antigravity-autopilot-os)** — by timteh
+  - OS-level UI Automation approach (accessibility tree) — không dùng CDP
+  - `aria-label` fallback strategy cho button label extraction
+
+### AI Learning Engine
+
+- **[Andrej Karpathy](https://karpathy.ai)**:
+  - "A Recipe for Training Neural Networks" (2019) — SGD + Momentum training loop
+  - "LLM Wiki" / Second Brain pattern (2026) — persistent knowledge base
   - RLVR — Reinforcement Learning from Verifiable Rewards (2025)
 
 ---

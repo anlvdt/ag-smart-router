@@ -22,22 +22,37 @@ const PORT_START     = 48787;
 const PORT_END       = 48850;
 
 const ACCEPT_CMDS = Object.freeze([
-    'antigravity.agent.acceptAgentStep',
-    'antigravity.prioritized.supercompleteAccept',
-    'antigravity.terminalCommand.accept',
-    'antigravity.acceptCompletion',
+    // ── Antigravity native accept commands (chat-safe ONLY) ──
+    // Source: zixfel/ag-auto-click-scroll v8.7 + YazanBaker decompile
+    // ONLY these 2 commands are safe — they only affect the chat panel:
+    'antigravity.agent.acceptAgentStep',          // Chat panel: accept agent step
+    'antigravity.terminalCommand.accept',          // Terminal command accept
+    // REMOVED: 'antigravity.prioritized.supercompleteAccept' — may trigger editor accept
+    // REMOVED: 'antigravity.acceptCompletion' — may trigger editor accept
+    // REMOVED: 'antigravity.prioritized.agentAcceptAllInFile' — EDITOR accept!
+    // REMOVED: 'antigravity.prioritized.agentAcceptFocusedHunk' — EDITOR accept!
 ]);
 
 const DEFAULT_PATTERNS = Object.freeze([
+    // ── Antigravity Agent Panel — Button Labels ──
+    // Source: YazanBaker priority matching + cotamatcotam iframe scan + Antigravity UI decompile
+    //
+    // Priority order (higher = matched first when multiple buttons visible):
+    //   Run > Accept > Always Allow > Allow > Continue > Retry
+    //
     // === SAFE: File edits — accept code changes, revertible ===
     'Accept all', 'Accept All', 'Accept', 'Accept & Run',
     'Keep All Edits', 'Keep All', 'Keep & Continue', 'Keep',
     // === SAFE: Agent flow — continue/retry execution ===
     'Continue', 'Retry', 'Keep Waiting', 'Proceed', 'Run Task',
     // === CAUTION: Per-request permissions (Safety Guard protects Run) ===
+    // "Run" button appears above terminal code blocks in Antigravity agent panel
+    // Safety Guard reads the command text from the <code> block before clicking
     'Run', 'Allow', 'Allow Once',
     'Allow in this Session', 'Allow this conversation',
     'Allow and Review', 'Approve Tool Result', 'Approve all',
+    // === Antigravity-specific: Agent Manager / Cortex step buttons ===
+    'Approve', 'Expand',
     // === RISKY: Permanent/billing — disabled by default ===
     'Always Allow', 'Allow in this Workspace',
     'Always Allow Without Review', 'Allow and Skip Reviewing Result',

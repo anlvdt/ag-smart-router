@@ -47,7 +47,6 @@ function elevatedWrite(fp, content) {
         vscode.env.appRoot,                    // IDE installation
         os.tmpdir(),                           // temp files
         path.join(os.homedir(), '.antigravity'), // Antigravity config
-        path.join(os.homedir(), '.kiro'),       // Kiro config
     ];
     const inAllowed = allowedRoots.some(root => resolved.startsWith(path.resolve(root)));
     if (!inAllowed) throw new Error(`Path outside allowed directories: ${fp}`);

@@ -55,15 +55,16 @@
     /** Find chat panel with multi-selector fallback */
     var _chatPanel = null, _chatPanelTick = 0;
     var CHAT_SELECTORS = [
+        // Antigravity agent panel (primary target)
         '.antigravity-agent-side-panel',
         '[id*="antigravity"][class*="panel"]',
+        '.react-app-container',                    // Antigravity React root (from YazanBaker)
+        // Generic VS Code chat selectors
         '[id*="chat"][class*="panel"]',
         '.chat-widget',
         '[data-testid*="chat"]',
         '[role="complementary"][class*="panel"]',
-        // Kiro-specific selectors
-        '[id*="kiro"][class*="panel"]',
-        '.kiro-chat-panel',
+        // Antigravity agent panel (generic selectors)
         '[class*="agent-panel"]',
         '[class*="agentic-panel"]',
         // Generic VS Code chat selectors
@@ -298,8 +299,8 @@
     var EDITOR_SKIP  = ['Accept Changes', 'Accept Incoming', 'Accept Current', 'Accept Both', 'Accept Combination'];
     var NEVER_SKIP = { 'Accept All': 1, 'Accept all': 1, 'Accept & Run': 1, 'Keep All Edits': 1, 'Keep All': 1, 'Keep & Continue': 1 };
 
-    var _clickedAt   = new WeakMap();
-    var _COOLDOWN_MS = 1500;  // reduced from 2s — faster reaction
+    var _clickedAt   = new WeakSet();   // Track clicked buttons — click once only (like zixfel)
+    var _COOLDOWN_MS = 1500;  // only used for re-scan timing, not re-click
     var _FAST_COOLDOWN_MS = 500; // faster cooldown for safe actions like Accept All
 
     // User activity tracking
@@ -311,28 +312,35 @@
     window.__gravAiTyping = false;
 
     var TYPING_SELECTORS = [
+        // Antigravity agent panel typing indicators
         '[aria-label*="thinking"]', '[aria-label*="generating"]',
         '[class*=streaming]', '[class*=typing-indicator]', '[class*=loading-dots]',
         '.codicon-loading', '[data-state="streaming"]',
-        '.chat-widget [class*=spinner]', '.antigravity-agent-side-panel [class*=spinner]',
+        '.chat-widget [class*=spinner]',
+        '.antigravity-agent-side-panel [class*=spinner]',
+        '.react-app-container [class*=spinner]',     // Antigravity React root
         '[class*=progress-indicator]', '[aria-busy="true"]',
-        '[class*=kiro][class*=spinner]', '[class*=agent][class*=loading]',
+        '[class*=agent][class*=loading]',
         '[class*=agent][class*=thinking]',
     ];
 
-    // Priority-ordered ALWAYS_CLICK — higher index = higher priority
-    // Inspired by YazanBaker's priority matching: Run > Accept > Always Allow > Allow
+    // ALWAYS_CLICK: buttons that are safe to click immediately without
+    // needing a Reject/Deny sibling nearby. These are patterns that ONLY
+    // appear in agent panel approval contexts, never in editor/toolbar.
+    // NOTE: "Run" is NOT here — it must have Reject nearby to be safe
+    // (prevents clicking "Run Python File", "Run Task" in editor toolbar)
     var ALWAYS_CLICK = {
-        'Run': 1, 'Accept all': 1, 'Accept All': 1, 'Accept': 1, 'Accept & Run': 1,
+        'Accept all': 1, 'Accept All': 1, 'Accept': 1, 'Accept & Run': 1,
         'Always Allow': 1, 'Allow': 1, 'Allow Once': 1,
         'Allow in this Session': 1, 'Allow in this Workspace': 1,
         'Allow this conversation': 1,
         'Always Allow Without Review': 1, 'Allow and Review': 1,
         'Allow and Skip Reviewing Result': 1,
-        'Approve Tool Result': 1, 'Approve all': 1,
-        'Trust': 1, 'Run Task': 1,
+        'Approve Tool Result': 1, 'Approve all': 1, 'Approve': 1,
+        'Trust': 1,
         'Keep All Edits': 1, 'Keep All': 1, 'Keep & Continue': 1, 'Keep': 1,
-        'Proceed': 1, 'Continue': 1,
+        'Proceed': 1, 'Continue': 1, 'Retry': 1, 'Keep Waiting': 1,
+        'Expand': 1,
     };
 
     function isAiTyping() {
@@ -443,13 +451,47 @@
         // (Accept All, Accept & Run, Keep All Edits, etc.)
         if (NEVER_SKIP[matched]) return false;
 
-        var inEditor = btn.closest && (
-            btn.closest('.monaco-diff-editor') || btn.closest('.merge-editor-view') ||
-            btn.closest('.view-zones') || btn.closest('.view-lines')
-        );
-        if (inEditor) {
-            if (text.indexOf('Accept') === 0) return true;
+        // ── FIX: Skip ALL buttons outside the agent/chat panel ──
+        // This prevents clicking "Run" in editor toolbar, context menus,
+        // notification toasts, sidebar, terminal tabs, etc.
+        // Only buttons inside the chat/agent panel should be auto-clicked.
+        if (btn.closest) {
+            // Context menus, dropdowns, quick-input (the screenshot bug)
+            if (btn.closest('.context-view') ||
+                btn.closest('.monaco-menu') ||
+                btn.closest('.menubar-menu-container') ||
+                btn.closest('[class*=context-menu]') ||
+                btn.closest('.quick-input-widget') ||
+                btn.closest('[class*=quick-pick]')) return true;
+
+            // Editor toolbar (Run ▶ button at top-right of editor)
+            if (btn.closest('.editor-actions') ||
+                btn.closest('.title-actions') ||
+                btn.closest('.editor-toolbar') ||
+                btn.closest('[class*=editor-group-header]') ||
+                btn.closest('.monaco-toolbar')) return true;
+
+            // Editor area (diff, merge, code)
+            if (btn.closest('.monaco-diff-editor') ||
+                btn.closest('.merge-editor-view') ||
+                btn.closest('.view-zones') ||
+                btn.closest('.view-lines') ||
+                btn.closest('.monaco-editor') ||
+                btn.closest('.editor-scrollable')) return true;
+
+            // Sidebar, panel tabs, terminal
+            if (btn.closest('.sidebar') ||
+                btn.closest('[class*=sidebar]') ||
+                btn.closest('.panel-header') ||
+                btn.closest('.terminal-tab') ||
+                btn.closest('[class*=explorer]') ||
+                btn.closest('[class*=extensions-list]')) return true;
+
+            // Notification toasts (except Accept/Allow patterns)
+            if (btn.closest('.notifications-toasts') && matched === 'Run') return true;
         }
+
+        // Editor-specific Accept patterns (merge/diff)
         for (var s = 0; s < EDITOR_SKIP.length; s++) {
             if (matchPattern(text, EDITOR_SKIP[s])) return true;
         }
@@ -459,10 +501,13 @@
     /**
      * Antigravity React UI class matching — from cotamatcotam gist.
      * Antigravity buttons use Tailwind-like classes: hover:bg-ide-button-hover, bg-ide-button-bac
+     * Also matches .react-app-container buttons (from YazanBaker Webview Guard)
      */
     function isAntigravityButton(btn) {
         var cls = (btn.className || '').toString();
-        return cls.indexOf('bg-ide-button') !== -1 || cls.indexOf('hover:bg-ide') !== -1;
+        return cls.indexOf('bg-ide-button') !== -1 ||
+               cls.indexOf('hover:bg-ide') !== -1 ||
+               cls.indexOf('ide-button') !== -1;
     }
 
     /**
@@ -517,6 +562,12 @@
      * Core scan function — processes a single button element.
      * Returns { target, matched, text } or null.
      * Includes SAFETY GUARD: blocks dangerous commands before clicking Run.
+     *
+     * Safe Click logic (same approach as zixfel/ag-auto-click-scroll):
+     *   A button is safe to click if it's in an approval dialog —
+     *   detected by having a Reject/Deny/Cancel sibling nearby.
+     *   This is more reliable than whitelisting CSS selectors because
+     *   Antigravity can change class names anytime.
      */
     function tryButton(b, aiTyping) {
         // Visibility — relaxed for overlays/dialogs/notifications
@@ -525,19 +576,51 @@
         }
         if (b.disabled) return null;
 
+        // ── BLOCK: Never click inside editor, toolbar, context menu, sidebar ──
+        // (Aligned with zixfel/ag-auto-click-scroll editor protection)
+        if (b.closest) {
+            if (b.closest('.monaco-editor') ||
+                b.closest('.monaco-diff-editor') ||
+                b.closest('.merge-editor-view') ||
+                b.closest('.inline-merge-region') ||
+                b.closest('.merged-editor') ||
+                b.closest('.editor-scrollable') ||
+                b.closest('.editor-actions') ||
+                b.closest('.title-actions') ||
+                b.closest('.monaco-toolbar') ||
+                b.closest('[class*=editor-group-header]') ||
+                b.closest('.view-zones') ||
+                b.closest('.view-lines') ||
+                b.closest('[id*="workbench.parts.editor"]') ||
+                b.closest('.context-view') ||
+                b.closest('.monaco-menu') ||
+                b.closest('.menubar-menu-container') ||
+                b.closest('[class*=context-menu]') ||
+                b.closest('.quick-input-widget') ||
+                b.closest('[class*=quick-pick]') ||
+                b.closest('.sidebar') ||
+                b.closest('[class*=sidebar]') ||
+                b.closest('[class*=explorer]') ||
+                b.closest('[class*=extensions-list]') ||
+                b.closest('.panel-header') ||
+                b.closest('.terminal-tab')) return null;
+        }
+        // Block diff-hunk and revert buttons inside any editor context
+        if (b.classList && (b.classList.contains('diff-hunk-button') ||
+            b.classList.contains('accept') || b.classList.contains('revert'))) {
+            if (b.closest && b.closest('[class*="editor"], [id*="editor"]')) return null;
+        }
+
+        // Already clicked — skip (WeakSet one-shot, like zixfel)
+        if (_clickedAt.has(b)) return null;
+
         var text = labelOf(b);
         if (!text) return null;
+        // Cap text length (zixfel uses 40, we use 60 for longer Antigravity labels)
+        if (text.length > 60) return null;
 
         var matched = findMatch(text);
         if (!matched) return null;
-
-        // Use faster cooldown for safe actions (Accept All, Keep All, etc.)
-        var cooldown = NEVER_SKIP[matched] ? _FAST_COOLDOWN_MS : _COOLDOWN_MS;
-        var lastClick = _clickedAt.get(b);
-        if (lastClick && (Date.now() - lastClick) < cooldown) return null;
-
-        // Skip editor merge/diff buttons
-        if (isEditorButton(b, text, matched)) return null;
 
         // AI typing gate — only click ALWAYS_CLICK patterns during generation
         if (aiTyping && !ALWAYS_CLICK[matched]) return null;
@@ -548,7 +631,7 @@
             if (cmd) {
                 var blocked = isDangerousCommand(cmd);
                 if (blocked) {
-                    _clickedAt.set(b, Date.now()); // cooldown to avoid re-checking
+                    _clickedAt.add(b); // mark as clicked
                     console.warn('[Grav Safety] BLOCKED: ' + cmd.slice(0, 100) + ' (matched: ' + blocked + ')');
                     bridgePost('/api/command-blocked', { cmd: cmd.slice(0, 500), reason: blocked, ts: Date.now() });
                     return null; // DO NOT CLICK
@@ -576,7 +659,7 @@
         var result = null;
 
         // ── Layer 1: Fast DOM scan (main document) ──
-        var btns = document.querySelectorAll('button, vscode-button, a.action-label, [role="button"]');
+        var btns = document.querySelectorAll('button, vscode-button, a.action-label, [role="button"], span.cursor-pointer');
         for (var i = 0; i < btns.length && !result; i++) {
             result = tryButton(btns[i], aiTyping);
         }
@@ -624,8 +707,7 @@
                             var text = (b.textContent || '').trim().toLowerCase();
                             if (text.indexOf('accept') !== -1 || text.indexOf('allow') !== -1 ||
                                 text.indexOf('run') !== -1 || text.indexOf('proceed') !== -1) {
-                                var lastClick = _clickedAt.get(b);
-                                if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
+                                if (_clickedAt.has(b)) continue;
                                 var label = (b.textContent || '').trim().split('\n')[0].trim();
                                 var matched = findMatch(label);
                                 if (matched) result = { target: b, matched: matched, text: label };
@@ -641,8 +723,7 @@
             var btns = document.querySelectorAll('button, vscode-button, [role="button"]');
             for (var i = 0; i < btns.length && !result; i++) {
                 var b = btns[i];
-                var lastClick = _clickedAt.get(b);
-                if (lastClick && (Date.now() - lastClick) < _COOLDOWN_MS) continue;
+                if (_clickedAt.has(b)) continue;
                 if (b.offsetParent === null) continue;
                 var t = labelOf(b);
                 if (!matchPattern(t, 'Accept')) continue;
@@ -654,8 +735,23 @@
 
         // ── Execute click ──
         if (result) {
-            _clickedAt.set(result.target, Date.now());
+            _clickedAt.add(result.target);
+            // Primary: standard .click()
             result.target.click();
+            // Fallback: dispatch full mouse event sequence for frameworks
+            // that ignore synthetic .click() (React, Lit, etc.)
+            try {
+                var rect = result.target.getBoundingClientRect();
+                var cx = rect.left + rect.width / 2;
+                var cy = rect.top + rect.height / 2;
+                ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(function(type) {
+                    var Ctor = type.indexOf('pointer') === 0 ? PointerEvent : MouseEvent;
+                    result.target.dispatchEvent(new Ctor(type, {
+                        bubbles: true, cancelable: true, view: window,
+                        clientX: cx, clientY: cy, button: 0, isPrimary: true
+                    }));
+                });
+            } catch(_) {}
             bridgePost('/api/click-log', { button: result.text, pattern: result.matched, source: 'grav' });
             _sessionTotal++;
             _sessionStats[result.matched] = (_sessionStats[result.matched] || 0) + 1;

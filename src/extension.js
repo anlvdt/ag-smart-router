@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  Grav v2.1.0 — Autopilot for Antigravity / Kiro
+//  Grav v2.1.0 — Autopilot for Antigravity
 //
 //  Modular architecture:
 //    constants.js  — Frozen config & patterns
@@ -48,13 +48,16 @@ const CDP_PORT = 9333;
  * Ensure Antigravity's argv.json includes --remote-debugging-port.
  * This makes CDP available automatically on every launch — no manual flags needed.
  * Returns true if patched (needs restart), false if already patched or not applicable.
+ *
+ * Antigravity stores argv.json in ~/.antigravity/argv.json
+ * Port 9333 is used to avoid conflict with Antigravity's built-in Browser Control (port 9222).
+ * Source: YazanBaker discovery — u/unlike_a_boss confirmed EADDRINUSE on macOS/Linux with 9222.
  */
 function ensureCdpInArgv() {
     const fs   = require('fs');
     const path = require('path');
     const os   = require('os');
 
-    // Antigravity stores argv.json in ~/.antigravity/
     const argvPath = path.join(os.homedir(), '.antigravity', 'argv.json');
     if (!fs.existsSync(argvPath)) return false;
 
@@ -152,7 +155,7 @@ function refreshBar() {
 // every terminal command the AI proposed — creating an unstoppable chain.
 let _acceptPaused = false;
 let _acceptClickCount = 0;
-const _ACCEPT_RATE_LIMIT = 10; // max accepts per 30s window
+const _ACCEPT_RATE_LIMIT = 30; // max accepts per 30s window (was 10 — too aggressive)
 const _ACCEPT_RATE_WINDOW = 30000;
 let _acceptRateStart = 0;
 
