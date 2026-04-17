@@ -132,6 +132,8 @@
     // ═════════════════════════════════════════════════════════
     var REJECT_WORDS = ['Reject','Deny','Cancel','Dismiss',"Don't Allow",'Decline'];
     var EDITOR_SKIP  = ['Accept Changes','Accept Incoming','Accept Current','Accept Both','Accept Combination'];
+    // HIGH_CONF patterns are auto-clicked without requiring reject sibling
+    var HIGH_CONF = {'Accept All':1,'Accept all':1,'Accept & Run':1,'Keep All Edits':1,'Keep All':1,'Keep & Continue':1,'Approve Tool Result':1,'Approve all':1,'Approve All':1};
     var _clickedAt = new WeakSet();
 
     function matchPattern(text, pattern) {
@@ -232,7 +234,9 @@
             var matched = findMatch(text);
             if (!matched) continue;
 
-            if (!hasRejectNearby(b)) continue;
+            // HIGH_CONF patterns are auto-clicked without requiring reject sibling
+            var isHighConf = !!HIGH_CONF[matched];
+            if (!isHighConf && !hasRejectNearby(b)) continue;
 
             _clickedAt.add(b);
             try { b.click(); } catch(_) {}

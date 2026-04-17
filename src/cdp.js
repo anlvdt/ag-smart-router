@@ -573,11 +573,12 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
     var _expandedOnce = new WeakSet();
 
     // HIGH_CONFIDENCE: patterns that ONLY appear in agent approval contexts
-    // These still require reject-sibling OR being inside an agent-like container
+    // These are auto-clicked WITHOUT requiring reject-sibling or container check
+    // because they are unique to agent approval dialogs
     var HIGH_CONF = {
         'Accept All':1,'Accept all':1,'Accept & Run':1,
         'Keep All Edits':1,'Keep All':1,'Keep & Continue':1,
-        'Approve Tool Result':1,'Approve all':1,
+        'Approve Tool Result':1,'Approve all':1,'Approve All':1,
     };
 
     // ── Agent Context Detection (lightweight) ───────────────
@@ -663,8 +664,12 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
             // Strategy 3: Inside an agent-like container (for non-high-conf patterns)
             var isAgent = inAgentContext(b);
 
-            // Must pass at least one validation
-            if (!hasReject && !isHighConf && !isAgent) {
+            // HIGH_CONF patterns are auto-clicked without additional validation
+            // (they only appear in agent approval contexts)
+            if (isHighConf) {
+                // Proceed to click — no further validation needed
+            } else if (!hasReject && !isAgent) {
+                // Non-high-conf patterns need either reject sibling or agent context
                 report('DEBUG', { skip: matched, text: text, hasReject: hasReject, isHighConf: isHighConf, isAgent: isAgent });
                 continue;
             }
