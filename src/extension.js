@@ -58,33 +58,83 @@ let _sessionState = {
 };
 
 // Status bar
-let _sbMain, _sbClicks, _sbScroll, _sbCdp;
+let _sbMain, _sbScroll, _sbCdp;
+
+// ── Antigravity IDE Detection ────────────────────────────────
+// Grav is designed EXCLUSIVELY for Antigravity IDE (fork of Windsurf/Codeium).
+// It must NOT activate its auto-click/CDP features on VS Code, Cursor, or other IDEs.
+//
+// NOTE: Detection runs inside activate() because vscode.env is not
+// fully populated at module-load time.
+function isAntigravity() {
+    const appName = vscode.env.appName || '';
+    const appRoot = vscode.env.appRoot || '';
+    const lower = (appName + ' ' + appRoot).toLowerCase();
+    // Antigravity IDE identifiers
+    if (lower.includes('antigravity')) return true;
+    // Windsurf (Antigravity's predecessor)
+    if (lower.includes('windsurf')) return true;
+    // Codeium IDE (Windsurf's original name)
+    if (lower.includes('codeium') && !lower.includes('codeium.codeium')) return true;
+    // Check argv.json existence as fallback
+    const argvPath = path.join(os.homedir(), '.antigravity', 'argv.json');
+    if (fs.existsSync(argvPath)) return true;
+    return false;
+}
+
+// Evaluated lazily inside activate() — NOT at module load time
+let _isAntigravity = false;
 
 // ── Auto-CDP: Patch argv.json ────────────────────────────────
 function ensureCdpInArgv() {
     try {
-        const argvPath = path.join(os.homedir(), '.antigravity', 'argv.json');
-        if (!fs.existsSync(argvPath)) return false;
+        // Check both Antigravity and Windsurf argv paths
+        const argvCandidates = [
+            path.join(os.homedir(), '.antigravity', 'argv.json'),
+            path.join(os.homedir(), '.windsurf', 'argv.json'),
+        ];
+        let argvPath = null;
+        for (const p of argvCandidates) {
+            if (fs.existsSync(p)) { argvPath = p; break; }
+        }
+        if (!argvPath) return false;
 
         const raw = fs.readFileSync(argvPath, 'utf8');
-        if (raw.includes('remote-debugging-port')) {
-            // Fix: Antigravity only reads string values from argv.json, not numbers.
-            // Replace numeric value with string value if present.
-            if (raw.includes(`"remote-debugging-port": ${CDP_PORT}`) && !raw.includes(`"remote-debugging-port": "${CDP_PORT}"`)) {
+
+        // Check if remote-debugging-port exists with CORRECT string value
+        const portRegex = /"remote-debugging-port"\s*:\s*"?(\d+)"?/;
+        const match = raw.match(portRegex);
+        if (match) {
+            const currentPort = match[1];
+            const isString = raw.includes(`"remote-debugging-port"`) && raw.includes(`"${currentPort}"`);
+
+            // Port exists and is correct string value — no change needed
+            if (currentPort === String(CDP_PORT) && isString) return false;
+
+            // Port exists but wrong format (numeric instead of string) — fix it
+            if (currentPort === String(CDP_PORT) && !isString) {
                 const fixed = raw.replace(
-                    `"remote-debugging-port": ${CDP_PORT}`,
+                    new RegExp(`"remote-debugging-port"\\s*:\\s*${CDP_PORT}`),
                     `"remote-debugging-port": "${CDP_PORT}"`
                 );
                 fs.writeFileSync(argvPath, fixed, 'utf8');
-                return true; // need restart
+                console.log('[Grav] Fixed argv.json: numeric → string port');
+                return true;
             }
-            return false;
+
+            // Port exists but different value — update it
+            const fixed = raw.replace(portRegex, `"remote-debugging-port": "${CDP_PORT}"`);
+            fs.writeFileSync(argvPath, fixed, 'utf8');
+            console.log('[Grav] Updated argv.json port to', CDP_PORT);
+            return true;
         }
 
+        // No remote-debugging-port at all — add it
         // Value MUST be a string — Antigravity's argv parser ignores numbers
         const insertLine = `\n\t// Grav: CDP auto-click (port ${CDP_PORT})\n\t"remote-debugging-port": "${CDP_PORT}"`;
         const patched = raw.replace(/\n?\s*\}\s*$/, ',' + insertLine + '\n}');
         fs.writeFileSync(argvPath, patched, 'utf8');
+        console.log('[Grav] Added CDP port to argv.json');
         return true;
     } catch (e) {
         console.error('[Grav] argv.json patch failed:', e.message);
@@ -102,8 +152,11 @@ async function discoverAcceptCommands() {
                             'edit', 'view', 'list', 'reset', 'clear'];
         _dynamicAcceptCmds = allCmds.filter(c => {
             const lower = c.toLowerCase();
-            // Must contain antigravity or agent
-            if (!lower.includes('antigravity') && !lower.includes('agent')) return false;
+            // Must contain an Antigravity-specific namespace
+            // (antigravity, windsurf, cascade, codeium, or agent)
+            if (!lower.includes('antigravity') && !lower.includes('windsurf') &&
+                !lower.includes('cascade') && !lower.includes('codeium') &&
+                !lower.includes('agent')) return false;
             // Must contain an accept-like action
             if (!lower.includes('accept') && !lower.includes('approve') &&
                 !lower.includes('allow') && !lower.includes('keep')) return false;
@@ -156,14 +209,12 @@ function getSessionSafe() {
 // ── Status Bar ───────────────────────────────────────────────
 function createBar() {
     _sbMain   = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
-    _sbClicks = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
     _sbScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
     _sbCdp    = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10003);
-    _sbMain.command = _sbClicks.command = _sbScroll.command = _sbCdp.command = 'grav.dashboard';
-    _sbClicks.color = '#f9e2af';
-    _ctx.subscriptions.push(_sbMain, _sbClicks, _sbScroll, _sbCdp);
+    _sbMain.command = _sbScroll.command = _sbCdp.command = 'grav.dashboard';
+    _ctx.subscriptions.push(_sbMain, _sbScroll, _sbCdp);
     refreshBar();
-    _sbMain.show(); _sbClicks.show(); _sbScroll.show(); _sbCdp.show();
+    _sbMain.show(); _sbScroll.show(); _sbCdp.show();
 }
 
 function refreshBar() {
@@ -177,10 +228,9 @@ function refreshBar() {
         _sbScroll.color = _scrollOn ? '#94e2d5' : '#f38ba8';
     }
 
-    // Merge CDP clicks + bridge clicks
-    const cdpClicks = cdp ? cdp.getTotalClicks() : 0;
-    const total = _totalClicks + cdpClicks;
-    if (_sbClicks) _sbClicks.text = '$(target) ' + total;
+    // Click count tracked internally but not shown on status bar
+    // const cdpClicks = cdp ? cdp.getTotalClicks() : 0;
+    // const total = _totalClicks + cdpClicks;
 
     if (_sbCdp) {
         const connected = cdp && cdp.isConnected();
@@ -200,12 +250,12 @@ function startAcceptLoop() {
     _acceptTimer = setInterval(() => {
         if (!_enabled || _acceptPaused) return;
 
-        // Use dynamically discovered commands
+        // Fire-and-forget: VS Code API accept commands
+        // NOTE: Do NOT increment _totalClicks here — executeCommand resolves
+        // even when no button was actually clicked. Real click counts come
+        // from CDP observer's [GRAV:CLICK] events and bridge /api/click-log.
         for (const cmd of _dynamicAcceptCmds) {
-            vscode.commands.executeCommand(cmd).then(() => {
-                _totalClicks++;
-                refreshBar();
-            }).catch(() => {});
+            vscode.commands.executeCommand(cmd).catch(() => {});
         }
     }, ms);
 }
@@ -347,6 +397,15 @@ function onSave() {
 // ═════════════════════════════════════════════════════════════
 async function activate(ctx) {
     _ctx = ctx;
+    _isAntigravity = isAntigravity();
+    console.log(`[Grav] Activating — IDE: "${vscode.env.appName}" | appRoot: "${vscode.env.appRoot}" | Antigravity: ${_isAntigravity}`);
+
+    // ── Antigravity-only extension ──
+    if (!_isAntigravity) {
+        console.log('[Grav] Not Antigravity IDE — extension disabled.');
+        return;
+    }
+
     _stats       = ctx.globalState.get('stats', {});
     _totalClicks = ctx.globalState.get('totalClicks', 0);
     _log         = ctx.globalState.get('clickLog', []) || [];
@@ -405,9 +464,24 @@ async function activate(ctx) {
             },
             onChatEvent: onChatEvent,
         });
+
+        // Auto hot-update observers when extension version changes
+        // This ensures new selector/logic changes are applied without manual refresh
+        const currentVer = ctx.extension?.packageJSON?.version || '0';
+        const lastCdpVer = ctx.globalState.get('grav-cdp-version', '0');
+        if (currentVer !== lastCdpVer) {
+            ctx.globalState.update('grav-cdp-version', currentVer);
+            // Delay hot update to let CDP connect first
+            setTimeout(() => {
+                if (cdp.isConnected()) {
+                    console.log('[Grav] Version changed, refreshing observers...');
+                    cdp.hotUpdate();
+                }
+            }, 3000);
+        }
     }
 
-    // ── Injection (FALLBACK for older versions) ──
+    // ── Injection (FALLBACK for older Antigravity versions) ──
     injection.hotUpdateRuntime(ctx);
     const ver     = ctx.extension?.packageJSON?.version || '0';
     const lastVer = ctx.globalState.get('grav-version', '0');
@@ -485,14 +559,37 @@ async function activate(ctx) {
         vscode.commands.registerCommand('grav.diagnostics', async () => {
             const stats = learning.getStats();
             const promoted = learning.getPromotedCommands();
+            const cdpEnabled = cfg('cdpEnabled', true);
+            const cdpPort = cfg('cdpPort', CDP_PORT);
+            let cdpProbe = [];
+            try {
+                if (cdp && cdp.isConnected && cdp.isConnected() && cdp.probeAcceptLike) {
+                    cdpProbe = await cdp.probeAcceptLike();
+                }
+            } catch (_) {}
+            // Count webview targets for diagnostics
+            const lastTargets = cdp && cdp.getLastTargets ? cdp.getLastTargets() : [];
+            const webviewCount = lastTargets.filter(t => (t.url || '').includes('vscode-webview://')).length;
+            const webviewTargets = lastTargets.filter(t => (t.url || '').includes('vscode-webview://')).slice(0, 5);
             const lines = [
-                `Grav v3.0.0`,
+                `Grav v3.3.0`,
                 `Platform: ${process.platform} (${require('os').arch()})`,
                 ``,
                 `── CDP Engine ──`,
+                `Enabled: ${cdpEnabled}  Port: ${cdpPort}`,
                 `Connected: ${cdp ? cdp.isConnected() : 'N/A'}`,
                 `Sessions: ${cdp ? cdp.getSessionCount() : 0}`,
+                `Session urls: ${cdp && cdp.getSessionSummaries ? (cdp.getSessionSummaries().map(s => `${(s.title||'').slice(0,18)}@${(s.url||'').slice(0,50)}`).join(' || ') || 'none') : 'N/A'}`,
+                `WEBVIEW targets: ${webviewCount} (want ≥1 for agent panel)`,
+                `Webview URLs: ${webviewTargets.length > 0 ? webviewTargets.map(t => (t.url || '').slice(0,60)).join(' || ') : 'NONE FOUND - Accept All invisible'}`,
                 `CDP Clicks: ${cdp ? cdp.getTotalClicks() : 0}`,
+                `Last error: ${cdp && cdp.getLastError ? (cdp.getLastError() || 'none') : 'N/A'}`,
+                `Debug: ${cdp && cdp.getDebugState ? JSON.stringify(cdp.getDebugState()) : 'N/A'}`,
+                `Observer labels (sample): ${cdp && cdp.getDebugLog ? (cdp.getDebugLog().find(x => Array.isArray(x.labels))?.labels?.slice(0, 20).join(' | ') || 'none yet') : 'N/A'}`,
+                `Observer accept-like: ${cdp && cdp.getDebugLog ? (cdp.getDebugLog().find(x => Array.isArray(x.acceptLike))?.acceptLike?.slice(0, 30).join(' | ') || 'none') : 'N/A'}`,
+                `CDP probe accept-like: ${Array.isArray(cdpProbe) && cdpProbe.length ? cdpProbe.map(p => `[${(p.url||'').slice(0,60)}] ${p.acceptLike.slice(0,20).join(' | ') || 'none'}`).join(' || ') : 'not run'}`,
+                `CDP all targets: ${lastTargets.length} total`,
+                `CDP targets (sample): ${lastTargets.slice(0, 10).map(t => `${t.type}:${(t.title||'').slice(0,22)}:${(t.url||'').slice(0,40)}`).join(' || ') || 'none'}`,
                 ``,
                 `── Extension Host ──`,
                 `HTTP bridge: ${bridge.getPort() || 'not started'}`,
@@ -557,6 +654,14 @@ async function activate(ctx) {
             cdp.setEnabled(newVal);
             vscode.window.showInformationMessage(`[Grav] CDP ${newVal ? 'ON' : 'OFF'}`);
         }),
+        vscode.commands.registerCommand('grav.refreshObserver', async () => {
+            if (!cdp || !cdp.isConnected()) {
+                vscode.window.showWarningMessage('[Grav] CDP not connected.');
+                return;
+            }
+            cdp.hotUpdate();
+            vscode.window.showInformationMessage('[Grav] Observer refreshed in all sessions.');
+        }),
         vscode.commands.registerCommand('grav.pauseAccept', () => {
             pauseAcceptLoop();
             vscode.window.showInformationMessage('[Grav] Auto-accept paused.');
@@ -583,7 +688,7 @@ async function activate(ctx) {
             if (cdp && cdp.isConnected()) {
                 cdp.hotUpdate();
             }
-            _totalClicks++;
+            // NOTE: Don't blindly increment — real clicks are counted by CDP observer
             refreshBar();
         }),
     );
@@ -591,7 +696,6 @@ async function activate(ctx) {
 
 function deactivate() {
     if (_sbMain)   _sbMain.dispose();
-    if (_sbClicks) _sbClicks.dispose();
     if (_sbScroll) _sbScroll.dispose();
     if (_sbCdp)    _sbCdp.dispose();
     if (_acceptTimer) clearInterval(_acceptTimer);

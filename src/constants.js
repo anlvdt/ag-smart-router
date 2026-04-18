@@ -46,6 +46,9 @@ const DEFAULT_PATTERNS = Object.freeze([
     'Allow and Review', 'Approve Tool Result', 'Approve all',
     // === Antigravity-specific: Agent Manager / Cortex step buttons ===
     'Approve', 'Expand',
+    // === Vietnamese localization (if Antigravity supports Vietnamese UI) ===
+    'Chấp nhận', 'Chấp nhận tất cả', 'Đồng ý', 'Cho phép', 'Tiếp tục',
+    'Chạy', 'Xác nhận', 'Duyệt', 'Giữ lại',
     // === RISKY: Permanent/billing — disabled by default ===
     'Always Allow', 'Allow in this Workspace',
     'Always Allow Without Review', 'Allow and Skip Reviewing Result',
