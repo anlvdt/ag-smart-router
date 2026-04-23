@@ -18,38 +18,38 @@
 'use strict';
 
 const vscode = require('vscode');
-const http   = require('http');
+const http = require('http');
 
 const { DEFAULT_BLACKLIST, DEFAULT_PATTERNS } = require('./constants');
 const { cfg } = require('./utils');
 
 // ── State ────────────────────────────────────────────────────
-let _ws             = null;
-let _enabled        = true;     // Always enabled by default
-let _port           = 0;
-let _msgId          = 0;
-let _sessions       = new Map();  // targetId → { sessionId, alive, lastCheck, url }
-let _heartbeat      = null;
+let _ws = null;
+let _enabled = true;     // Always enabled by default
+let _port = 0;
+let _msgId = 0;
+let _sessions = new Map();  // targetId → { sessionId, alive, lastCheck, url }
+let _heartbeat = null;
 let _reconnectTimer = null;
-let _callbacks      = new Map();  // msgId → { resolve, reject, timer }
-let _blockedLog     = [];
-let _onBlocked      = null;
-let _onClicked      = null;
-let _onChatEvent    = null;
-let _totalClicks    = 0;
-let _clickLog       = [];
-let _lastError      = '';       // last connect/WS error (for diagnostics)
-let _lastPhase      = 'init';   // init|disabled|discoverPort|fetchVersion|connecting|open|closed|error
-let _debugLog       = [];       // observer debug payloads (last N)
+let _callbacks = new Map();  // msgId → { resolve, reject, timer }
+let _blockedLog = [];
+let _onBlocked = null;
+let _onClicked = null;
+let _onChatEvent = null;
+let _totalClicks = 0;
+let _clickLog = [];
+let _lastError = '';       // last connect/WS error (for diagnostics)
+let _lastPhase = 'init';   // init|disabled|discoverPort|fetchVersion|connecting|open|closed|error
+let _debugLog = [];       // observer debug payloads (last N)
 const MAX_DEBUG_LOG = 20;
 let _connectWatchdog = null;
-let _lastTargets    = [];       // last discovered targets (for diagnostics)
+let _lastTargets = [];       // last discovered targets (for diagnostics)
 
-const CDP_PORTS     = [9333, 9222, 9229, 9230, 9234, 9235, 9236];
-const WS_TIMEOUT    = 5000;
-const HEARTBEAT_MS  = 5000;     // 5s — aggressive self-healing
-const RECONNECT_MS  = 3000;     // 3s — fast reconnect
-const MAX_BLOCKED   = 50;
+const CDP_PORTS = [9333, 9222, 9229, 9230, 9234, 9235, 9236];
+const WS_TIMEOUT = 5000;
+const HEARTBEAT_MS = 5000;     // 5s — aggressive self-healing
+const RECONNECT_MS = 3000;     // 3s — fast reconnect
+const MAX_BLOCKED = 50;
 const DEAD_AFTER_MS = 15000;    // prune dead sessions after 15s
 
 let _reconnectAttempts = 0;
@@ -64,17 +64,17 @@ function setPhase(p) {
  * Initialize CDP module — auto-connect immediately.
  */
 function init(opts = {}) {
-    _onBlocked   = opts.onBlocked   || null;
-    _onClicked   = opts.onClicked   || null;
+    _onBlocked = opts.onBlocked || null;
+    _onClicked = opts.onClicked || null;
     _onChatEvent = opts.onChatEvent || null;
-    _port        = cfg('cdpPort', 0);
-    _enabled     = cfg('cdpEnabled', true);
+    _port = cfg('cdpPort', 0);
+    _enabled = cfg('cdpEnabled', true);
 
     // Always attempt to connect — this is the primary mechanism
     connect();
 }
 
-function isEnabled()   { return _enabled; }
+function isEnabled() { return _enabled; }
 function isConnected() { return !!(_ws && _ws.readyState === 1); }
 function getLastError() { return _lastError || ''; }
 function getDebugLog() { return _debugLog; }
@@ -106,7 +106,7 @@ function getDebugState() {
 }
 function getBlockedLog() { return _blockedLog; }
 function getTotalClicks() { return _totalClicks; }
-function getClickLog()   { return _clickLog; }
+function getClickLog() { return _clickLog; }
 function getSessionCount() { return _sessions.size; }
 
 function setEnabled(val) {
@@ -170,11 +170,11 @@ async function connect() {
                         _lastError = 'handshake stuck (watchdog timeout)';
                         setPhase('error');
                         console.error('[Grav CDP] WS stuck in CONNECTING — forcing close');
-                        try { _ws.terminate(); } catch (_) { try { _ws.close(); } catch (_) {} }
+                        try { _ws.terminate(); } catch (_) { try { _ws.close(); } catch (_) { } }
                         cleanup();
                         if (_enabled) scheduleReconnect();
                     }
-                } catch (_) {}
+                } catch (_) { }
             }, WS_TIMEOUT + 1000);
 
             _ws.on('open', () => {
@@ -190,7 +190,7 @@ async function connect() {
             });
 
             _ws.on('message', (data) => {
-                try { handleMessage(JSON.parse(data.toString())); } catch (_) {}
+                try { handleMessage(JSON.parse(data.toString())); } catch (_) { }
             });
 
             _ws.on('close', (code, reason) => {
@@ -226,7 +226,7 @@ async function connect() {
 
 function disconnect() {
     cleanup();
-    if (_ws) try { _ws.close(); } catch (_) {}
+    if (_ws) try { _ws.close(); } catch (_) { }
     _ws = null;
 }
 
@@ -243,7 +243,7 @@ function cleanup() {
     _sessions.clear();
     for (const [, cb] of _callbacks) {
         clearTimeout(cb.timer);
-        try { cb.reject(new Error('closed')); } catch (_) {}
+        try { cb.reject(new Error('closed')); } catch (_) { }
     }
     _callbacks.clear();
 }
@@ -265,7 +265,7 @@ async function discoverPort() {
         try {
             const res = await httpGet(`http://127.0.0.1:${port}/json/version`);
             if (res && res.includes('webSocketDebuggerUrl')) return port;
-        } catch (_) {}
+        } catch (_) { }
     }
     return 0;
 }
@@ -341,20 +341,20 @@ function handleMessage(msg) {
                     // This allows nested OOPIFs (webviews inside webviews) to be discovered
                     send('Target.setAutoAttach', {
                         autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                    }, sessionId).catch(() => {});
+                    }, sessionId).catch(() => { });
                     // Enable domains and inject observer
-                    send('Runtime.enable', {}, sessionId).catch(() => {});
-                    send('DOM.enable', {}, sessionId).catch(() => {});
-                    send('Input.enable', {}, sessionId).catch(() => {});
+                    send('Runtime.enable', {}, sessionId).catch(() => { });
+                    send('DOM.enable', {}, sessionId).catch(() => { });
+                    send('Input.enable', {}, sessionId).catch(() => { });
                     injectObserver(sessionId);
                 }
             } else if (sessionId) {
                 // Even for non-agent targets, enable auto-attach to discover nested webviews
                 send('Target.setAutoAttach', {
                     autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                }, sessionId).catch(() => {});
+                }, sessionId).catch(() => { });
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     if (msg.method === 'Target.detachedFromTarget') {
@@ -421,7 +421,7 @@ function handleConsoleEvent(params) {
         try {
             const data = JSON.parse(payload);
             cdpNativeClick(data.p || '', data.b || '');
-        } catch (_) {}
+        } catch (_) { }
     }
 
     if (type === 'BLOCKED') {
@@ -434,7 +434,7 @@ function handleConsoleEvent(params) {
     }
 
     if (type === 'CHAT' && _onChatEvent) {
-        try { _onChatEvent(JSON.parse(payload)); } catch (_) {}
+        try { _onChatEvent(JSON.parse(payload)); } catch (_) { }
     }
 
     if (type === 'QUOTA') {
@@ -540,7 +540,7 @@ async function cdpNativeClick(pattern, buttonText) {
 function isAgentTarget(info) {
     if (!info) return false;
     const urlRaw = info.url || '';
-    const url  = urlRaw.toLowerCase();
+    const url = urlRaw.toLowerCase();
     const title = (info.title || '').toLowerCase();
     const type = info.type;
 
@@ -548,11 +548,22 @@ function isAgentTarget(info) {
     if (type !== 'page' && type !== 'iframe' && type !== 'other'
         && type !== 'webview') return false;
 
+    // ── Antigravity workbench page (main frame) ──
+    // Agent buttons live in the main workbench — this is where Accept All, Run, etc. appear.
+    // The main workbench MUST ALWAYS BE ACCEPTED. Because the title dynamically changes based
+    // on the active file (e.g., "settings.json - workspace"), we MUST check the URL before
+    // applying the strict title blocklist, otherwise the workbench gets blocked when certain files are open!
+    if (url.includes('antigravity') && url.includes('workbench')) return true;
+    if (url.includes('windsurf') && url.includes('workbench')) return true;
+    if (type === 'page' && url.includes('workbench.html')) return true;
+
     // ══════════════════════════════════════════════════════════
     //  HARD BLOCK LIST — NEVER inject into these targets
     //  These are non-agent panels where clicking would be destructive
     // ══════════════════════════════════════════════════════════
     const BLOCK_URLS = [
+        // Grav dashboard (MUST SKIP — otherwise auto-clicks its own buttons!)
+        'grav', 'gravdashboard', 'grav-dashboard',
         // Settings panels (all variants)
         'settings', 'preferences', 'preference',
         // Browser / Simple Browser panel
@@ -608,32 +619,24 @@ function isAgentTarget(info) {
         return false;
     }
 
-    // ── Antigravity workbench page (main frame) ──
-    // Agent buttons live in the main workbench — this is where Accept All, Run, etc. appear.
-    // The workbench URL is typically: file:///path/to/Antigravity.app/.../workbench.html
-    // On some installs, "antigravity" may not appear in the path, so also match workbench.html directly.
-    if (url.includes('antigravity') && url.includes('workbench')) return true;
-    if (url.includes('windsurf') && url.includes('workbench'))    return true;
-    if (type === 'page' && url.includes('workbench.html'))        return true;
-
     // ── Antigravity-specific internal URLs ──
-    if (url.includes('antigravity') && url.includes('agent'))   return true;
-    if (url.includes('antigravity') && url.includes('chat'))    return true;
+    if (url.includes('antigravity') && url.includes('agent')) return true;
+    if (url.includes('antigravity') && url.includes('chat')) return true;
     if (url.includes('antigravity') && url.includes('cascade')) return true;
-    if (url.includes('antigravity') && url.includes('cortex'))  return true;
+    if (url.includes('antigravity') && url.includes('cortex')) return true;
 
     // ── Windsurf legacy URLs (Antigravity was forked from Windsurf) ──
-    if (url.includes('windsurf') && url.includes('agent'))   return true;
-    if (url.includes('windsurf') && url.includes('chat'))    return true;
+    if (url.includes('windsurf') && url.includes('agent')) return true;
+    if (url.includes('windsurf') && url.includes('chat')) return true;
     if (url.includes('windsurf') && url.includes('cascade')) return true;
-    if (url.includes('codeium') && url.includes('agent'))    return true;
-    if (url.includes('codeium') && url.includes('chat'))     return true;
+    if (url.includes('codeium') && url.includes('agent')) return true;
+    if (url.includes('codeium') && url.includes('chat')) return true;
 
     // ── SKIP: everything else ──
     if (url.startsWith('chrome-extension://')) return false;
-    if (url.startsWith('devtools://'))         return false;
-    if (url.startsWith('http://'))             return false;
-    if (url.startsWith('https://'))            return false;
+    if (url.startsWith('devtools://')) return false;
+    if (url.startsWith('http://')) return false;
+    if (url.startsWith('https://')) return false;
     // url blank handled above
 
     // Default: accept unknown internal URLs (future-proof)
@@ -646,11 +649,37 @@ function isAgentTarget(info) {
 
 async function discoverTargets() {
     try {
-        // Enable auto-attach so OOPIF/webview subtargets become reachable.
-        // This is critical for Antigravity 1.19.6+ where agent UI runs in OOPIF.
+        // ══════════════════════════════════════════════════════════
+        //  CRITICAL: Enable auto-attach BEFORE discovering targets
+        //  This is required for Antigravity 1.19.6+ where agent UI
+        //  runs in OOPIF (Out-of-Process Iframe).
+        //
+        //  Order matters:
+        //  1. setAutoAttach (enables automatic attachment to new targets)
+        //  2. setDiscoverTargets (starts receiving target events)
+        //  3. getTargets (gets current list)
+        //  4. Attach to main pages first (they contain nested webviews)
+        // ══════════════════════════════════════════════════════════
         try {
-            await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
-        } catch (_) {}
+            // Enable auto-attach with flatten=true for OOPIF support
+            await send('Target.setAutoAttach', { 
+                autoAttach: true, 
+                waitForDebuggerOnStart: false, 
+                flatten: true,
+                // CRITICAL: filter parameter helps discover webview targets
+                filter: [
+                    { type: 'page' },
+                    { type: 'iframe' },
+                    { type: 'webview' },
+                    { type: 'other' },
+                ]
+            });
+        } catch (_) {
+            // Fallback without filter (older CDP versions)
+            try {
+                await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+            } catch (_) { }
+        }
         await send('Target.setDiscoverTargets', { discover: true });
         const { targetInfos } = await send('Target.getTargets');
         _lastTargets = (targetInfos || []).map(t => ({
@@ -681,6 +710,26 @@ async function discoverTargets() {
                 await attachToTarget(info.targetId, info.url, info.title || '');
             }
         }
+        
+        // ══════════════════════════════════════════════════════════
+        //  SECOND PASS: Force attach to ALL page targets
+        //  This ensures we discover nested webviews inside main pages.
+        //  Antigravity's agent panel is a webview inside the main workbench.
+        // ══════════════════════════════════════════════════════════
+        for (const info of targetInfos) {
+            if (info.type === 'page' && !_sessions.has(info.targetId)) {
+                try {
+                    const { sessionId } = await send('Target.attachToTarget', {
+                        targetId: info.targetId, flatten: true,
+                    });
+                    // Enable auto-attach on this page to discover nested webviews
+                    await send('Target.setAutoAttach', {
+                        autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
+                    }, sessionId);
+                    console.log('[Grav CDP] Force-attached to page for nested discovery:', info.targetId);
+                } catch (_) { }
+            }
+        }
     } catch (e) {
         console.error('[Grav CDP] Target discovery failed:', e.message);
     }
@@ -704,7 +753,7 @@ async function attachToTarget(targetId, url, title = '') {
             await send('Target.setAutoAttach', {
                 autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
             }, sessionId);
-        } catch (_) {}
+        } catch (_) { }
 
         // Enable Runtime + Console + DOM + Input for this session
         await send('Runtime.enable', {}, sessionId);
@@ -713,10 +762,10 @@ async function attachToTarget(targetId, url, title = '') {
             await send('Runtime.evaluate', {
                 expression: `console.log('[GRAV:DEBUG] ' + JSON.stringify({ ping: 1, ts: Date.now(), url: location && location.href ? String(location.href).slice(0,120) : '' }))`,
             }, sessionId);
-        } catch (_) {}
+        } catch (_) { }
         // DOM + Input needed for CDP native click fallback
-        try { await send('DOM.enable', {}, sessionId); } catch (_) {}
-        try { await send('Input.enable', {}, sessionId); } catch (_) {}
+        try { await send('DOM.enable', {}, sessionId); } catch (_) { }
+        try { await send('Input.enable', {}, sessionId); } catch (_) { }
 
         // Inject the observer
         await injectObserver(sessionId);
@@ -727,9 +776,9 @@ async function attachToTarget(targetId, url, title = '') {
 
 // ── Observer Injection ───────────────────────────────────────
 async function injectObserver(sessionId) {
-    const patterns      = cfg('approvePatterns', DEFAULT_PATTERNS);
+    const patterns = cfg('approvePatterns', DEFAULT_PATTERNS);
     const userBlacklist = cfg('terminalBlacklist', []);
-    const allBlacklist  = [...DEFAULT_BLACKLIST, ...userBlacklist];
+    const allBlacklist = [...DEFAULT_BLACKLIST, ...userBlacklist];
     const scrollEnabled = cfg('autoScroll', true);
     const scrollPauseMs = cfg('scrollPauseMs', 7000);
 
@@ -764,7 +813,7 @@ async function probeAcceptLike() {
             }catch(e){return '';}
         }
         // Prefer prefix match to avoid false positives from long sentences ("Terminal ... run ...")
-        var acceptRe = /^(accept\\s+all|accept|approve|allow|keep|continue|proceed|ok|yes|apply|confirm|agree|run|chấp\\s*nhận|đồng\\s*ý|cho\\s*phép|tiếp\\s*tục|chạy|xác\\s*nhận|duyệt|giữ)\\b/i;
+        var acceptRe = /^(accept\\s+all|accept|approve|retry|proceed|run|expand)\\b/i;
         var sel = 'button,[role=\"button\"],[role=\"menuitem\"],a.action-label,vscode-button,a,[tabindex],span.cursor-pointer,[class*=\"cursor-pointer\"],[class*=\"flux-button\"],[class*=\"flux-action\"],[data-testid*=\"accept\"],[data-testid*=\"approve\"],[class*=\"clickable\"]';
 
         function collectFromRoot(root, into){
@@ -778,13 +827,20 @@ async function probeAcceptLike() {
         // Collect from main doc + open shadow roots + same-origin iframes
         var nodes = [];
         collectFromRoot(document, nodes);
-        try {
-            var all = document.querySelectorAll('*');
-            for (var i=0;i<all.length;i++){
-                var sr = all[i].shadowRoot;
-                if (sr) collectFromRoot(sr, nodes);
-            }
-        } catch(e){}
+        function scanShadow(root) {
+            if (!root) return;
+            try {
+                var all = root.querySelectorAll('*');
+                for (var i=0;i<all.length;i++){
+                    var sr = all[i].shadowRoot;
+                    if (sr) {
+                        collectFromRoot(sr, nodes);
+                        scanShadow(sr);
+                    }
+                }
+            } catch(e){}
+        }
+        scanShadow(document);
         try {
             var iframes = document.querySelectorAll('iframe');
             for (var j=0;j<iframes.length;j++){
@@ -855,7 +911,7 @@ async function probeAcceptLike() {
  */
 function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) {
     // Version tag - increment this when observer logic changes
-    const OBSERVER_VERSION = 'v3.3.0';
+    const OBSERVER_VERSION = 'v3.4.0';
     return `(function() {
     'use strict';
     // Version-based guard: allows new observer to replace old one
@@ -951,10 +1007,25 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
 
     function isBlocked(cmd) {
         if (!cmd) return null;
-        var lower = cmd.toLowerCase();
+        var lower = cmd.toLowerCase().trim();
         for (var i = 0; i < BLACKLIST.length; i++) {
             var p = BLACKLIST[i].toLowerCase().trim();
-            if (p && lower.indexOf(p) !== -1) return BLACKLIST[i];
+            if (!p) continue;
+            var isMulti = p.indexOf(' ') !== -1 || p.indexOf('|') !== -1;
+            if (isMulti) {
+                // Multi-word: check if command starts with pattern or contains it after sudo/separator
+                if (lower.indexOf(p) === 0) return BLACKLIST[i];
+                if (lower.indexOf('sudo ' + p) !== -1) return BLACKLIST[i];
+                if (lower.indexOf('nohup ' + p) !== -1) return BLACKLIST[i];
+                // Check after ; or && or ||
+                var seps = lower.split(/[;&|]+/);
+                for (var j = 0; j < seps.length; j++) {
+                    var seg = seps[j].replace(/^\\s*(sudo|nohup|env)\\s+/g, '').trim();
+                    if (seg.indexOf(p) === 0) return BLACKLIST[i];
+                }
+            }
+            // Single-word patterns: skip in observer Safety Guard
+            // Only multi-word destructive patterns should block Run button
         }
         return null;
     }
@@ -985,12 +1056,21 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
     //    - Editor: .monaco-editor, .monaco-diff-editor
     //    - Browser: .simple-browser, [class*=browser]
     //    - Extensions: .extensions-editor, [class*=extension-editor]
+    //    - Grav Dashboard: .root (Grav's own dashboard)
     //
     //  CRITICAL: We MUST NOT click buttons in Settings, Browser,
-    //  Editor, Extensions — only in agent chat panel.
+    //  Editor, Extensions, or Grav Dashboard — only in agent chat panel.
     // ══════════════════════════════════════════════════════════
     function inEditorContext(btn) {
         if (!btn.closest) return false;
+        
+        // ── Grav Dashboard detection (by page title or root class) ──
+        // Grav dashboard has title "Grav — Dashboard" and uses .root container
+        try {
+            var pageTitle = (document.title || '').toLowerCase();
+            if (pageTitle.indexOf('grav') !== -1 && pageTitle.indexOf('dashboard') !== -1) return true;
+        } catch(_) {}
+        
         return !!(
             // ── Monaco Editor (code editor, diff, merge) ──
             btn.closest('.monaco-editor') ||
@@ -1058,42 +1138,91 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
     var _clicked = new WeakSet();
     var _clickedIds = {};  // text+position dedup map
     var _expandedOnce = new WeakSet();
+    var _globalCooldown = 0;  // Global cooldown after ANY click (prevent rapid fire)
+    var _runCooldown = 0;     // Extra cooldown for Run buttons (terminal needs more time)
+    var _lastClickedPattern = '';  // Track last clicked pattern
+
+    // Cooldown durations (ms)
+    var COOLDOWN = {
+        'Run': 5000,           // 5s - terminal commands need time
+        'Accept': 1500,        // 1.5s - file changes
+        'Accept all': 1500,
+        'Accept All': 1500,
+        'Approve': 2000,       // 2s
+        'Allow Once': 3000,    // 3s - permission dialogs
+        'Allow This Conversation': 3000,
+        _default: 1000,        // 1s default
+        _global: 500,          // 500ms minimum between ANY clicks
+    };
+
+    function getCooldown(text) {
+        return COOLDOWN[text] || COOLDOWN._default;
+    }
 
     function isAlreadyClicked(btn, text) {
         // Layer 1: WeakSet (same DOM node)
         if (_clicked.has(btn)) return true;
-        // Layer 2: text+position dedup (catches rapid double-clicks on same button)
-        // Short timeout (500ms) — same button text can appear again legitimately after each tool call
+        
+        // Layer 2: Global cooldown - minimum time between ANY clicks
+        if (Date.now() < _globalCooldown) return true;
+        
+        // Layer 3: text+position dedup with pattern-specific timeout
+        var timeout = getCooldown(text);
         var key = text + '|' + (btn.getBoundingClientRect().top | 0);
-        if (_clickedIds[key] && Date.now() - _clickedIds[key] < 500) return true;
+        if (_clickedIds[key] && Date.now() - _clickedIds[key] < timeout) return true;
+        
+        // Layer 4: Same pattern cooldown (even at different positions)
+        var patternKey = 'pattern:' + text;
+        if (_clickedIds[patternKey] && Date.now() - _clickedIds[patternKey] < timeout) return true;
+        
         return false;
     }
 
     function markClicked(btn, text) {
         _clicked.add(btn);
+        var now = Date.now();
+        
+        // Position-based tracking
         var key = text + '|' + (btn.getBoundingClientRect().top | 0);
-        _clickedIds[key] = Date.now();
-        // Cleanup old entries every 100 clicks
-        if (++_clickId % 100 === 0) {
-            var now = Date.now();
+        _clickedIds[key] = now;
+        
+        // Pattern-based tracking (prevents clicking same pattern at different positions too fast)
+        var patternKey = 'pattern:' + text;
+        _clickedIds[patternKey] = now;
+        
+        // Set global cooldown
+        _globalCooldown = now + COOLDOWN._global;
+        
+        // Extra cooldown for Run buttons
+        if (text === 'Run' || text.indexOf('Run ') === 0) {
+            _runCooldown = now + COOLDOWN['Run'];
+        }
+        
+        _lastClickedPattern = text;
+        
+        // Cleanup old entries every 50 clicks
+        if (++_clickId % 50 === 0) {
             for (var k in _clickedIds) {
-                if (now - _clickedIds[k] > 10000) delete _clickedIds[k];
+                if (now - _clickedIds[k] > 30000) delete _clickedIds[k];
             }
         }
+    }
+
+    // Check if we're in Run cooldown period
+    function isRunCooldown() {
+        return Date.now() < _runCooldown;
     }
 
     // HIGH_CONFIDENCE: patterns that ONLY appear in agent approval contexts
     // These are auto-clicked WITHOUT requiring reject-sibling or container check
     // because they are unique to agent approval dialogs
-    // HIGH_CONFIDENCE: patterns that ONLY appear in agent approval contexts
-    // These are auto-clicked WITHOUT requiring reject-sibling or container check
     var HIGH_CONF = {
-        'Accept All':1,'Accept all':1,'Accept & Run':1,
-        'Keep All Edits':1,'Keep All':1,'Keep & Continue':1,
-        'Approve Tool Result':1,'Approve all':1,'Approve All':1,
-        // Vietnamese
-        'Chấp nhận tất cả':1,'Chấp nhận':1,'Đồng ý':1,'Duyệt tất cả':1,
+        'Accept All': 1, 'Accept all': 1, 'Accept': 1,
+        'Approve': 1, 'Expand': 1, 'Run': 1, 'Retry': 1,
+        'Proceed': 1, 'Resume': 1, 'Try Again': 1,
+        'Reconnect': 1, 'Resume Conversation': 1, 'Continue': 1,
     };
+
 
     // ══════════════════════════════════════════════════════════
     //  Agent Chat Context Detection — Antigravity 1.19.6+
@@ -1276,8 +1405,12 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
         try {
             var all = root.querySelectorAll('*');
             for (var i = 0; i < all.length; i++) {
-                if (all[i].shadowRoot && _shadowRoots.indexOf(all[i].shadowRoot) === -1) {
-                    _shadowRoots.push(all[i].shadowRoot);
+                var sr = all[i].shadowRoot;
+                if (sr) {
+                    if (_shadowRoots.indexOf(sr) === -1) {
+                        _shadowRoots.push(sr);
+                    }
+                    collectShadowRoots(sr);
                 }
             }
         } catch(_) {}
@@ -1380,6 +1513,9 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
 
             // Safety guard for Run/Execute commands
             if (matched === 'Run' || matched === 'Run Task') {
+                // Global cooldown: don't click Run too fast (terminal needs time)
+                if (isRunCooldown()) continue;
+                
                 var cmd = extractCmd(b);
                 if (cmd) {
                     var blocked = isBlocked(cmd);
@@ -1418,71 +1554,17 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
     }
 
     // ══════════════════════════════════════════════════════════
-    //  SOLUTION 6: Aggressive MutationObserver
-    //  Reduced throttle from 80ms → 30ms for faster response.
-    //  Added characterData tracking for text changes.
-    //  Observe iframes as they appear.
+    //  SOLUTION 6: Periodic Scanner (Replaces MutationObserver)
+    //  React transitions + OOPIF can cause MutationObservers to
+    //  detach or drop events. SetInterval scanning ensures buttons
+    //  are never missed.
     // ══════════════════════════════════════════════════════════
-    var _flushTimer = null;
-    function onMutation(mutations) {
-        // Quick-check: any added nodes or attribute changes?
-        var dominated = false;
-        if (mutations) {
-            for (var m = 0; m < mutations.length && !dominated; m++) {
-                var added = mutations[m].addedNodes;
-                if (added && added.length > 0) dominated = true;
-                if (mutations[m].type === 'attributes') dominated = true;
-            }
-        }
-        if (!dominated && mutations) return; // text-only change, skip
-
-        if (!_flushTimer) {
-            scanAndClick();
-            _flushTimer = setTimeout(function() { _flushTimer = null; }, 30);
-        }
-    }
-
-    var _observer = null;
-    function attachObserver() {
-        var root = document.body || document.documentElement;
-        if (!root) { setTimeout(attachObserver, 500); return; }
-        try {
-            if (_observer) _observer.disconnect();
-            _observer = new MutationObserver(onMutation);
-            _observer.observe(root, {
-                childList: true, subtree: true,
-                attributes: true, characterData: true,
-                attributeFilter: ['class','style','disabled','aria-hidden','aria-label','data-state','data-visible'],
-            });
-        } catch(_) {}
-    }
-    attachObserver();
-
-    // Also observe iframes as they load
-    function observeIframes() {
-        try {
-            var iframes = document.querySelectorAll('iframe');
-            for (var i = 0; i < iframes.length; i++) {
-                if (iframes[i].__gravObserved) continue;
-                iframes[i].__gravObserved = true;
-                iframes[i].addEventListener('load', function() {
-                    try {
-                        var doc = this.contentDocument;
-                        if (doc && doc.body) {
-                            var obs = new MutationObserver(onMutation);
-                            obs.observe(doc.body, { childList: true, subtree: true, attributes: true,
-                                attributeFilter: ['class','style','disabled','aria-hidden'] });
-                        }
-                    } catch(_) {}
-                    setTimeout(scanAndClick, 100);
-                });
-            }
-        } catch(_) {}
-    }
+    // Removed MutationObserver in favor of flat polling.
 
     // ══════════════════════════════════════════════════════════
-    //  SOLUTION 7: Multi-speed polling
-    //  Fast poll (300ms) always active + slow poll (1500ms) safety net
+    //  SOLUTION 7: Slower polling to prevent "requires input" errors
+    //  Previous: 800ms fast + 3000ms slow = too aggressive
+    //  New: 1500ms standard + 5000ms safety = gives terminal time
     // ══════════════════════════════════════════════════════════
     var _lastClickTime = Date.now();
     var _origReport = report;
@@ -1491,130 +1573,126 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
         _origReport(type, data);
     };
 
-    // Fast poll — catches transient buttons
+    // Standard poll — 1.5s interval (was 800ms)
     setInterval(function() {
-        scanAndClick();
-        observeIframes();
-    }, 300);
-
-    // Slow poll — safety net with shadow root refresh
-    setInterval(function() {
-        collectShadowRoots(document.body);
         scanAndClick();
     }, 1500);
 
-    // Initial scan
-    scanAndClick();
+    // Slow poll — 5s safety net (was 3s)
+    setInterval(function() {
+        scanAndClick();
+    }, 5000);
+
+    // Initial scan with delay (let page settle)
+    setTimeout(function() {
+        scanAndClick();
+    }, 1000);
 
     // ── Auto-Scroll (stick-to-bottom) ───────────────────────
+    // Tracks per-element "was at bottom" state. If user scrolls up, we let them read.
     if (SCROLL_ON) {
-        var _scrollPaused = false;
-        var _lastUserScroll = 0;
-        var _autoScrolling = false;
+        var _agWasAtBottom = new WeakMap();
+        var _agJustScrolled = new WeakSet();
+        var BOTTOM_THRESHOLD = 150;
+        var _isAutoScrolling = false;
 
-        // Detect user scroll to pause auto-scroll temporarily
-        document.addEventListener('wheel', function(e) {
-            if (e.isTrusted && e.deltaY < 0) {
-                _scrollPaused = true;
-                _lastUserScroll = Date.now();
+        window.addEventListener('scroll', function(e) {
+            var el = e.target;
+            if (!el || el.nodeType !== 1) return;
+            
+            // Only care about in-chat scrolling
+            if (!el.closest || !el.closest('.antigravity-agent-side-panel,[class*=chat],[class*=agent]')) return;
+
+            // Ignores programmatic scroll events
+            if (_agJustScrolled.has(el)) {
+                _agJustScrolled.delete(el);
+                return;
             }
-        }, { passive: true, capture: true });
+            if (_isAutoScrolling) return;
 
-        document.addEventListener('mousedown', function(e) {
-            if (e.isTrusted) _lastUserScroll = Date.now();
+            var gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+            if (gap <= BOTTOM_THRESHOLD) {
+                // User scrolled back to the bottom
+                _agWasAtBottom.set(el, true);
+            } else {
+                // User scrolled up to read
+                _agWasAtBottom.set(el, false);
+            }
         }, true);
 
         setInterval(function() {
-            if (_scrollPaused && Date.now() - _lastUserScroll > SCROLL_PAUSE) {
-                _scrollPaused = false;
-            }
-            if (_scrollPaused) return;
-
-            // Only scroll inside agent/chat containers.
-            // Without this guard, we might scroll sidebars, panels, or other UI.
-            var ROOT_SEL = '.antigravity-agent-side-panel,.react-app-container,[class*=agent],[class*=chat],[class*=cascade],[class*=cortex]';
-            var root = null;
-            try { root = document.querySelector(ROOT_SEL); } catch(_) {}
-            if (!root) return;
-
-            // Find the largest scrollable container inside the agent root
-            var best = null, bestH = 0;
-            var els = root.querySelectorAll('*');
-            for (var i = 0; i < els.length; i++) {
-                var el = els[i];
-                if (el.scrollHeight <= el.clientHeight + 30) continue;
-                if (el.tagName === 'TEXTAREA' || el.tagName === 'CODE' || el.tagName === 'PRE') continue;
+            var scrollables = Array.from(document.querySelectorAll('*')).filter(function (el) {
+                if (el.tagName === 'TEXTAREA' || el.tagName === 'CODE' || el.tagName === 'PRE' || el.tagName === 'INPUT') return false;
+                var style = window.getComputedStyle(el);
+                var hasScrollbar = el.scrollHeight > el.clientHeight &&
+                    (style.overflowY === 'auto' || style.overflowY === 'scroll');
+                if (!hasScrollbar) return false;
                 var cls = (el.className || '').toString().toLowerCase();
-                // Skip code blocks, terminals, editors
-                if (/code|terminal|xterm|editor|monaco|diff|tree|explorer|outline/.test(cls)) continue;
-                var s = window.getComputedStyle(el);
-                if (s.overflowY !== 'auto' && s.overflowY !== 'scroll') continue;
-                if (el.clientHeight > bestH) { bestH = el.clientHeight; best = el; }
-            }
-            if (!best) return;
+                if (/editor|monaco|diff|tree|explorer|outline|sidebar/.test(cls)) return false;
+                
+                var inChatPanel = el.closest('.antigravity-agent-side-panel,[class*=chat],[class*=agent],[class*=cascade],[class*=cortex]');
+                return !!inChatPanel;
+            });
 
-            var gap = best.scrollHeight - best.scrollTop - best.clientHeight;
-            if (gap > 5 && gap < 5000) {
-                _autoScrolling = true;
-                best.scrollTop = best.scrollHeight;
-                setTimeout(function() { _autoScrolling = false; }, 200);
+            if (scrollables.length > 0) {
+                _isAutoScrolling = true;
+                scrollables.forEach(function (el) {
+                    var gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+                    var wasBottom = _agWasAtBottom.get(el);
+
+                    // First time seeing this target? Check if it's currently at the bottom.
+                    if (wasBottom === undefined) {
+                        wasBottom = gap <= BOTTOM_THRESHOLD;
+                        _agWasAtBottom.set(el, wasBottom);
+                    }
+
+                    if (wasBottom) {
+                        if (gap > 5) {
+                            _agJustScrolled.add(el);
+                            try {
+                                if (gap < 300) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                                else el.scrollTop = el.scrollHeight;
+                            } catch(_) {
+                                el.scrollTop = el.scrollHeight;
+                            }
+                        }
+                    }
+                });
+                setTimeout(function () { _isAutoScrolling = false; }, 200);
             }
-        }, 400);
+        }, 800);
     }
-
-    // ── Quota Detection ─────────────────────────────────────
-    var QUOTA_PHRASES = [
-        'quota reached','exhausted your capacity','quota will reset',
-        'rate limit exceeded','quota exhausted','capacity exceeded',
-        'too many requests','limit reached','credits exhausted',
-        'usage limit exceeded','try again later','temporarily unavailable',
-        'resource exhausted','insufficient quota','spending limit',
-    ];
-    var _lastQuota = 0;
-
-    setInterval(function() {
-        if (Date.now() - _lastQuota < 30000) return;
-        var alerts = document.querySelectorAll('[role="alert"],[aria-live],[class*=notification],[class*=toast],[class*=error],[class*=quota],[class*=limit]');
-        for (var i = 0; i < alerts.length; i++) {
-            var txt = (alerts[i].textContent || '').toLowerCase();
-            for (var j = 0; j < QUOTA_PHRASES.length; j++) {
-                if (txt.indexOf(QUOTA_PHRASES[j]) !== -1) {
-                    _lastQuota = Date.now();
-                    report('QUOTA', QUOTA_PHRASES[j]);
-                    return;
-                }
-            }
-        }
-    }, 5000);
 
     // ── Self-Healing ────────────────────────────────────────
     var _healTick = 0;
     setInterval(function() {
         _healTick++;
-        // Re-attach observer every 2 minutes (webview navigation kills it)
-        if (_healTick >= 120) {
+        // Refresh open shadow roots explicitly
+        if (_healTick >= 30) {
             _healTick = 0;
-            attachObserver();
             collectShadowRoots(document.body);
         }
-    }, 1000);
+    }, 1500);
 
-    // ── Suppress Corrupt Banner ─────────────────────────────
-    (function() {
-        function dismiss() {
-            var toasts = document.querySelectorAll('.notifications-toasts .notification-toast, .notification-list-item');
-            toasts.forEach(function(el) {
-                var t = (el.textContent || '').toLowerCase();
-                if (t.indexOf('corrupt') !== -1 || t.indexOf('reinstall') !== -1) {
-                    var btn = el.querySelector('.codicon-notifications-clear, .codicon-close, [class*=close]');
-                    if (btn) btn.click(); else el.style.display = 'none';
-                }
-            });
-        }
-        dismiss();
-        var c = 0;
-        var t = setInterval(function() { dismiss(); if (++c > 30) clearInterval(t); }, 1000);
-    })();
+    // ── Suppress Corrupt Banner + "Requires Input" Notifications ──
+    // DISABLED: This was causing persistent notification flashing in bottom-left corner
+    // (function() {
+    //     function dismiss() {
+    //         var toasts = document.querySelectorAll('.notifications-toasts .notification-toast, .notification-list-item');
+    //         toasts.forEach(function(el) {
+    //             var t = (el.textContent || '').toLowerCase();
+    //             if (t.indexOf('corrupt') !== -1 || t.indexOf('reinstall') !== -1 ||
+    //                 t.indexOf('requires your input') !== -1 || t.indexOf('step requires') !== -1 ||
+    //                 t.indexOf('requires input') !== -1) {
+    //                 var btn = el.querySelector('.codicon-notifications-clear, .codicon-close, [class*=close]');
+    //                 if (btn) btn.click(); else el.style.display = 'none';
+    //             }
+    //         });
+    //     }
+    //     dismiss();
+    //     var c = 0;
+    //     var t = setInterval(function() { dismiss(); if (++c > 60) clearInterval(t); }, 1500);  // Run longer (48s) to catch late notifications
+    // })();
 
     report('BOOT', { v:2, patterns: PATTERNS.length, blacklist: BLACKLIST.length, scroll: SCROLL_ON, shadows: _shadowRoots.length, url: location.href.substring(0, 100) });
 
@@ -1623,7 +1701,7 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
         var allBtns = collectAllButtons();
         var labels = [];
         var acceptLike = [];
-        var acceptRe = /(accept|approve|allow|keep|continue|run|proceed)/i;
+        var acceptRe = /(accept|approve|retry|run|proceed|expand)/i;
         for (var i = 0; i < allBtns.length && i < 200; i++) {
             var l = labelOf(allBtns[i]);
             if (l) {
@@ -1643,6 +1721,9 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs) 
 }
 
 // ── Heartbeat & Self-Healing ─────────────────────────────────
+let _lastFullDiscovery = 0;
+const FULL_DISCOVERY_INTERVAL = 15000; // Full re-discovery every 15s
+
 function startHeartbeat() {
     if (_heartbeat) clearInterval(_heartbeat);
     _heartbeat = setInterval(async () => {
@@ -1673,7 +1754,17 @@ function startHeartbeat() {
         }
 
         // Re-discover targets (new webviews may have appeared)
-        discoverTargets();
+        // Do full discovery less frequently to avoid overwhelming CDP
+        const now = Date.now();
+        if (now - _lastFullDiscovery > FULL_DISCOVERY_INTERVAL || _sessions.size === 0) {
+            _lastFullDiscovery = now;
+            discoverTargets();
+        }
+        
+        // If no sessions after discovery, something is wrong - log diagnostic
+        if (_sessions.size === 0) {
+            console.log('[Grav CDP] WARNING: No active sessions. Targets:', _lastTargets.length);
+        }
     }, HEARTBEAT_MS);
 }
 
@@ -1687,8 +1778,18 @@ async function hotUpdate() {
                 returnByValue: true,
             }, session.sessionId);
             await injectObserver(session.sessionId);
-        } catch (_) {}
+        } catch (_) { }
     }
+}
+
+// ── Force Reconnect (for manual recovery) ────────────────────
+async function forceReconnect() {
+    console.log('[Grav CDP] Force reconnect requested');
+    _port = 0; // Reset port to re-discover
+    _reconnectAttempts = 0;
+    disconnect();
+    await new Promise(r => setTimeout(r, 500));
+    return connect();
 }
 
 // ── Blocked Command Logging ──────────────────────────────────
@@ -1700,7 +1801,7 @@ function logBlocked(cmd, reason) {
 }
 
 module.exports = {
-    init, connect, disconnect,
+    init, connect, disconnect, forceReconnect,
     isEnabled, isConnected, setEnabled,
     getBlockedLog, getTotalClicks, getClickLog, getSessionCount,
     getLastError,

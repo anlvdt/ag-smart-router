@@ -7,7 +7,7 @@
 let _passed = 0, _failed = 0;
 function assert(condition, msg) {
     if (condition) { _passed++; }
-    else { _failed++; console.error(`  ✗ FAIL: ${msg}`); }
+    else { _failed++; console.error(`  x FAIL: ${msg}`); }
 }
 function eq(a, b, msg) { assert(JSON.stringify(a) === JSON.stringify(b), `${msg} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 function section(name) { console.log(`\n── ${name} ──`); }

@@ -1,598 +1,621 @@
 <!DOCTYPE html>
 <html lang="{{LANG}}">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Grav</title>
 <style>
-:root {
-    --bg: #0f0f17; --surface: #13131d; --surface2: #1a1a28; --surface3: #222234;
-    --border: #2a2a3e; --border2: #363650; --text: #e0e0f0; --text2: #9090b0; --text3: #606080;
-    --accent: #7aa2f7; --green: #9ece6a; --red: #f7768e;
-    --yellow: #e0af68; --purple: #bb9af7; --teal: #73daca; --peach: #ff9e64;
-    --cyan: #89ddff; --pink: #f78cc6;
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1e2030;
+  --card:#262a3e;
+  --card2:#2d3250;
+  --border:#3b4063;
+  --border2:#4d5380;
+  --mute:#8890b0;
+  --text:#cdd2e4;
+  --bright:#e2e6f5;
+  --white:#f0f2ff;
+  --blue:#7aa2f7;
+  --green:#73daca;
+  --yellow:#ffc777;
+  --red:#ff757f;
+  --purple:#c3a6ff;
+  --cyan:#86e1fc;
+  --orange:#ff966c;
+  --radius:8px;
 }
-* { box-sizing: border-box; margin: 0; padding: 0 }
-body { font-family: 'SF Mono','Cascadia Code','JetBrains Mono',monospace; background: var(--bg); color: var(--text); font-size: 12px; line-height: 1.5 }
-::-webkit-scrollbar { width: 4px }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px }
+html{font-size:14px}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+  background:var(--bg);color:var(--text);
+  line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-.shell { max-width: 720px; margin: 0 auto; padding: 14px 18px 24px }
+.root{max-width:700px;margin:0 auto;padding:18px 22px 32px}
 
 /* ── Header ── */
-.hdr { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px }
-.brand { display: flex; align-items: baseline; gap: 8px }
-.brand h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent }
-.brand .v { font-size: 10px; color: var(--text3) }
-.hdr-right { display: flex; align-items: center; gap: 6px }
-.chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; background: var(--surface2); border: 1px solid var(--border) }
-.chip.on { color: var(--green); border-color: var(--green) }
-.chip.off { color: var(--red); border-color: var(--red) }
-.chip-count { color: var(--yellow) }
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-bottom:14px;margin-bottom:16px;
+  border-bottom:1px solid var(--border);
+}
+.hdr-brand{display:flex;align-items:baseline;gap:8px}
+.hdr-name{font-size:1.2rem;font-weight:800;color:var(--white);letter-spacing:.5px}
+.hdr-ver{font-size:.75rem;color:var(--mute);font-weight:500}
+.hdr-r{display:flex;align-items:center;gap:8px}
 
-/* ── Tabs ── */
-.tabs { display: flex; gap: 2px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 0 }
-.tab { padding: 7px 14px; font-size: 11px; font-weight: 700; color: var(--text3); cursor: pointer; border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0; transition: 0.15s; user-select: none; letter-spacing: 0.3px }
-.tab:hover { color: var(--text2); background: var(--surface) }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--surface) }
-.tab-panel { display: none }
-.tab-panel.active { display: block }
+/* ── Pill buttons ── */
+.pill{
+  font-size:.8rem;font-weight:700;padding:5px 12px;
+  border:1.5px solid var(--border);border-radius:var(--radius);
+  color:var(--text);cursor:pointer;background:transparent;
+  font-family:inherit;transition:all .15s;
+}
+.pill:hover{border-color:var(--bright);color:var(--white)}
+.pill-on{border-color:var(--green);color:var(--green);background:rgba(115,218,202,.1)}
+.pill-off{border-color:var(--red);color:var(--red);background:rgba(255,117,127,.1)}
+.pill-num{color:var(--blue);border-color:var(--blue);cursor:default;background:rgba(122,162,247,.1);font-variant-numeric:tabular-nums}
 
-/* ── Cards ── */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; margin-bottom: 6px }
-.card-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); margin-bottom: 6px }
+/* ── Section ── */
+.sec{margin-bottom:10px}
+.sec-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:var(--card);
+  border:1px solid var(--border);border-radius:var(--radius);
+  cursor:pointer;user-select:none;transition:all .12s;
+}
+.sec-head:hover{background:var(--card2);border-color:var(--border2)}
+.sec-lbl{font-size:.85rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--white)}
+.sec-arrow{font-size:.65rem;color:var(--mute);transition:transform .15s}
+.sec-arrow.open{transform:rotate(90deg)}
+.sec-body{
+  border:1px solid var(--border);border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);
+  background:var(--card);padding:14px;display:none;
+}
+.sec-body.open{display:block}
+.sec-head:has(+.sec-body.open){border-radius:var(--radius) var(--radius) 0 0}
 
-/* ── Grid layouts ── */
-.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px }
-.g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px }
-.g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px }
-.g6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px }
+/* ── Gauge row ── */
+.gauge{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid var(--border);
+}
+.gauge:last-child{border-bottom:none}
+.gauge-k{font-size:.9rem;color:var(--text);min-width:90px}
+.gauge-v{font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--white)}
+.gauge-v.blue{color:var(--blue)}
+.gauge-v.green{color:var(--green)}
+.gauge-v.yellow{color:var(--yellow)}
+.gauge-v.red{color:var(--red)}
+.gauge-v.purple{color:var(--purple)}
+.gauge-v.cyan{color:var(--cyan)}
 
-/* ── Metric boxes ── */
-.metric { padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; text-align: center }
-.metric-lg .metric-num { font-size: 24px }
-.metric-num { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2 }
-.metric-lbl { font-size: 8px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px }
+/* ── Toggle row ── */
+.trow{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.trow:last-child{border-bottom:none}
+.trow-info{flex:1}
+.trow-name{font-size:1rem;font-weight:600;color:var(--white)}
+.trow-desc{font-size:.8rem;color:var(--text);margin-top:2px}
 
-/* ── Feature rows ── */
-.row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 3px }
-.row-left { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1 }
-.row-name { font-size: 12px; font-weight: 700 }
-.row-hint { font-size: 10px; color: var(--text3) }
+/* ── Toggle switch ── */
+.tog{position:relative;width:40px;height:22px;flex-shrink:0}
+.tog input{display:none}
+.tog span{
+  position:absolute;inset:0;background:var(--border2);
+  border-radius:11px;transition:.2s;cursor:pointer;
+}
+.tog span::before{
+  content:'';position:absolute;left:3px;top:3px;
+  width:16px;height:16px;background:var(--mute);
+  border-radius:50%;transition:.2s;
+}
+.tog input:checked+span{background:var(--green)}
+.tog input:checked+span::before{transform:translateX(18px);background:#fff}
 
-/* ── Toggle ── */
-.sw { position: relative; width: 32px; height: 18px; flex-shrink: 0 }
-.sw input { display: none }
-.sw span { position: absolute; inset: 0; background: var(--border); border-radius: 9px; transition: 0.2s; cursor: pointer }
-.sw span::before { content: ''; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; background: var(--text3); border-radius: 50%; transition: 0.2s }
-.sw input:checked + span { background: var(--green) }
-.sw input:checked + span::before { transform: translateX(14px); background: #fff }
+/* ── Range slider ── */
+.rng{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px solid var(--border);
+}
+.rng:last-child{border-bottom:none}
+.rng-lbl{font-size:.85rem;color:var(--text);min-width:56px}
+.rng input[type=range]{flex:1;height:5px;accent-color:var(--blue);border-radius:3px}
+.rng-val{font-size:.85rem;color:var(--blue);font-weight:700;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
 
-/* ── Sliders ── */
-.slider { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 3px }
-.slider label { font-size: 11px; color: var(--text2); min-width: 60px }
-.slider input[type=range] { flex: 1; accent-color: var(--accent); height: 2px }
-.slider .val { font-size: 11px; color: var(--accent); font-weight: 700; min-width: 44px; text-align: right; font-variant-numeric: tabular-nums }
+/* ── Pattern tags ── */
+.pgrid{display:flex;flex-wrap:wrap;gap:6px}
+.ptag{
+  font-size:.85rem;font-weight:600;padding:6px 12px;
+  border:1.5px solid var(--border);border-radius:var(--radius);
+  color:var(--text);cursor:pointer;user-select:none;
+  transition:all .12s;background:transparent;font-family:inherit;
+}
+.ptag:hover{border-color:var(--bright);color:var(--white);background:var(--card2)}
+.ptag.on{border-color:var(--green);color:var(--green);background:rgba(115,218,202,.1)}
+.ptag.off{opacity:.4}
 
-/* ── Pattern chips ── */
-.pat-grid { display: flex; flex-wrap: wrap; gap: 3px }
-.pat { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; user-select: none; font-size: 11px; font-weight: 600; transition: 0.15s }
-.pat:hover { border-color: var(--text3) }
-.pat.on { border-color: var(--green); color: var(--green) }
-.pat.off { opacity: 0.3 }
-.pat .dot { width: 5px; height: 5px; border-radius: 50% }
-.pat.on .dot { background: var(--green) }
-.pat.off .dot { background: var(--text3) }
-
-/* ── Bars ── */
-.bar-row { display: flex; align-items: center; gap: 5px; margin-bottom: 2px }
-.bar-lbl { font-size: 10px; color: var(--text2); min-width: 70px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.bar-bg { flex: 1; height: 10px; background: var(--bg); border-radius: 2px; overflow: hidden }
-.bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s }
-.bar-cnt { font-size: 10px; color: var(--text3); min-width: 24px; font-variant-numeric: tabular-nums }
+/* ── Bar chart ── */
+.bar-r{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.bar-k{font-size:.8rem;color:var(--text);min-width:76px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-bg{flex:1;height:10px;background:var(--bg);border-radius:5px;overflow:hidden}
+.bar-fg{height:100%;border-radius:5px;transition:width .3s}
+.bar-n{font-size:.8rem;color:var(--bright);min-width:28px;font-variant-numeric:tabular-nums}
 
 /* ── Concept cards ── */
-.concept-card { padding: 7px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 3px }
-.concept-name { font-size: 11px; font-weight: 700; color: var(--teal) }
-.concept-bar { height: 3px; border-radius: 2px; margin-top: 4px; background: var(--bg); overflow: hidden }
-.concept-fill { height: 100%; border-radius: 2px; transition: width 0.3s }
-.concept-meta { font-size: 9px; color: var(--text3); margin-top: 2px; display: flex; justify-content: space-between }
+.cpt{padding:9px 0;border-bottom:1px solid var(--border)}
+.cpt:last-child{border-bottom:none}
+.cpt-top{display:flex;justify-content:space-between;align-items:center}
+.cpt-name{font-size:.9rem;font-weight:700;color:var(--cyan)}
+.cpt-risk{
+  font-size:.7rem;font-weight:700;text-transform:uppercase;
+  padding:3px 8px;border-radius:4px;
+}
+.cpt-risk.safe{color:var(--green);background:rgba(115,218,202,.15)}
+.cpt-risk.caution{color:var(--yellow);background:rgba(255,199,119,.15)}
+.cpt-risk.danger{color:var(--red);background:rgba(255,117,127,.15)}
+.cpt-risk.unknown{color:var(--mute);background:rgba(136,144,176,.12)}
+.cpt-bar{height:4px;background:var(--bg);border-radius:2px;margin-top:6px;overflow:hidden}
+.cpt-fill{height:100%;border-radius:2px;transition:width .3s}
+.cpt-meta{font-size:.75rem;color:var(--text);display:flex;justify-content:space-between;margin-top:4px}
 
-/* ── Risk badge ── */
-.risk { display: inline-block; padding: 1px 5px; border-radius: 2px; font-size: 9px; font-weight: 700; text-transform: uppercase }
-.risk-safe { background: rgba(158,206,106,0.15); color: var(--green) }
-.risk-caution { background: rgba(224,175,104,0.15); color: var(--yellow) }
-.risk-danger { background: rgba(247,118,142,0.15); color: var(--red) }
-.risk-unknown { background: rgba(96,96,128,0.15); color: var(--text3) }
-
-/* ── Log ── */
-.log-box { max-height: 160px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px }
-.log-item { display: flex; justify-content: space-between; padding: 3px 7px; font-size: 10px; border-bottom: 1px solid var(--bg) }
-.log-item:last-child { border: none }
-.log-empty { color: var(--text3); padding: 8px; font-size: 10px; text-align: center }
-.log-new { animation: flash 0.4s ease }
-@keyframes flash { from { background: rgba(122,162,247,0.15); } to { background: transparent; } }
-
-/* ── Wiki log ── */
-.wiki-log { max-height: 200px; overflow-y: auto }
-.wiki-log-item { padding: 4px 8px; font-size: 10px; border-bottom: 1px solid var(--bg); display: flex; gap: 6px; align-items: baseline }
-.wiki-log-item .op { font-weight: 700; min-width: 44px }
-.wiki-log-item .op-ingest { color: var(--green) }
-.wiki-log-item .op-lint { color: var(--yellow) }
-.wiki-log-item .op-approve { color: var(--teal) }
-.wiki-log-item .op-reject { color: var(--red) }
-.wiki-log-item .ts { color: var(--text3); min-width: 56px; font-size: 9px }
-
-/* ── Buttons ── */
-.btn-row { display: flex; gap: 4px; justify-content: flex-end }
-.btn { padding: 4px 12px; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 700; background: var(--surface); color: var(--text2); transition: 0.15s; font-family: inherit }
-.btn:hover { border-color: var(--text3); color: var(--text) }
-.btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent) }
-.btn-primary:hover { filter: brightness(1.1); color: var(--bg) }
-.btn-danger { color: var(--red); border-color: var(--red) }
-.btn-sm { font-size: 9px; padding: 2px 6px }
+/* ── Feed (log) ── */
+.feed{
+  max-height:180px;overflow-y:auto;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius);padding:3px 0;
+}
+.feed-row{
+  display:flex;align-items:baseline;gap:8px;
+  padding:5px 10px;font-size:.85rem;
+  border-bottom:1px solid rgba(59,64,99,.4);
+}
+.feed-row:last-child{border-bottom:none}
+.feed-ts{color:var(--mute);min-width:52px;font-size:.75rem;font-variant-numeric:tabular-nums}
+.feed-op{font-weight:700;min-width:44px}
+.feed-op.ingest{color:var(--green)}
+.feed-op.lint{color:var(--yellow)}
+.feed-op.approve{color:var(--green)}
+.feed-op.reject{color:var(--red)}
+.feed-cmd{color:var(--bright);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-conf{color:var(--text);min-width:36px;text-align:right;font-variant-numeric:tabular-nums}
+.feed-empty{color:var(--mute);padding:12px;text-align:center;font-size:.85rem}
+.feed-new{animation:pulse .4s ease}
+@keyframes pulse{from{background:rgba(122,162,247,.12)}to{background:transparent}}
 
 /* ── Footer ── */
-.ftr { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border) }
-.ftr select { background: var(--surface); color: var(--text2); border: 1px solid var(--border); border-radius: 3px; padding: 3px 6px; font-size: 10px; font-family: inherit }
+.foot{
+  display:flex;align-items:center;justify-content:flex-end;
+  gap:8px;margin-top:14px;padding-top:14px;
+  border-top:1px solid var(--border);
+}
+.fbtn{
+  font-size:.85rem;font-weight:700;padding:7px 16px;
+  border:1.5px solid var(--border);border-radius:var(--radius);
+  background:transparent;color:var(--bright);cursor:pointer;
+  font-family:inherit;transition:all .12s;
+}
+.fbtn:hover{border-color:var(--white);color:var(--white);background:var(--card2)}
+.fbtn-go{border-color:var(--blue);color:var(--blue)}
+.fbtn-go:hover{background:var(--blue);color:var(--bg)}
+.fbtn-x{border-color:var(--red);color:var(--red)}
+.fbtn-x:hover{background:var(--red);color:var(--bg)}
 
 /* ── Toast ── */
-.toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%) translateY(50px); background: var(--surface3); color: var(--text); padding: 5px 14px; border-radius: 3px; font-size: 11px; font-weight: 700; border: 1px solid var(--border2); opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 999 }
-.toast.show { transform: translateX(-50%) translateY(0); opacity: 1 }
+.toast{
+  position:fixed;bottom:16px;left:50%;
+  transform:translateX(-50%) translateY(40px);
+  background:var(--card2);color:var(--white);
+  padding:8px 18px;font-size:.85rem;font-weight:700;
+  border:1px solid var(--border2);border-radius:var(--radius);
+  opacity:0;transition:all .15s;pointer-events:none;z-index:99;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
-.c1{background:var(--accent)}.c2{background:var(--green)}.c3{background:var(--yellow)}.c4{background:var(--red)}.c5{background:var(--purple)}.c6{background:var(--teal)}
+/* ── Typing indicator ── */
+.typing{display:none;align-items:center;gap:7px;padding:8px 0;font-size:.85rem;color:var(--blue)}
+.typing.on{display:flex}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:blink 1.2s infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+
+/* ── Sub-label ── */
+.sub-lbl{font-size:.75rem;color:var(--text);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
 </style>
 </head>
 <body>
-<div class="shell">
+<div class="root">
 
-<!-- ═══ HEADER ═══ -->
+<!-- HEADER -->
 <div class="hdr">
-    <div class="brand"><h1>Grav</h1><span class="v">v1.0.0 — Pilot · Cortex</span></div>
-    <div class="hdr-right">
-        <span class="chip chip-count" id="totalCount">{{TOTAL}}</span>
-        <span class="chip on" id="masterChip" onclick="toggleMaster()" style="cursor:pointer"><span id="masterLabel">ON</span></span>
-    </div>
+  <div class="hdr-brand"><span class="hdr-name">Grav</span><span class="hdr-ver">v3.4.2</span></div>
+  <div class="hdr-r">
+    <span class="pill pill-num" id="totalCount">{{TOTAL}}</span>
+    <button class="pill pill-on" id="masterPill" onclick="toggleMaster()">ON</button>
+  </div>
 </div>
 
-<!-- ═══ TABS ═══ -->
-<div class="tabs">
-    <div class="tab active" onclick="switchTab('autopilot')">Điều khiển</div>
-    <div class="tab" onclick="switchTab('brain')">Bộ não</div>
-    <div class="tab" onclick="switchTab('stats')">Thống kê</div>
+<!-- CONTROL -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secCtrl')"><span class="sec-lbl">Control</span><span class="sec-arrow open" id="arrCtrl">▶</span></div>
+  <div class="sec-body open" id="secCtrl">
+    <div class="trow">
+      <div class="trow-info"><div class="trow-name">Auto-Click</div><div class="trow-desc">Automatically click accept / run buttons</div></div>
+      <label class="tog" onclick="event.stopPropagation()"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()"><span></span></label>
+    </div>
+    <div class="trow">
+      <div class="trow-info"><div class="trow-name">Auto-Scroll</div><div class="trow-desc">Keep chat scrolled to bottom</div></div>
+      <label class="tog" onclick="event.stopPropagation()"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()"><span></span></label>
+    </div>
+    <div style="margin-top:8px">
+      <div class="rng"><span class="rng-lbl">Click</span><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'"><span class="rng-val" id="valApprove">{{APPROVE_MS}}ms</span></div>
+      <div class="rng"><span class="rng-lbl">Scroll</span><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'"><span class="rng-val" id="valScroll">{{SCROLL_MS}}ms</span></div>
+      <div class="rng"><span class="rng-lbl">Pause</span><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'"><span class="rng-val" id="valPause">{{PAUSE_MS}}ms</span></div>
+    </div>
+  </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     TAB 1: AUTOPILOT — controls, timing, patterns
-     ═══════════════════════════════════════════════════════════ -->
-<div id="tab-autopilot" class="tab-panel active">
-
-    <div class="card">
-        <div class="card-title" data-i18n="sec-features">modules</div>
-        <div class="row">
-            <div class="row-left" onclick="toggleFeat('chkEnabled')"><div><span class="row-name" data-i18n="feat-autoclick">Auto-Click</span><div class="row-hint" data-i18n="desc-approve">Tự động bấm nút chấp nhận (Accept All, Allow, Run...)</div></div></div>
-            <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()"><span></span></label>
-        </div>
-        <div class="row">
-            <div class="row-left" onclick="toggleFeat('chkScroll')"><div><span class="row-name" data-i18n="feat-scroll">Auto-Scroll</span><div class="row-hint" data-i18n="desc-scroll">Tự cuộn chat xuống cuối trang</div></div></div>
-            <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()"><span></span></label>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-title" data-i18n="sec-timing">timing</div>
-        <div class="slider"><label data-i18n="lbl-approve">Tốc độ click</label><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="document.getElementById('valApprove').textContent=this.value+'ms'"><span class="val" id="valApprove">{{APPROVE_MS}}ms</span></div>
-        <div class="slider"><label data-i18n="lbl-scroll">Tốc độ cuộn</label><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="document.getElementById('valScroll').textContent=this.value+'ms'"><span class="val" id="valScroll">{{SCROLL_MS}}ms</span></div>
-        <div class="slider"><label data-i18n="lbl-pause">Tạm dừng</label><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="document.getElementById('valPause').textContent=this.value+'ms'"><span class="val" id="valPause">{{PAUSE_MS}}ms</span></div>
-    </div>
-
-    <div class="card">
-        <div class="card-title" data-i18n="sec-patterns">Nút tự động bấm</div>
-        <div class="pat-grid" id="patGrid"></div>
-    </div>
-
+<!-- TARGETS -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secPat')"><span class="sec-lbl">Targets</span><span class="sec-arrow open" id="arrPat">▶</span></div>
+  <div class="sec-body open" id="secPat"><div class="pgrid" id="patGrid"></div></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     TAB 2: SECOND BRAIN — wiki, learning, concepts
-     ═══════════════════════════════════════════════════════════ -->
-<div id="tab-brain" class="tab-panel">
-
-    <!-- Hero metrics -->
-    <div class="g6" style="margin-bottom:8px">
-        <div class="metric"><div class="metric-num" style="color:var(--accent)" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="metric-lbl">Vòng học</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--teal)" id="brainTracking">{{LEARN_TRACKING}}</div><div class="metric-lbl">Đang theo dõi</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--green)" id="brainWhite">{{WHITE_COUNT}}</div><div class="metric-lbl">Cho phép</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--red)" id="brainBlack">{{BLACK_COUNT}}</div><div class="metric-lbl">Chặn</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--purple)" id="brainPromoted">{{LEARN_COUNT}}</div><div class="metric-lbl">Đã nâng cấp</div></div>
-        <div class="metric"><div class="metric-num" style="color:var(--peach)" id="brainPatterns">{{LEARN_PATTERNS}}</div><div class="metric-lbl">Mẫu nhận diện</div></div>
-    </div>
-
-    <!-- Session Intelligence -->
-    <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div class="card-title" style="margin-bottom:0">Phiên làm việc</div>
-            <span id="healthBadge" class="risk risk-unknown">—</span>
-        </div>
-        <div class="g4" style="margin-bottom:6px">
-            <div class="metric"><div class="metric-num" style="color:var(--accent)" id="sessDuration">0m</div><div class="metric-lbl">Thời lượng</div></div>
-            <div class="metric"><div class="metric-num" style="color:var(--teal)" id="sessMsg">0</div><div class="metric-lbl">Tin nhắn</div></div>
-            <div class="metric"><div class="metric-num" style="color:var(--green)" id="sessApprove">0</div><div class="metric-lbl">Đã bấm</div></div>
-            <div class="metric"><div class="metric-num" style="color:var(--yellow)" id="sessAvgResp">—</div><div class="metric-lbl">TB phản hồi</div></div>
-        </div>
-        <!-- AI typing indicator -->
-        <div id="aiTypingRow" style="display:none;align-items:center;gap:6px;padding:4px 8px;background:rgba(122,162,247,0.06);border-radius:3px;margin-bottom:6px">
-            <span style="color:var(--accent);font-size:10px;font-weight:700">● AI ĐANG SUY NGHĨ</span>
-            <span style="color:var(--text3);font-size:9px">tạm dừng auto-click khi AI đang trả lời</span>
-        </div>
-        <!-- Tool breakdown -->
-        <div id="toolBreakdown"></div>
-    </div>
-
-    <!-- Wiki overview -->
-    <div class="card">
-        <div class="card-title">Bộ nhớ</div>
-        <div class="g3" style="margin-bottom:8px">
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--cyan)" id="wikiPages">{{WIKI_PAGES}}</div><div class="metric-lbl">Trang</div></div>
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--teal)" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="metric-lbl">Tín hiệu</div></div>
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--yellow)" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</div><div class="metric-lbl">Xung đột</div></div>
-        </div>
-        <div style="display:flex;gap:4px">
-            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Quản lý luật</button>
-            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Xem bộ nhớ</button>
-            <button class="btn btn-sm" onclick="vscode.postMessage({command:'manageTerminal'})" style="flex:1">Kiểm tra</button>
-        </div>
-    </div>
-
-    <!-- Concept map -->
-    <div class="card">
-        <div class="card-title">Bản đồ tín hiệu</div>
-        <div id="conceptMap">
-            <div class="log-empty">Tín hiệu sẽ xuất hiện khi hệ thống học được các mẫu</div>
-        </div>
-    </div>
-
-    <!-- Wiki activity log -->
-    <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div class="card-title" style="margin-bottom:0">Nhật ký sự kiện</div>
-        </div>
-        <div class="log-box wiki-log" id="wikiLog">
-            <div class="log-empty">—</div>
-        </div>
-    </div>
-
+<!-- SESSION -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secSess')"><span class="sec-lbl">Session</span><span class="sec-arrow open" id="arrSess">▶</span></div>
+  <div class="sec-body open" id="secSess">
+    <div class="typing" id="aiTyping"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span><span style="margin-left:3px">AI is thinking...</span></div>
+    <div class="gauge"><span class="gauge-k">Uptime</span><span class="gauge-v blue" id="sessDuration">0m</span></div>
+    <div class="gauge"><span class="gauge-k">Messages</span><span class="gauge-v" id="sessMsg">0</span></div>
+    <div class="gauge"><span class="gauge-k">Clicks</span><span class="gauge-v green" id="sessApprove">0</span></div>
+    <div class="gauge"><span class="gauge-k">Avg Response</span><span class="gauge-v" id="sessAvgResp">—</span></div>
+    <div class="gauge"><span class="gauge-k">Health</span><span class="gauge-v" id="healthBadge">—</span></div>
+    <div id="toolBreakdown" style="margin-top:6px"></div>
+    <div class="gauge" style="margin-top:4px"><span class="gauge-k">Idle</span><span class="gauge-v" id="idleStatus">—</span></div>
+  </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     TAB 3: STATS — click stats, bars, log
-     ═══════════════════════════════════════════════════════════ -->
-<div id="tab-stats" class="tab-panel">
-
-    <div class="card">
-        <div class="card-title" data-i18n="sec-stats">Thống kê</div>
-        <div class="g2" style="margin-bottom:8px">
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--accent)" id="statTotal">{{TOTAL}}</div><div class="metric-lbl">Tổng lượt bấm</div></div>
-            <div class="metric metric-lg"><div class="metric-num" style="color:var(--green)" id="statActive">0</div><div class="metric-lbl">Nút đang bật</div></div>
-        </div>
-        <div id="statBars" style="margin-bottom:6px"></div>
-    </div>
-
-    <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div class="card-title" style="margin-bottom:0" data-i18n="lbl-log">log</div>
-            <button class="btn btn-sm btn-danger" onclick="clearLog()">Xóa</button>
-        </div>
-        <div class="log-box" id="logList"><div class="log-empty">—</div></div>
-    </div>
-
-    <!-- Terminal log (inline terminal capture) -->
-    <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div class="card-title" style="margin-bottom:0">Terminal</div>
-            <span style="font-size:9px;color:var(--text3)">giao diện + shell</span>
-        </div>
-        <div class="log-box" id="termLogList"><div class="log-empty">—</div></div>
-    </div>
-
-    <div style="margin-top:4px"><button class="btn btn-danger btn-sm" onclick="resetStats()" style="width:100%">Xóa thống kê</button></div>
-
+<!-- QUOTA -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secQuota')"><span class="sec-lbl">Quota</span><span class="sec-arrow" id="arrQuota">▶</span></div>
+  <div class="sec-body" id="secQuota">
+    <div class="gauge"><span class="gauge-k">Overall</span><span class="gauge-v" id="quotaPct">—</span></div>
+    <div class="gauge"><span class="gauge-k">Usage Rate</span><span class="gauge-v" id="quotaRate">—</span></div>
+    <div class="gauge"><span class="gauge-k">Runway</span><span class="gauge-v" id="quotaRunway">—</span></div>
+    <div class="gauge"><span class="gauge-k">Next Reset</span><span class="gauge-v" id="quotaReset">—</span></div>
+    <div id="quotaModels" style="margin-top:6px"></div>
+    <div class="gauge" style="margin-top:4px"><span class="gauge-k">LS Port</span><span class="gauge-v" id="quotaPort" style="font-size:.8rem">—</span></div>
+  </div>
 </div>
 
-<!-- ═══ FOOTER ═══ -->
-<div class="ftr">
-    <select id="selLang" onchange="changeLang()">
-        <option value="vi" {{LANG_VI}}>Tiếng Việt</option>
-        <option value="en" {{LANG_EN}}>English</option>
-        <option value="zh" {{LANG_ZH}}>中文</option>
-    </select>
-    <div class="btn-row">
-        <button class="btn" onclick="vscode.postMessage({command:'reload'})">Tải lại</button>
-        <button class="btn btn-primary" onclick="saveAll()">Lưu</button>
+<!-- ROI -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secRoi')"><span class="sec-lbl">ROI</span><span class="sec-arrow" id="arrRoi">▶</span></div>
+  <div class="sec-body" id="secRoi">
+    <div class="gauge"><span class="gauge-k">Time Saved</span><span class="gauge-v green" id="roiSaved">0s</span></div>
+    <div class="gauge"><span class="gauge-k">Clicks</span><span class="gauge-v blue" id="roiClicks">0</span></div>
+    <div class="gauge"><span class="gauge-k">Productivity</span><span class="gauge-v" id="roiGain">0%</span></div>
+    <div class="gauge"><span class="gauge-k">Daily Estimate</span><span class="gauge-v cyan" id="roiDaily">0m</span></div>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+      <div class="sub-lbl" style="margin-bottom:4px">Lifetime</div>
+      <div class="gauge"><span class="gauge-k">Total Saved</span><span class="gauge-v green" id="roiLifeSaved">0m</span></div>
+      <div class="gauge"><span class="gauge-k">Total Clicks</span><span class="gauge-v" id="roiLifeClicks">0</span></div>
+      <div class="gauge"><span class="gauge-k">Sessions</span><span class="gauge-v" id="roiLifeSessions">0</span></div>
     </div>
+  </div>
+</div>
+
+<!-- BRAIN -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secBrain')"><span class="sec-lbl">Brain</span><span class="sec-arrow" id="arrBrain">▶</span></div>
+  <div class="sec-body" id="secBrain">
+    <div class="gauge"><span class="gauge-k">Epoch</span><span class="gauge-v blue" id="brainEpoch">{{LEARN_EPOCH}}</span></div>
+    <div class="gauge"><span class="gauge-k">Tracking</span><span class="gauge-v" id="brainTracking">{{LEARN_TRACKING}}</span></div>
+    <div class="gauge"><span class="gauge-k">Allowed</span><span class="gauge-v green" id="brainWhite">{{WHITE_COUNT}}</span></div>
+    <div class="gauge"><span class="gauge-k">Blocked</span><span class="gauge-v red" id="brainBlack">{{BLACK_COUNT}}</span></div>
+    <div class="gauge"><span class="gauge-k">Promoted</span><span class="gauge-v purple" id="brainPromoted">{{LEARN_COUNT}}</span></div>
+    <div class="gauge"><span class="gauge-k">Patterns</span><span class="gauge-v" id="brainPatterns">{{LEARN_PATTERNS}}</span></div>
+    <div style="margin-top:8px"><button class="fbtn" onclick="vscode.postMessage({command:'manageTerminal'})" style="width:100%">Manage Rules</button></div>
+  </div>
+</div>
+
+<!-- MEMORY -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secMem')"><span class="sec-lbl">Memory</span><span class="sec-arrow" id="arrMem">▶</span></div>
+  <div class="sec-body" id="secMem">
+    <div class="gauge"><span class="gauge-k">Pages</span><span class="gauge-v blue" id="wikiPages">{{WIKI_PAGES}}</span></div>
+    <div class="gauge"><span class="gauge-k">Concepts</span><span class="gauge-v cyan" id="wikiConcepts">{{WIKI_CONCEPTS}}</span></div>
+    <div class="gauge"><span class="gauge-k">Conflicts</span><span class="gauge-v yellow" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</span></div>
+    <div id="conceptMap" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secStats')"><span class="sec-lbl">Stats</span><span class="sec-arrow" id="arrStats">▶</span></div>
+  <div class="sec-body" id="secStats">
+    <div class="gauge"><span class="gauge-k">Total Clicks</span><span class="gauge-v blue" id="statTotal">{{TOTAL}}</span></div>
+    <div class="gauge"><span class="gauge-k">Active Buttons</span><span class="gauge-v green" id="statActive">0</span></div>
+    <div id="statBars" style="margin-top:6px"></div>
+    <div style="margin-top:8px"><button class="fbtn fbtn-x" onclick="resetStats()" style="width:100%">Reset Stats</button></div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="sec">
+  <div class="sec-head" onclick="togSec('secLog')"><span class="sec-lbl">Log</span><span class="sec-arrow" id="arrLog">▶</span></div>
+  <div class="sec-body" id="secLog">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span class="sub-lbl">Click Log</span>
+      <button class="fbtn fbtn-x" style="font-size:.7rem;padding:2px 8px" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="feed" id="logList"><div class="feed-empty">No clicks yet</div></div>
+    <div style="margin-top:10px;margin-bottom:6px"><span class="sub-lbl">Terminal</span></div>
+    <div class="feed" id="termLogList"><div class="feed-empty">No terminal activity</div></div>
+    <div style="margin-top:10px;margin-bottom:6px"><span class="sub-lbl">Events</span></div>
+    <div class="feed" id="wikiLog"><div class="feed-empty">No events yet</div></div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="foot">
+  <button class="fbtn" onclick="vscode.postMessage({command:'reload'})">Reload</button>
+  <button class="fbtn fbtn-go" onclick="saveAll()">Save</button>
 </div>
 
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
-var vscode = acquireVsCodeApi();
-var ALL_PATTERNS = ['Accept all','Accept All','Accept','Accept & Run','Keep All Edits','Keep All','Keep & Continue','Keep','Continue','Retry','Keep Waiting','Proceed','Run Task','Run','Allow','Allow Once','Allow in this Session','Allow this conversation','Allow and Review','Approve Tool Result','Approve all','Always Allow','Allow in this Workspace','Always Allow Without Review','Allow and Skip Reviewing Result','Trust','OK','Confirm','Enable Overages'];
-var patterns = {{PATTERNS_JSON}};
-var disabledPatterns = {{DISABLED_JSON}};
-ALL_PATTERNS.forEach(function(p) { if (patterns.indexOf(p) === -1 && disabledPatterns.indexOf(p) === -1) disabledPatterns.push(p); });
+var vscode=acquireVsCodeApi();
+var $=function(id){return document.getElementById(id)};
+var ALL_PATTERNS={{ALL_PATTERNS_JSON}};
+var patterns={{PATTERNS_JSON}};
+var disabledPatterns={{DISABLED_JSON}};
+var PATTERN_GROUPS={{PATTERN_GROUPS_JSON}};
 
-var CONCEPTS_DATA = {{CONCEPTS_JSON}};
-var WIKI_LOG_DATA = {{WIKI_LOG_JSON}};
-
-var _i18n = {
-    vi: {'sec-features':'Chức năng','sec-timing':'Thời gian','sec-patterns':'Nút tự động bấm','sec-stats':'Thống kê','lbl-log':'Nhật ký','desc-approve':'Tự động bấm nút chấp nhận (Accept All, Allow, Run...)','desc-scroll':'Tự cuộn chat xuống cuối trang','lbl-approve':'Tốc độ click','lbl-scroll':'Tốc độ cuộn','lbl-pause':'Tạm dừng','feat-autoclick':'Auto-Click','feat-scroll':'Auto-Scroll'},
-    en: {'sec-features':'Features','sec-timing':'Timing','sec-patterns':'Auto-click buttons','sec-stats':'Stats','lbl-log':'Log','desc-approve':'Auto-clicks approval buttons (Accept All, Allow, Run...)','desc-scroll':'Auto-scrolls chat to bottom','lbl-approve':'Click speed','lbl-scroll':'Scroll speed','lbl-pause':'Pause','feat-autoclick':'Auto-Click','feat-scroll':'Auto-Scroll'},
-    zh: {'sec-features':'功能','sec-timing':'时间设置','sec-patterns':'自动点击按钮','sec-stats':'统计','lbl-log':'日志','desc-approve':'自动点击审批按钮 (Accept All, Allow, Run...)','desc-scroll':'聊天面板自动滚动到底部','lbl-approve':'点击速度','lbl-scroll':'滚动速度','lbl-pause':'暂停','feat-autoclick':'自动点击','feat-scroll':'自动滚动'}
-};
-function applyI18n(lang) { var s = _i18n[lang] || _i18n['en']; document.querySelectorAll('[data-i18n]').forEach(function(el) { var k = el.getAttribute('data-i18n'); if (s[k]) el.textContent = s[k]; }); }
-applyI18n('{{LANG}}');
-
-/* ── Tab switching ── */
-function switchTab(name) {
-    document.querySelectorAll('.tab').forEach(function(t,i) { t.classList.toggle('active', ['autopilot','brain','stats'][i] === name); });
-    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
-    var el = document.getElementById('tab-' + name);
-    if (el) el.classList.add('active');
-    // Refresh click log when switching to stats
-    if (name === 'stats') vscode.postMessage({ command: 'getLog' });
+// Build reverse mapping: variant → display name
+var PATTERN_DISPLAY={};
+for(var display in PATTERN_GROUPS){
+  PATTERN_GROUPS[display].forEach(function(v){PATTERN_DISPLAY[v]=display;});
 }
 
-/* ── Toast ── */
-var _toastTimer;
-function toast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(_toastTimer); _toastTimer = setTimeout(function() { t.classList.remove('show'); }, 1000); }
+// Get all variants for a display name
+function getVariants(displayName){return PATTERN_GROUPS[displayName]||[displayName];}
 
-/* ── Master toggle ── */
-function updateMasterUI() {
-    var on = document.getElementById('chkEnabled').checked;
-    var el = document.getElementById('masterChip');
-    el.className = 'chip ' + (on ? 'on' : 'off');
-    document.getElementById('masterLabel').textContent = on ? 'ON' : 'OFF';
+// Check if any variant of a display pattern is enabled
+function isDisplayEnabled(displayName){
+  var variants=getVariants(displayName);
+  for(var i=0;i<variants.length;i++){if(patterns.indexOf(variants[i])!==-1)return true;}
+  return false;
 }
-function toggleMaster() { var c = document.getElementById('chkEnabled'); c.checked = !c.checked; instantToggle(); }
-function toggleFeat(id) { var c = document.getElementById(id); c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
-function instantToggle() { vscode.postMessage({ command: 'toggle', enabled: document.getElementById('chkEnabled').checked }); updateMasterUI(); toast(document.getElementById('chkEnabled').checked ? 'ON' : 'OFF'); }
-function scrollToggle() { vscode.postMessage({ command: 'scrollToggle', enabled: document.getElementById('chkScroll').checked }); toast('Scroll ' + (document.getElementById('chkScroll').checked ? 'ON' : 'OFF')); }
-function changeLang() { vscode.postMessage({ command: 'changeLang', lang: document.getElementById('selLang').value }); applyI18n(document.getElementById('selLang').value); }
 
-/* ── Patterns ── */
-function renderPatterns() {
-    var grid = document.getElementById('patGrid');
-    var all = [], seen = {};
-    ALL_PATTERNS.concat(patterns).concat(disabledPatterns).forEach(function(p) { if (!seen[p]) { seen[p] = true; all.push(p); } });
-    var h = '', active = 0;
-    all.forEach(function(p) {
-        var on = patterns.indexOf(p) !== -1; if (on) active++;
-        h += '<div class="pat ' + (on ? 'on' : 'off') + '" onclick="togPat(\'' + p.replace(/'/g, "\\'") + '\')">';
-        h += '<span class="dot"></span>' + p + '</div>';
+// Initialize: ensure variants are synced
+ALL_PATTERNS.forEach(function(p){if(patterns.indexOf(p)===-1&&disabledPatterns.indexOf(p)===-1)disabledPatterns.push(p)});
+var CONCEPTS_DATA={{CONCEPTS_JSON}};
+var WIKI_LOG_DATA={{WIKI_LOG_JSON}};
+
+function togSec(id){
+  var body=$(id);var arr=$('arr'+id.replace('sec',''));
+  var open=body.classList.toggle('open');
+  if(arr)arr.classList.toggle('open',open);
+}
+
+var _tt;
+function toast(m){var t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(function(){t.classList.remove('show')},900)}
+
+function updateMasterUI(){
+  var on=$('chkEnabled').checked;var p=$('masterPill');
+  p.className='pill '+(on?'pill-on':'pill-off');p.textContent=on?'ON':'OFF';
+}
+function toggleMaster(){var c=$('chkEnabled');c.checked=!c.checked;instantToggle()}
+function instantToggle(){vscode.postMessage({command:'toggle',enabled:$('chkEnabled').checked});updateMasterUI();toast($('chkEnabled').checked?'Enabled':'Disabled')}
+function scrollToggle(){vscode.postMessage({command:'scrollToggle',enabled:$('chkScroll').checked});toast('Scroll '+($('chkScroll').checked?'ON':'OFF'))}
+
+function renderPatterns(){
+  var grid=$('patGrid');
+  var h='',active=0;
+  // Only show unique display names (hide variants)
+  ALL_PATTERNS.forEach(function(displayName){
+    var on=isDisplayEnabled(displayName);
+    if(on)active++;
+    h+='<button class="ptag '+(on?'on':'off')+'" onclick="togPat(\''+displayName.replace(/'/g,"\\'")+'\')">'+displayName+'</button>';
+  });
+  grid.innerHTML=h;$('statActive').textContent=active;
+}
+function togPat(displayName){
+  var variants=getVariants(displayName);
+  var wasOn=isDisplayEnabled(displayName);
+  if(wasOn){
+    // Turn OFF: remove all variants from patterns, add to disabled
+    variants.forEach(function(v){
+      patterns=patterns.filter(function(x){return x!==v;});
+      if(disabledPatterns.indexOf(v)===-1)disabledPatterns.push(v);
     });
-    grid.innerHTML = h;
-    document.getElementById('statActive').textContent = active;
-}
-function togPat(v) {
-    if (patterns.indexOf(v) !== -1) { patterns = patterns.filter(function(x) { return x !== v; }); if (disabledPatterns.indexOf(v) === -1) disabledPatterns.push(v); }
-    else { disabledPatterns = disabledPatterns.filter(function(x) { return x !== v; }); if (patterns.indexOf(v) === -1) patterns.push(v); }
-    renderPatterns(); toast(v + ' ' + (patterns.indexOf(v) !== -1 ? 'ON' : 'OFF'));
-}
-renderPatterns(); updateMasterUI();
-
-/* ── Save ── */
-function saveAll() {
-    vscode.postMessage({ command: 'save', data: {
-        enabled: document.getElementById('chkEnabled').checked,
-        scrollOn: document.getElementById('chkScroll').checked,
-        pauseMs: parseInt(document.getElementById('rngPause').value) || 7000,
-        scrollMs: parseInt(document.getElementById('rngScroll').value) || 500,
-        approveMs: parseInt(document.getElementById('rngApprove').value) || 1000,
-        patterns: patterns, disabledPatterns: disabledPatterns,
-        language: document.getElementById('selLang').value
-    }}); toast('Đã lưu');
-}
-
-/* ── Stats bars ── */
-var BAR_COLORS = ['c1','c2','c3','c4','c5','c6'];
-function renderBars(stats) {
-    var el = document.getElementById('statBars'); var max = 0;
-    ALL_PATTERNS.forEach(function(p) { var c = stats[p] || 0; if (c > max) max = c; });
-    if (el.children.length === 0) {
-        var h = '';
-        ALL_PATTERNS.forEach(function(p, i) { h += '<div class="bar-row"><span class="bar-lbl">' + p + '</span><div class="bar-bg"><div class="bar-fill ' + BAR_COLORS[i % 6] + '" id="fill-' + i + '" style="width:0%"></div></div><span class="bar-cnt" id="cnt-' + i + '">0</span></div>'; });
-        el.innerHTML = h;
-    }
-    ALL_PATTERNS.forEach(function(p, i) {
-        var c = stats[p] || 0; var pct = max > 0 ? Math.round(c / max * 100) : 0;
-        var f = document.getElementById('fill-' + i); var t = document.getElementById('cnt-' + i);
-        if (f) f.style.width = pct + '%';
-        if (t && t.textContent !== String(c)) t.textContent = c;
+  }else{
+    // Turn ON: add all variants to patterns, remove from disabled
+    variants.forEach(function(v){
+      disabledPatterns=disabledPatterns.filter(function(x){return x!==v;});
+      if(patterns.indexOf(v)===-1)patterns.push(v);
     });
+  }
+  renderPatterns();toast(displayName+' '+(isDisplayEnabled(displayName)?'ON':'OFF'));
+}
+renderPatterns();updateMasterUI();
+
+function saveAll(){
+  vscode.postMessage({command:'save',data:{
+    enabled:$('chkEnabled').checked,scrollOn:$('chkScroll').checked,
+    pauseMs:parseInt($('rngPause').value)||7000,scrollMs:parseInt($('rngScroll').value)||500,
+    approveMs:parseInt($('rngApprove').value)||1000,patterns:patterns,disabledPatterns:disabledPatterns,language:'en'
+  }});toast('Saved');
 }
 
-/* ── Click log ── */
-var _lastLogKey = null;
-function renderLog(log) {
-    var el = document.getElementById('logList');
-    if (!log || !log.length) { if (_lastLogKey !== '') { _lastLogKey = ''; el.innerHTML = '<div class="log-empty">—</div>'; } return; }
-    // Key = first entry time+pattern — avoids full string compare
-    var key = (log[0] && (log[0].time + log[0].pattern)) || '';
-    if (_lastLogKey === key) return;
-    var isNew = _lastLogKey !== null;
-    _lastLogKey = key;
-    var colors = { Run: 'var(--green)', Allow: 'var(--accent)', Accept: 'var(--peach)', 'Always Allow': 'var(--teal)', Retry: 'var(--purple)', 'Keep Waiting': 'var(--teal)', Continue: 'var(--accent)' };
-    var h = '';
-    log.forEach(function(c, i) {
-        var cls = (i === 0 && isNew) ? ' log-new' : '';
-        h += '<div class="log-item' + cls + '"><span style="color:' + (colors[c.pattern] || 'var(--text2)') + ';font-weight:700">' + (c.pattern || '') + '</span><span style="color:var(--text3)">' + (c.time || '') + '</span></div>';
-    });
-    el.innerHTML = h;
-    el.scrollTop = 0;
-}
-function resetStats() { vscode.postMessage({ command: 'resetStats' }); document.getElementById('totalCount').textContent = '0'; document.getElementById('statTotal').textContent = '0'; renderBars({}); toast('Đã xóa'); }
-function clearLog() { vscode.postMessage({ command: 'clearLog' }); renderLog([]); toast('Đã xóa'); }
-
-/* ── Concept map rendering ── */
-function renderConcepts(data) {
-    var el = document.getElementById('conceptMap');
-    if (!data || Object.keys(data).length === 0) { el.innerHTML = '<div class="log-empty">Tín hiệu sẽ xuất hiện khi hệ thống học được các mẫu</div>'; return; }
-    var entries = Object.entries(data).sort(function(a,b) { return b[1].commands.length - a[1].commands.length; });
-    var h = '';
-    var riskClass = { safe: 'risk-safe', caution: 'risk-caution', danger: 'risk-danger', unknown: 'risk-unknown' };
-    entries.forEach(function(e) {
-        var name = e[0], c = e[1];
-        var pct = Math.max(0, Math.min(100, Math.round((c.avgConfidence + 1) / 2 * 100)));
-        var barColor = c.avgConfidence >= 0.5 ? 'var(--green)' : c.avgConfidence >= 0 ? 'var(--yellow)' : 'var(--red)';
-        h += '<div class="concept-card">';
-        h += '<div style="display:flex;justify-content:space-between;align-items:center">';
-        h += '<span class="concept-name">' + name + '</span>';
-        h += '<span class="risk ' + (riskClass[c.riskLevel] || 'risk-unknown') + '">' + (c.riskLevel || 'unknown') + '</span>';
-        h += '</div>';
-        h += '<div class="concept-bar"><div class="concept-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
-        h += '<div class="concept-meta"><span>' + c.commands.length + ' commands</span><span>conf: ' + Math.round(c.avgConfidence * 100) + '%</span></div>';
-        h += '</div>';
-    });
-    el.innerHTML = h;
+var BC=['var(--blue)','var(--green)','var(--yellow)','var(--red)','var(--purple)','var(--cyan)'];
+function renderBars(stats){
+  var el=$('statBars');var max=0;
+  ALL_PATTERNS.forEach(function(p){var c=stats[p]||0;if(c>max)max=c});
+  if(!el.children.length){
+    var h='';ALL_PATTERNS.forEach(function(p,i){
+      h+='<div class="bar-r"><span class="bar-k">'+p+'</span><div class="bar-bg"><div class="bar-fg" id="bf-'+i+'" style="width:0%;background:'+BC[i%6]+'"></div></div><span class="bar-n" id="bn-'+i+'">0</span></div>';
+    });el.innerHTML=h;
+  }
+  ALL_PATTERNS.forEach(function(p,i){
+    var c=stats[p]||0;var pct=max>0?Math.round(c/max*100):0;
+    var f=$('bf-'+i),t=$('bn-'+i);
+    if(f)f.style.width=pct+'%';if(t&&t.textContent!==String(c))t.textContent=c;
+  });
 }
 
-/* ── Wiki log rendering ── */
-var _lastWikiKey = null;
-function renderWikiLog(log) {
-    var el = document.getElementById('wikiLog');
-    if (!log || !log.length) { if (_lastWikiKey !== '') { _lastWikiKey = ''; el.innerHTML = '<div class="log-empty">—</div>'; } return; }
-    // Keyed on last entry — log is chronological, last = newest
-    var key = (log[log.length - 1] && (log[log.length - 1].time + (log[log.length - 1].cmd || log[log.length - 1].op || log[log.length - 1].detail || ''))) || '';
-    if (_lastWikiKey === key) return;
-    var isNew = _lastWikiKey !== null;
-    _lastWikiKey = key;
-    var h = '';
-    var opCls = { ingest: 'op-ingest', lint: 'op-lint', approve: 'op-approve', reject: 'op-reject', msg: 'op-approve' };
-    // Reverse for display (newest first)
-    log.slice().reverse().forEach(function(l, i) {
-        var cls = (i === 0 && isNew) ? ' log-new' : '';
-        h += '<div class="wiki-log-item' + cls + '">';
-        h += '<span class="ts">' + (l.time || '').slice(11, 19) + '</span>';
-        h += '<span class="op ' + (opCls[l.op] || opCls[l.action] || '') + '">' + (l.op || '') + '</span>';
-        h += '<span style="color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (l.cmd || l.detail || '') + '</span>';
-        if (l.action) h += '<span style="color:' + (l.action === 'approve' ? 'var(--green)' : 'var(--red)') + ';margin-left:auto;padding-left:4px">' + l.action + '</span>';
-        if (l.conf !== undefined) h += '<span style="color:var(--text3);min-width:32px;text-align:right">' + (Math.round(l.conf * 100)) + '%</span>';
-        h += '</div>';
-    });
-    el.innerHTML = h;
-    el.scrollTop = 0;
+var _lk=null;
+function renderLog(log){
+  var el=$('logList');
+  if(!log||!log.length){if(_lk!==''){_lk='';el.innerHTML='<div class="feed-empty">No clicks yet</div>'}return}
+  var key=(log[0]&&(log[0].time+log[0].pattern))||'';if(_lk===key)return;
+  var isNew=_lk!==null;_lk=key;
+  var h='';log.forEach(function(c,i){
+    var cls=(i===0&&isNew)?' feed-new':'';
+    h+='<div class="feed-row'+cls+'"><span class="feed-ts">'+(c.time||'')+'</span><span class="feed-op" style="color:var(--green)">'+(c.pattern||'')+'</span><span class="feed-cmd">'+(c.button||'')+'</span></div>';
+  });el.innerHTML=h;el.scrollTop=0;
+}
+function resetStats(){vscode.postMessage({command:'resetStats'});$('totalCount').textContent='0';$('statTotal').textContent='0';renderBars({});toast('Reset')}
+function clearLog(){vscode.postMessage({command:'clearLog'});renderLog([]);toast('Cleared')}
+
+function renderConcepts(data){
+  var el=$('conceptMap');
+  if(!data||!Object.keys(data).length){el.innerHTML='<div class="feed-empty">Concepts appear as the system learns</div>';return}
+  var entries=Object.entries(data).sort(function(a,b){return b[1].commands.length-a[1].commands.length});
+  var h='';entries.forEach(function(e){
+    var name=e[0],c=e[1];
+    var pct=Math.max(0,Math.min(100,Math.round((c.avgConfidence+1)/2*100)));
+    var col=c.avgConfidence>=0.5?'var(--green)':c.avgConfidence>=0?'var(--yellow)':'var(--red)';
+    h+='<div class="cpt"><div class="cpt-top"><span class="cpt-name">'+name+'</span><span class="cpt-risk '+(c.riskLevel||'unknown')+'">'+(c.riskLevel||'?')+'</span></div>';
+    h+='<div class="cpt-bar"><div class="cpt-fill" style="width:'+pct+'%;background:'+col+'"></div></div>';
+    h+='<div class="cpt-meta"><span>'+c.commands.length+' cmds</span><span>'+Math.round(c.avgConfidence*100)+'%</span></div></div>';
+  });el.innerHTML=h;
 }
 
-/* ── Session rendering ── */
-var TOOL_COLORS = { 'file-edit':'var(--accent)', 'terminal':'var(--green)', 'search':'var(--teal)', 'think':'var(--purple)', 'tool-call':'var(--yellow)' };
-var HEALTH_CFG = {
-    healthy: { cls:'risk-safe', lbl:'✅ Ổn định' },
-    learning: { cls:'risk-caution', lbl:'🧠 Đang học' },
-    degrading: { cls:'risk-danger', lbl:'⚠️ Suy giảm' },
-    new: { cls:'risk-unknown', lbl:'○ Mới' }
-};
-function fmtMs(ms) {
-    if (!ms || ms <= 0) return '\u2014';
-    if (ms < 1000) return ms + 'ms';
-    if (ms < 60000) return Math.round(ms/1000) + 's';
-    return Math.floor(ms/60000) + 'm ' + Math.round((ms%60000)/1000) + 's';
-}
-function renderSession(s) {
-    if (!s) return;
-    document.getElementById('sessDuration').textContent = fmtMs(s.sessionMs);
-    document.getElementById('sessMsg').textContent = s.msgCount || 0;
-    document.getElementById('sessApprove').textContent = s.approveCount || 0;
-    document.getElementById('sessAvgResp').textContent = s.avgResponseMs ? fmtMs(s.avgResponseMs) : '\u2014';
-
-    // AI typing indicator
-    var tr = document.getElementById('aiTypingRow');
-    if (tr) tr.style.display = s.aiTyping ? 'flex' : 'none';
-
-    // Learning health badge
-    var hb = document.getElementById('healthBadge');
-    if (hb && s.learningHealth) {
-        var hc = HEALTH_CFG[s.learningHealth] || HEALTH_CFG['new'];
-        hb.className = 'risk ' + hc.cls;
-        hb.textContent = hc.lbl;
-    }
-
-    // Tool breakdown bars
-    var bd = document.getElementById('toolBreakdown');
-    if (bd && s.toolBreakdown && Object.keys(s.toolBreakdown).length > 0) {
-        var entries = Object.entries(s.toolBreakdown).sort(function(a,b){ return b[1].count - a[1].count; });
-        var maxCount = entries[0][1].count;
-        var h = '';
-        entries.forEach(function(e) {
-            var tool = e[0], td = e[1];
-            var pct = maxCount > 0 ? Math.round(td.count / maxCount * 100) : 0;
-            var col = TOOL_COLORS[tool] || 'var(--text2)';
-            var avgMs = td.count > 0 ? Math.round(td.totalMs / td.count) : 0;
-            h += '<div class="bar-row">';
-            h += '<span class="bar-lbl" style="color:' + col + '">' + tool + '</span>';
-            h += '<div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div>';
-            h += '<span class="bar-cnt" style="min-width:50px">' + td.count + (avgMs ? ' \u00b7 ' + fmtMs(avgMs) : '') + '</span>';
-            h += '</div>';
-        });
-        bd.innerHTML = h;
-    }
+var _wk=null;
+function renderWikiLog(log){
+  var el=$('wikiLog');
+  if(!log||!log.length){if(_wk!==''){_wk='';el.innerHTML='<div class="feed-empty">No events yet</div>'}return}
+  var key=(log[log.length-1]&&(log[log.length-1].time+(log[log.length-1].cmd||'')))||'';
+  if(_wk===key)return;var isNew=_wk!==null;_wk=key;
+  var h='';log.slice().reverse().forEach(function(l,i){
+    var cls=(i===0&&isNew)?' feed-new':'';
+    h+='<div class="feed-row'+cls+'"><span class="feed-ts">'+(l.time||'').slice(11,19)+'</span>';
+    h+='<span class="feed-op '+(l.op||l.action||'')+'">'+(l.op||'')+'</span>';
+    h+='<span class="feed-cmd">'+(l.cmd||l.detail||'')+'</span>';
+    if(l.conf!==undefined)h+='<span class="feed-conf">'+Math.round(l.conf*100)+'%</span>';
+    h+='</div>';
+  });el.innerHTML=h;el.scrollTop=0;
 }
 
-/* ── Terminal log rendering ── */
-var _lastTermKey = null;
-function renderTermLog(log) {
-    var el = document.getElementById('termLogList');
-    if (!el) return;
-    if (!log || !log.length) { if (_lastTermKey !== '') { _lastTermKey = ''; el.innerHTML = '<div class="log-empty">\u2014</div>'; } return; }
-    var key = (log[0] && (log[0].time + log[0].cmd)) || '';
-    if (_lastTermKey === key) return;
-    var isNew = _lastTermKey !== null;
-    _lastTermKey = key;
-    var h = '';
-    var srcColors = { 'shell':'var(--green)', 'agent':'var(--teal)', 'ui':'var(--text2)', 'ui-scan':'var(--text3)' };
-    log.forEach(function(t, i) {
-        var cls = (i === 0 && isNew) ? ' log-new' : '';
-        var col = srcColors[t.source] || 'var(--text2)';
-        h += '<div class="log-item' + cls + '">';
-        h += '<span style="color:' + col + ';font-family:monospace;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + (t.cmd || '').slice(0, 80) + '</span>';
-        h += '<span style="color:var(--text3);font-size:9px;white-space:nowrap;margin-left:4px">' + (t.source || '') + ' ' + (t.time || '') + '</span>';
-        h += '</div>';
-    });
-    el.innerHTML = h;
-    el.scrollTop = 0;
+var _tk=null;
+function renderTermLog(log){
+  var el=$('termLogList');if(!el)return;
+  if(!log||!log.length){if(_tk!==''){_tk='';el.innerHTML='<div class="feed-empty">No terminal activity</div>'}return}
+  var key=(log[0]&&(log[0].time+log[0].cmd))||'';if(_tk===key)return;
+  var isNew=_tk!==null;_tk=key;
+  var h='';log.forEach(function(t,i){
+    var cls=(i===0&&isNew)?' feed-new':'';
+    h+='<div class="feed-row'+cls+'"><span class="feed-ts">'+(t.time||'')+'</span><span class="feed-op" style="color:var(--mute)">'+(t.source||'')+'</span><span class="feed-cmd">'+(t.cmd||'').slice(0,80)+'</span></div>';
+  });el.innerHTML=h;el.scrollTop=0;
 }
 
-/* ── Message handler ── */
-window.addEventListener('message', function(e) {
-    var m = e.data;
-    if (m.command === 'statsUpdated') { document.getElementById('totalCount').textContent = m.totalClicks || 0; document.getElementById('statTotal').textContent = m.totalClicks || 0; renderBars(m.stats || {}); }
-    if (m.command === 'logUpdated') renderLog(m.log);
-    if (m.command === 'termLogUpdated') renderTermLog(m.termLog);
-    if (m.command === 'sessionUpdated') renderSession(m.session);
-    if (m.command === 'quotaDetected') {
-        var hb = document.getElementById('healthBadge');
-        if (hb) { hb.className = 'risk risk-danger'; hb.textContent = '\u26a0 Quota Hit'; }
-    }
-    if (m.command === 'brainUpdated') {
-        document.getElementById('brainEpoch').textContent = m.epoch || 0;
-        document.getElementById('brainTracking').textContent = m.tracking || 0;
-        document.getElementById('brainWhite').textContent = m.whiteCount || 0;
-        document.getElementById('brainBlack').textContent = m.blackCount || 0;
-        document.getElementById('brainPromoted').textContent = m.promoted || 0;
-        document.getElementById('brainPatterns').textContent = m.patterns || 0;
-        document.getElementById('wikiPages').textContent = m.wikiPages || 0;
-        document.getElementById('wikiConcepts').textContent = m.wikiConcepts || 0;
-        document.getElementById('wikiContradictions').textContent = m.wikiContradictions || 0;
-        if (m.concepts) renderConcepts(m.concepts);
-        if (m.wikiLog) renderWikiLog(m.wikiLog);
-        if (m.session) renderSession(m.session);
-        if (m.termLog) renderTermLog(m.termLog);
-    }
+function fmtMs(ms){if(!ms||ms<=0)return'\u2014';if(ms<1000)return ms+'ms';if(ms<60000)return Math.round(ms/1000)+'s';return Math.floor(ms/60000)+'m'}
+var HC={healthy:{c:'green',l:'Healthy'},learning:{c:'yellow',l:'Learning'},degrading:{c:'red',l:'Degrading'},new:{c:'',l:'New'}};
+function renderSession(s){
+  if(!s)return;
+  $('sessDuration').textContent=fmtMs(s.sessionMs);
+  $('sessMsg').textContent=s.msgCount||0;
+  $('sessApprove').textContent=s.approveCount||0;
+  $('sessAvgResp').textContent=s.avgResponseMs?fmtMs(s.avgResponseMs):'\u2014';
+  var ty=$('aiTyping');if(ty)ty.classList.toggle('on',!!s.aiTyping);
+  var hb=$('healthBadge');if(hb&&s.learningHealth){var hc=HC[s.learningHealth]||HC['new'];hb.className='gauge-v'+(hc.c?' '+hc.c:'');hb.textContent=hc.l}
+  var bd=$('toolBreakdown');
+  if(bd&&s.toolBreakdown&&Object.keys(s.toolBreakdown).length>0){
+    var entries=Object.entries(s.toolBreakdown).sort(function(a,b){return b[1].count-a[1].count});
+    var mx=entries[0][1].count;var h='';
+    entries.forEach(function(e,i){
+      var tool=e[0],td=e[1];var pct=mx>0?Math.round(td.count/mx*100):0;
+      var avgMs=td.count>0?Math.round(td.totalMs/td.count):0;
+      h+='<div class="bar-r"><span class="bar-k">'+tool+'</span><div class="bar-bg"><div class="bar-fg" style="width:'+pct+'%;background:'+BC[i%6]+'"></div></div><span class="bar-n">'+td.count+(avgMs?' \u00b7 '+fmtMs(avgMs):'')+'</span></div>';
+    });bd.innerHTML=h;
+  }
+}
+
+/* ── Quota ── */
+function renderQuota(q){
+  if(!q)return;
+  var pp=$('quotaPct');if(pp){var c=q.overallPct>=90?'red':q.overallPct>=70?'yellow':'green';pp.className='gauge-v '+c;pp.textContent=q.overallPct+'%'}
+  var rr=$('quotaRate');if(rr)rr.textContent=q.usageRate>0?q.usageRate+'%/h':'\u2014';
+  var rw=$('quotaRunway');if(rw){if(q.runwayMin===Infinity||q.runwayMin>9999)rw.textContent='\u221E';else if(q.runwayMin<=0){rw.textContent='Exhausted';rw.className='gauge-v red'}else if(q.runwayMin<60){rw.textContent=q.runwayMin+'m';rw.className='gauge-v'+(q.runwayMin<=30?' red':' yellow')}else{rw.textContent=Math.round(q.runwayMin/60*10)/10+'h';rw.className='gauge-v'}}
+  var nr=$('quotaReset');if(nr){if(q.nextReset>0){var d=q.nextReset-Date.now();nr.textContent=d>0?fmtMs(d):'Now'}else nr.textContent='\u2014'}
+  var pt=$('quotaPort');if(pt)pt.textContent=q.lsPort||'scanning...';
+  var ml=$('quotaModels');if(ml&&q.models&&Object.keys(q.models).length>0){
+    var h='';Object.entries(q.models).forEach(function(e){
+      var n=e[0],m=e[1];var col=m.status==='critical'?'var(--red)':m.status==='warning'?'var(--yellow)':'var(--green)';
+      h+='<div class="bar-r"><span class="bar-k">'+(m.name||n)+'</span><div class="bar-bg"><div class="bar-fg" style="width:'+m.pct+'%;background:'+col+'"></div></div><span class="bar-n">'+m.pct+'%</span></div>';
+    });ml.innerHTML=h;
+  }else if(ml&&q.error){ml.innerHTML='<div class="feed-empty">'+q.error+'</div>'}
+}
+
+/* ── ROI ── */
+function renderROI(r){
+  if(!r)return;var s=r.session,l=r.lifetime;
+  if(s){
+    var sv=$('roiSaved');if(sv)sv.textContent=s.savedSec>=60?s.savedMin+'m':s.savedSec+'s';
+    var rc=$('roiClicks');if(rc)rc.textContent=s.clicks;
+    var rg=$('roiGain');if(rg){rg.textContent=s.gainPct+'%';rg.className='gauge-v'+(s.gainPct>=10?' green':s.gainPct>=5?' yellow':'')}
+    var rd=$('roiDaily');if(rd)rd.textContent=s.dailySavedMin+'m';
+  }
+  if(l){
+    var ls=$('roiLifeSaved');if(ls)ls.textContent=l.savedHours>=1?l.savedHours+'h':l.savedMin+'m';
+    var lc=$('roiLifeClicks');if(lc)lc.textContent=l.totalClicks;
+    var ln=$('roiLifeSessions');if(ln)ln.textContent=l.sessions;
+  }
+}
+
+/* ── Idle ── */
+function renderIdle(isIdle){
+  var el=$('idleStatus');if(!el)return;
+  if(isIdle===undefined||isIdle===null){el.textContent='\u2014';return}
+  el.textContent=isIdle?'Idle (auto-accept active)':'Typing (paused)';
+  el.className='gauge-v'+(isIdle?' green':' yellow');
+}
+
+window.addEventListener('message',function(e){
+  var m=e.data;
+  if(m.command==='statsUpdated'){$('totalCount').textContent=m.totalClicks||0;$('statTotal').textContent=m.totalClicks||0;renderBars(m.stats||{})}
+  if(m.command==='logUpdated')renderLog(m.log);
+  if(m.command==='termLogUpdated')renderTermLog(m.termLog);
+  if(m.command==='sessionUpdated')renderSession(m.session);
+  if(m.command==='quotaUpdated')renderQuota(m.quota);
+  if(m.command==='idleChanged')renderIdle(m.idle);
+  if(m.command==='brainUpdated'){
+    $('brainEpoch').textContent=m.epoch||0;$('brainTracking').textContent=m.tracking||0;
+    $('brainWhite').textContent=m.whiteCount||0;$('brainBlack').textContent=m.blackCount||0;
+    $('brainPromoted').textContent=m.promoted||0;$('brainPatterns').textContent=m.patterns||0;
+    $('wikiPages').textContent=m.wikiPages||0;$('wikiConcepts').textContent=m.wikiConcepts||0;
+    $('wikiContradictions').textContent=m.wikiContradictions||0;
+    if(m.concepts)renderConcepts(m.concepts);if(m.wikiLog)renderWikiLog(m.wikiLog);
+    if(m.session)renderSession(m.session);if(m.termLog)renderTermLog(m.termLog);
+    if(m.quota)renderQuota(m.quota);if(m.roi)renderROI(m.roi);
+    if(m.idle!==undefined)renderIdle(m.idle);
+  }
 });
-vscode.postMessage({ command: 'getStats' });
-vscode.postMessage({ command: 'getLog' });
-renderBars({{STATS_JSON}});
-renderConcepts(CONCEPTS_DATA);
-renderWikiLog(WIKI_LOG_DATA);
+vscode.postMessage({command:'getStats'});vscode.postMessage({command:'getLog'});
+renderBars({{STATS_JSON}});renderConcepts(CONCEPTS_DATA);renderWikiLog(WIKI_LOG_DATA);
 </script>
 </body>
 </html>

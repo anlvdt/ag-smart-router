@@ -7,14 +7,14 @@
 let _passed = 0, _failed = 0;
 function assert(condition, msg) {
     if (condition) { _passed++; }
-    else { _failed++; console.error(`  ✗ FAIL: ${msg}`); }
+    else { _failed++; console.error(`  x FAIL: ${msg}`); }
 }
 function section(name) { console.log(`\n── ${name} ──`); }
 
 // Mock vscode
 const Module = require('module');
 const origResolve = Module._resolveFilename;
-Module._resolveFilename = function(request, parent, isMain, options) {
+Module._resolveFilename = function (request, parent, isMain, options) {
     if (request === 'vscode') return 'vscode';
     return origResolve.call(this, request, parent, isMain, options);
 };
@@ -24,7 +24,7 @@ require.cache['vscode'] = {
         workspace: {
             getConfiguration: () => ({
                 get: (k, f) => f,
-                update: async () => {},
+                update: async () => { },
             }),
             workspaceFolders: [{ name: 'test-project' }],
         },
@@ -46,7 +46,7 @@ const mockCtx = {
 
 // Mock wiki
 const mockWiki = {
-    ingest: () => {},
+    ingest: () => { },
     query: () => null,
     getSequences: () => ({}),
 };
@@ -97,7 +97,8 @@ const result2 = learning.evaluateCommand('rm -rf /');
 assert(result2.allowed === false, 'rm -rf / blocked');
 
 const result3 = learning.evaluateCommand('unknowncmd123');
-assert(result3.allowed === false, 'unknown command blocked');
+assert(result3.allowed === false, 'unknown command blocked by default');
+assert(result3.confidence <= 0.3, 'unknown command has low confidence');
 
 section('Compound command evaluation');
 const result4 = learning.evaluateCommand('npm install && git push');

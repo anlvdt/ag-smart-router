@@ -1,6 +1,13 @@
 .git/**
 .vscode/**
 .gitignore
+node_modules/.package-lock.json
+.agents
+.agent
+_agents
+_agent
+.claude
+.qoder
 ._*
 **/._*
 *.vsix
@@ -12,8 +19,6 @@ package-lock.json
 src/extension.legacy.js
 test_*.py
 test-*.js
-node_modules/**
-!node_modules/ws/**
 scripts/**
 launch-antigravity.sh
 KARPATHY-AI-LEARNING-GUIDE.md

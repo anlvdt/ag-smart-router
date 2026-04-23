@@ -14,7 +14,7 @@ const files = fs.readdirSync(testDir)
     .filter(f => f.endsWith('.test.js'))
     .sort();
 
-console.log(`\n🧪 Grav Test Suite — ${files.length} test files\n`);
+console.log(`\nGrav Test Suite — ${files.length} test files\n`);
 
 let totalPassed = 0, totalFailed = 0;
 
@@ -27,14 +27,14 @@ for (const file of files) {
             const p = parseInt(match[1]), f = parseInt(match[2]);
             totalPassed += p;
             totalFailed += f;
-            const icon = f > 0 ? '✗' : '✓';
+            const icon = f > 0 ? 'x' : 'v';
             console.log(`  ${icon} ${file}: ${p} passed, ${f} failed`);
         } else {
             console.log(`  ? ${file}: (no summary found)`);
         }
     } catch (e) {
         totalFailed++;
-        console.log(`  ✗ ${file}: CRASHED`);
+        console.log(`  x ${file}: CRASHED`);
         if (e.stderr) console.log(`    ${e.stderr.split('\n')[0]}`);
     }
 }

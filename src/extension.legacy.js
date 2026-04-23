@@ -18,26 +18,26 @@
 //      → Win32 native button handler
 // ═══════════════════════════════════════════════════════════════
 const vscode = require('vscode');
-const fs     = require('fs');
-const path   = require('path');
-const os     = require('os');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
-const http   = require('http');
+const http = require('http');
 const { execSync, execFile } = require('child_process');
 
 // ── Constants ────────────────────────────────────────────────
 const TAG = { open: '<!-- GRAV-RUNTIME-START -->', close: '<!-- GRAV-RUNTIME-END -->' };
 const LEGACY_TAGS = [
-    ['<!-- AG-AUTOPILOT-START -->',          '<!-- AG-AUTOPILOT-END -->'],
-    ['<!-- AG-AUTO-CLICK-SCROLL-START -->',  '<!-- AG-AUTO-CLICK-SCROLL-END -->'],
-    ['<!-- AG-MODEL-SWITCH-START -->',       '<!-- AG-MODEL-SWITCH-END -->'],
-    ['<!-- AG-TOOLKIT-START -->',            '<!-- AG-TOOLKIT-END -->'],
+    ['<!-- AG-AUTOPILOT-START -->', '<!-- AG-AUTOPILOT-END -->'],
+    ['<!-- AG-AUTO-CLICK-SCROLL-START -->', '<!-- AG-AUTO-CLICK-SCROLL-END -->'],
+    ['<!-- AG-MODEL-SWITCH-START -->', '<!-- AG-MODEL-SWITCH-END -->'],
+    ['<!-- AG-TOOLKIT-START -->', '<!-- AG-TOOLKIT-END -->'],
 ];
 const LEGACY_SCRIPTS = ['ag-auto-script.js', 'ag-modelswitch-client.js'];
-const RUNTIME_FILE   = 'grav-runtime.js';
-const CONFIG_FILE    = 'grav-config.json';
-const PORT_START     = 48787;
-const PORT_END       = 48850;
+const RUNTIME_FILE = 'grav-runtime.js';
+const CONFIG_FILE = 'grav-config.json';
+const PORT_START = 48787;
+const PORT_END = 48850;
 
 const ACCEPT_CMDS = [
     'antigravity.agent.acceptAgentStep',
@@ -47,37 +47,32 @@ const ACCEPT_CMDS = [
 ];
 
 const DEFAULT_PATTERNS = [
-    'Run','Allow','Always Allow','Keep Waiting','Continue','Retry',
-    'Accept all','Accept All','Accept','Accept & Run',
-    'Allow in this Session','Allow in this Workspace',
-    'Allow this conversation',
-    'Always Allow Without Review','Allow and Review','Allow and Skip Reviewing Result',
-    'Approve Tool Result','Approve all',
-    'Keep All Edits','Keep & Continue','Keep',
-    'Proceed','Trust','Run Task',
-    'Allow Once',
+    'Accept all', 'Accept All', 'Accept',
+    'Retry', 'Proceed',
+    'Run',
+    'Approve', 'Expand',
 ];
 
 const SAFE_TERMINAL_CMDS = [
-    'ls','dir','cat','echo','pwd','cd','mkdir','cp','mv','touch',
-    'npm','npx','yarn','pnpm','bun','deno','node','python','python3','pip','pip3',
-    'git','which','where','type','file','stat','readlink',
-    'head','tail','wc','sort','uniq','diff','grep','find','xargs',
-    'sed','awk','tr','cut','tee','date','whoami','id',
-    'env','printenv','uname','hostname','df','du','free',
-    'ps','top','htop','lsof','netstat','ss','ping','dig','nslookup','host',
-    'cargo','rustc','go','java','javac','mvn','gradle',
-    'docker','docker-compose','podman','kubectl','helm','terraform','ansible',
-    'make','cmake','gcc','g++','clang',
-    'jq','yq','base64','md5','sha256sum','openssl',
-    'tar','zip','unzip','gzip','gunzip','bzip2','xz',
-    'curl','wget','http','httpie',
-    'brew','apt','apt-get','yum','dnf','pacman','snap',
-    'sqlite3','psql','mysql','mongosh','redis-cli',
-    'tsc','eslint','prettier','jest','vitest','mocha','playwright',
-    'sass','postcss','webpack','vite','esbuild','rollup','turbo',
-    'uvx','uv','pipx','poetry','pdm','ruff','black','mypy',
-    'code','antigravity',
+    'ls', 'dir', 'cat', 'echo', 'pwd', 'cd', 'mkdir', 'cp', 'mv', 'touch',
+    'npm', 'npx', 'yarn', 'pnpm', 'bun', 'deno', 'node', 'python', 'python3', 'pip', 'pip3',
+    'git', 'which', 'where', 'type', 'file', 'stat', 'readlink',
+    'head', 'tail', 'wc', 'sort', 'uniq', 'diff', 'grep', 'find', 'xargs',
+    'sed', 'awk', 'tr', 'cut', 'tee', 'date', 'whoami', 'id',
+    'env', 'printenv', 'uname', 'hostname', 'df', 'du', 'free',
+    'ps', 'top', 'htop', 'lsof', 'netstat', 'ss', 'ping', 'dig', 'nslookup', 'host',
+    'cargo', 'rustc', 'go', 'java', 'javac', 'mvn', 'gradle',
+    'docker', 'docker-compose', 'podman', 'kubectl', 'helm', 'terraform', 'ansible',
+    'make', 'cmake', 'gcc', 'g++', 'clang',
+    'jq', 'yq', 'base64', 'md5', 'sha256sum', 'openssl',
+    'tar', 'zip', 'unzip', 'gzip', 'gunzip', 'bzip2', 'xz',
+    'curl', 'wget', 'http', 'httpie',
+    'brew', 'apt', 'apt-get', 'yum', 'dnf', 'pacman', 'snap',
+    'sqlite3', 'psql', 'mysql', 'mongosh', 'redis-cli',
+    'tsc', 'eslint', 'prettier', 'jest', 'vitest', 'mocha', 'playwright',
+    'sass', 'postcss', 'webpack', 'vite', 'esbuild', 'rollup', 'turbo',
+    'uvx', 'uv', 'pipx', 'poetry', 'pdm', 'ruff', 'black', 'mypy',
+    'code', 'antigravity',
 ];
 
 const DEFAULT_BLACKLIST = [
@@ -111,54 +106,54 @@ const DEFAULT_BLACKLIST = [
 //   5. Decay + momentum: temporal awareness, recent data matters more
 //   6. Loss visualization: track confidence trajectory over time
 const LEARN = {
-    ALPHA:           0.15,   // learning rate — how fast confidence moves per event
-    MOMENTUM:        0.9,    // exponential moving average factor for smoothing
-    GAMMA:           0.97,   // daily decay factor (like weight decay / regularization)
-    PROMOTE_THRESH:  0.75,   // confidence threshold to auto-suggest whitelist
-    DEMOTE_THRESH:  -0.50,   // confidence threshold to auto-suggest blacklist
-    OBSERVE_MIN:     5,      // minimum observations before any suggestion (avoid overfitting)
-    MAX_ENTRIES:     1000,   // max tracked commands
-    MAX_HISTORY:     50,     // confidence history length per command (for visualization)
-    CONTEXT_WEIGHT:  0.1,    // bonus/penalty weight for contextual signals
-    GENERALIZE_MIN:  3,      // min commands in a cluster to generalize a pattern
-    BATCH_SIZE:      10,     // process learning updates in mini-batches
+    ALPHA: 0.15,   // learning rate — how fast confidence moves per event
+    MOMENTUM: 0.9,    // exponential moving average factor for smoothing
+    GAMMA: 0.97,   // daily decay factor (like weight decay / regularization)
+    PROMOTE_THRESH: 0.75,   // confidence threshold to auto-suggest whitelist
+    DEMOTE_THRESH: -0.50,   // confidence threshold to auto-suggest blacklist
+    OBSERVE_MIN: 5,      // minimum observations before any suggestion (avoid overfitting)
+    MAX_ENTRIES: 1000,   // max tracked commands
+    MAX_HISTORY: 50,     // confidence history length per command (for visualization)
+    CONTEXT_WEIGHT: 0.1,    // bonus/penalty weight for contextual signals
+    GENERALIZE_MIN: 3,      // min commands in a cluster to generalize a pattern
+    BATCH_SIZE: 10,     // process learning updates in mini-batches
 };
 
 // ── State ────────────────────────────────────────────────────
-let _ctx          = null;
-let _enabled      = true;
-let _scrollOn     = true;
-let _patterns     = [];
-let _stats        = {};
-let _log          = [];
-let _totalClicks  = 0;
-let _httpServer   = null;
-let _httpPort     = 0;
-let _acceptTimer  = null;
-let _dashboard    = null;
-let _lsPort       = 0;
-let _lsCsrf       = '';
-let _lsOk         = false;
-let _lastQuotaMs  = 0;
+let _ctx = null;
+let _enabled = true;
+let _scrollOn = true;
+let _patterns = [];
+let _stats = {};
+let _log = [];
+let _totalClicks = 0;
+let _httpServer = null;
+let _httpPort = 0;
+let _acceptTimer = null;
+let _dashboard = null;
+let _lsPort = 0;
+let _lsCsrf = '';
+let _lsOk = false;
+let _lastQuotaMs = 0;
 
 // Adaptive learning state (Karpathy-inspired neural model)
-let _learnData    = {};  // { cmdName: { conf, velocity, obs, rewards, history[], contexts{} } }
-let _learnEpoch   = 0;   // global training step counter
+let _learnData = {};  // { cmdName: { conf, velocity, obs, rewards, history[], contexts{} } }
+let _learnEpoch = 0;   // global training step counter
 let _userWhitelist = [];
 let _userBlacklist = [];
-let _patternCache  = []; // generalized patterns discovered from data
+let _patternCache = []; // generalized patterns discovered from data
 
 // ── Session Intelligence state ───────────────────────────────
 // Resets each time the extension activates (per IDE session)
 let _sessionState = {
-    startMs:       0,
-    msgCount:      0,
-    toolCalls:     [],        // [{ tool, startMs, endMs, durationMs }]
+    startMs: 0,
+    msgCount: 0,
+    toolCalls: [],        // [{ tool, startMs, endMs, durationMs }]
     responseTimes: [],        // ms per AI message
-    lastActivityMs:0,
-    aiTyping:      false,
-    approveCount:  0,
-    rejectCount:   0,         // manual rejects from user (future)
+    lastActivityMs: 0,
+    aiTyping: false,
+    approveCount: 0,
+    rejectCount: 0,         // manual rejects from user (future)
     toolBreakdown: {},        // { toolType: { count, totalMs } }
 };
 
@@ -199,7 +194,7 @@ function elevatedWrite(fp, content) {
         else if (process.platform === 'linux')
             execSync(`pkexec bash -c "cp '${tmp}' '${fp}' && chmod 644 '${fp}'"`, { timeout: 30000 });
         else throw new Error('Permission denied — restart as admin');
-    } finally { try { fs.unlinkSync(tmp); } catch (_) {} }
+    } finally { try { fs.unlinkSync(tmp); } catch (_) { } }
 }
 
 function workbenchPath() {
@@ -226,7 +221,7 @@ function deepFind(dir, name, depth) {
             if (e.isFile() && e.name === name) return fp;
             if (e.isDirectory()) { const r = deepFind(fp, name, depth - 1); if (r) return r; }
         }
-    } catch (_) {}
+    } catch (_) { }
     return null;
 }
 
@@ -242,11 +237,11 @@ function buildRuntime() {
     const pats = cfg('approvePatterns', DEFAULT_PATTERNS)
         .filter(p => !dp.includes(p));
     let src = fs.readFileSync(path.join(_ctx.extensionPath, 'media', 'runtime.js'), 'utf8');
-    src = src.replace(/\/\*\{\{PAUSE_MS\}\}\*\/\d+/,    String(cfg('scrollPauseMs', 7000)));
-    src = src.replace(/\/\*\{\{SCROLL_MS\}\}\*\/\d+/,   String(cfg('scrollIntervalMs', 500)));
-    src = src.replace(/\/\*\{\{APPROVE_MS\}\}\*\/\d+/,  String(cfg('approveIntervalMs', 1000)));
+    src = src.replace(/\/\*\{\{PAUSE_MS\}\}\*\/\d+/, String(cfg('scrollPauseMs', 7000)));
+    src = src.replace(/\/\*\{\{SCROLL_MS\}\}\*\/\d+/, String(cfg('scrollIntervalMs', 500)));
+    src = src.replace(/\/\*\{\{APPROVE_MS\}\}\*\/\d+/, String(cfg('approveIntervalMs', 1000)));
     src = src.replace(/\/\*\{\{PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(pats));
-    src = src.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/,     String(cfg('enabled', true)));
+    src = src.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/, String(cfg('enabled', true)));
     return src;
 }
 
@@ -262,7 +257,7 @@ function inject() {
         // remove legacy script files
         for (const f of [...LEGACY_SCRIPTS, RUNTIME_FILE]) {
             const p = path.join(dir, f);
-            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {}
+            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) { }
         }
         // write runtime
         elevatedWrite(path.join(dir, RUNTIME_FILE), buildRuntime());
@@ -284,7 +279,7 @@ function eject() {
         elevatedWrite(wb, html);
         for (const f of [...LEGACY_SCRIPTS, RUNTIME_FILE]) {
             const p = path.join(dir, f);
-            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {}
+            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) { }
         }
         return true;
     } catch (e) { vscode.window.showErrorMessage('[Grav] eject failed: ' + e.message); return false; }
@@ -325,7 +320,7 @@ function patchChecksums() {
             if (pj.checksums[rp] !== h) { pj.checksums[rp] = h; dirty = true; }
         }
         if (dirty) elevatedWrite(pjp, JSON.stringify(pj, null, '\t'));
-    } catch (_) {}
+    } catch (_) { }
 }
 
 function clearCodeCache() {
@@ -337,7 +332,7 @@ function clearCodeCache() {
                 : path.join(os.homedir(), '.config', 'Antigravity');
         const d = path.join(base, 'Code Cache', 'js');
         if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
-    } catch (_) {}
+    } catch (_) { }
 }
 
 function writeRuntimeConfig() {
@@ -354,7 +349,7 @@ function writeRuntimeConfig() {
             scrollMs: cfg('scrollIntervalMs', 500),
             approveMs: cfg('approveIntervalMs', 1000),
         }));
-    } catch (_) {}
+    } catch (_) { }
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -384,9 +379,9 @@ function discoverLS() {
                     { timeout: 5000 }
                 ).toString();
                 if (ok && ok.startsWith('{')) { _lsPort = port; _lsOk = true; return true; }
-            } catch (_) {}
+            } catch (_) { }
         }
-    } catch (_) {}
+    } catch (_) { }
     return false;
 }
 
@@ -398,7 +393,7 @@ function startAcceptLoop() {
     const ms = cfg('approveIntervalMs', 2000);
     _acceptTimer = setInterval(() => {
         if (!_enabled) return;
-        for (const cmd of ACCEPT_CMDS) vscode.commands.executeCommand(cmd).catch(() => {});
+        for (const cmd of ACCEPT_CMDS) vscode.commands.executeCommand(cmd).catch(() => { });
     }, ms);
 }
 
@@ -449,7 +444,7 @@ function matchesBlacklist(cmdLine, blacklist) {
         if (p.startsWith('/') && p.endsWith('/')) {
             try {
                 if (new RegExp(p.slice(1, -1), 'i').test(cmdLine)) return pattern;
-            } catch (_) {}
+            } catch (_) { }
         }
     }
     return null;
@@ -545,7 +540,7 @@ function getPromotedCommands() {
 function loadLearnData() {
     if (!_ctx) return;
     const raw = _ctx.globalState.get('learnData', {});
-    _learnEpoch   = _ctx.globalState.get('learnEpoch', 0);
+    _learnEpoch = _ctx.globalState.get('learnEpoch', 0);
     _userWhitelist = cfg('terminalWhitelist', []);
     _userBlacklist = cfg('terminalBlacklist', []);
 
@@ -820,7 +815,7 @@ function saveLearnData() {
             _ctx.globalState.update('learnData', _learnData);
             _ctx.globalState.update('learnEpoch', _learnEpoch);
             _ctx.globalState.update('wiki', _wiki);
-        } catch (_) {}
+        } catch (_) { }
     }, 2000);
 }
 
@@ -1051,21 +1046,21 @@ function wikiIngest(cmd, action, data, context) {
  */
 function classifyCommand(cmd) {
     const categories = {
-        'package-manager': ['npm','npx','yarn','pnpm','bun','pip','pip3','cargo','go','mvn','gradle','brew','apt','apt-get','yum','dnf','pacman','snap','uvx','uv','pipx','poetry','pdm'],
+        'package-manager': ['npm', 'npx', 'yarn', 'pnpm', 'bun', 'pip', 'pip3', 'cargo', 'go', 'mvn', 'gradle', 'brew', 'apt', 'apt-get', 'yum', 'dnf', 'pacman', 'snap', 'uvx', 'uv', 'pipx', 'poetry', 'pdm'],
         'version-control': ['git'],
-        'container-ops': ['docker','docker-compose','podman','kubectl','helm'],
-        'build-tool': ['make','cmake','gcc','g++','clang','tsc','webpack','vite','esbuild','rollup','turbo'],
-        'test-runner': ['jest','vitest','mocha','playwright','pytest','unittest'],
-        'linter-formatter': ['eslint','prettier','ruff','black','mypy','pylint','flake8'],
-        'file-ops': ['ls','dir','cat','cp','mv','touch','mkdir','rm','find','head','tail','wc','sort','uniq','diff','tar','zip','unzip','gzip','chmod','chown'],
-        'network': ['curl','wget','ping','dig','nslookup','host','netstat','ss','ssh','scp','rsync'],
-        'system-info': ['ps','top','htop','lsof','df','du','free','uname','hostname','whoami','id','env','printenv','date'],
-        'text-processing': ['grep','sed','awk','tr','cut','tee','xargs','jq','yq'],
-        'database': ['sqlite3','psql','mysql','mongosh','redis-cli'],
-        'language-runtime': ['node','python','python3','deno','java','javac','rustc','ruby','perl','php','lua'],
-        'infra': ['terraform','ansible','pulumi','cdk'],
-        'crypto-encoding': ['base64','md5','sha256sum','openssl'],
-        'shell-script': ['bash','sh','zsh'],
+        'container-ops': ['docker', 'docker-compose', 'podman', 'kubectl', 'helm'],
+        'build-tool': ['make', 'cmake', 'gcc', 'g++', 'clang', 'tsc', 'webpack', 'vite', 'esbuild', 'rollup', 'turbo'],
+        'test-runner': ['jest', 'vitest', 'mocha', 'playwright', 'pytest', 'unittest'],
+        'linter-formatter': ['eslint', 'prettier', 'ruff', 'black', 'mypy', 'pylint', 'flake8'],
+        'file-ops': ['ls', 'dir', 'cat', 'cp', 'mv', 'touch', 'mkdir', 'rm', 'find', 'head', 'tail', 'wc', 'sort', 'uniq', 'diff', 'tar', 'zip', 'unzip', 'gzip', 'chmod', 'chown'],
+        'network': ['curl', 'wget', 'ping', 'dig', 'nslookup', 'host', 'netstat', 'ss', 'ssh', 'scp', 'rsync'],
+        'system-info': ['ps', 'top', 'htop', 'lsof', 'df', 'du', 'free', 'uname', 'hostname', 'whoami', 'id', 'env', 'printenv', 'date'],
+        'text-processing': ['grep', 'sed', 'awk', 'tr', 'cut', 'tee', 'xargs', 'jq', 'yq'],
+        'database': ['sqlite3', 'psql', 'mysql', 'mongosh', 'redis-cli'],
+        'language-runtime': ['node', 'python', 'python3', 'deno', 'java', 'javac', 'rustc', 'ruby', 'perl', 'php', 'lua'],
+        'infra': ['terraform', 'ansible', 'pulumi', 'cdk'],
+        'crypto-encoding': ['base64', 'md5', 'sha256sum', 'openssl'],
+        'shell-script': ['bash', 'sh', 'zsh'],
     };
 
     // Exact match first
@@ -1284,8 +1279,8 @@ function updateSynthesis() {
         const avgTrend = recentHistory.reduce((a, b) => a + b, 0) / recentHistory.length;
         _wiki.synthesis['risk-trend'] = {
             description: avgTrend > 0.05 ? 'Improving — confidence rising across commands' :
-                         avgTrend < -0.05 ? 'Degrading — confidence falling, review needed' :
-                         'Stable — no significant changes',
+                avgTrend < -0.05 ? 'Degrading — confidence falling, review needed' :
+                    'Stable — no significant changes',
             members: [],
             strength: avgTrend,
         };
@@ -1416,13 +1411,13 @@ function wikiQuery(cmd) {
 
 async function suggestPromotion(cmd, data) {
     const confPct = Math.round(data.conf * 100);
-    const msg = `[Grav] 🧠 "${cmd}" confidence ${confPct}% sau ${data.obs} observations. Thêm vào whitelist?`;
+    const msg = `[Grav] "${cmd}" confidence ${confPct}% sau ${data.obs} observations. Thêm vào whitelist?`;
     const pick = await vscode.window.showInformationMessage(msg, 'Thêm', 'Bỏ qua', 'Blacklist');
     if (pick === 'Thêm') {
         _userWhitelist.push(cmd);
         await vscode.workspace.getConfiguration('grav').update('terminalWhitelist', _userWhitelist, vscode.ConfigurationTarget.Global);
         setupSafeApprove();
-        vscode.window.showInformationMessage(`[Grav] ✓ "${cmd}" → whitelist (conf: ${confPct}%)`);
+        vscode.window.showInformationMessage(`[Grav] "${cmd}" → whitelist (conf: ${confPct}%)`);
     } else if (pick === 'Blacklist') {
         _userBlacklist.push(cmd);
         await vscode.workspace.getConfiguration('grav').update('terminalBlacklist', _userBlacklist, vscode.ConfigurationTarget.Global);
@@ -1434,7 +1429,7 @@ async function suggestPromotion(cmd, data) {
 
 async function suggestDemotion(cmd, data) {
     const confPct = Math.round(data.conf * 100);
-    const msg = `[Grav] ⚠️ "${cmd}" confidence ${confPct}% — thường bị reject. Thêm vào blacklist?`;
+    const msg = `[Grav] "${cmd}" confidence ${confPct}% — thường bị reject. Thêm vào blacklist?`;
     const pick = await vscode.window.showWarningMessage(msg, 'Blacklist', 'Bỏ qua');
     if (pick === 'Blacklist') {
         _userBlacklist.push(cmd);
@@ -1464,10 +1459,10 @@ function getLearnStats() {
             velocity: Math.round(d.velocity * 1000) / 1000,
             obs: d.obs,
             status: d.conf >= LEARN.PROMOTE_THRESH && d.obs >= LEARN.OBSERVE_MIN ? 'promoted' :
-                    d.conf <= LEARN.DEMOTE_THRESH && d.obs >= LEARN.OBSERVE_MIN ? 'demoted' :
+                d.conf <= LEARN.DEMOTE_THRESH && d.obs >= LEARN.OBSERVE_MIN ? 'demoted' :
                     d.obs < LEARN.OBSERVE_MIN ? 'observing' :
-                    d.conf > 0.3 ? 'learning' :
-                    d.conf < -0.3 ? 'suspicious' : 'neutral',
+                        d.conf > 0.3 ? 'learning' :
+                            d.conf < -0.3 ? 'suspicious' : 'neutral',
             history: (d.history || []).map(h => ({ t: h.t, c: Math.round(h.c * 100) / 100 })),
             topContext: getTopContext(d.contexts),
             lastSeen: new Date(d.lastSeen).toLocaleDateString(),
@@ -1502,9 +1497,9 @@ function safeSession() {
 
     return {
         sessionMs,
-        msgCount:    _sessionState.msgCount,
+        msgCount: _sessionState.msgCount,
         approveCount: _sessionState.approveCount,
-        aiTyping:    _sessionState.aiTyping,
+        aiTyping: _sessionState.aiTyping,
         avgResponseMs,
         toolBreakdown: _sessionState.toolBreakdown,
         recentTools,
@@ -1562,8 +1557,8 @@ function setupSafeApprove() {
                 .then(() => c.update('chat.tools.terminal.autoReplyToPrompts', true, vscode.ConfigurationTarget.Global))
                 .then(() => c.update('chat.tools.edits.autoApprove', true, vscode.ConfigurationTarget.Global))
                 .then(() => c.update('chat.agent.terminal.autoApprove', true, vscode.ConfigurationTarget.Global))
-                .catch(() => {});
-        } catch (_) {}
+                .catch(() => { });
+        } catch (_) { }
     }, 3000);
 }
 
@@ -1581,7 +1576,7 @@ function setupTerminalListener(ctx) {
 
     // Log which methods are available
     const hasShellExec = !!vscode.window.onDidStartTerminalShellExecution;
-    const hasShellEnd  = !!vscode.window.onDidEndTerminalShellExecution;
+    const hasShellEnd = !!vscode.window.onDidEndTerminalShellExecution;
     const hasWriteData = !!vscode.window.onDidWriteTerminalData;
     console.log(`[Grav] Terminal listener: shellExec=${hasShellExec} shellEnd=${hasShellEnd} writeData=${hasWriteData}`);
 
@@ -1633,7 +1628,7 @@ function setupTerminalListener(ctx) {
                             });
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
             })
         );
     }
@@ -1672,7 +1667,7 @@ function setupTerminalListener(ctx) {
                     } else {
                         _termBuffers.set(tid, buf.slice(-1000)); // keep last 1KB
                     }
-                } catch (_) {}
+                } catch (_) { }
             })
         );
     }
@@ -1693,7 +1688,7 @@ function setupTerminalListener(ctx) {
                         });
                     }
                 }
-            } catch (_) {}
+            } catch (_) { }
         })
     );
 
@@ -1784,10 +1779,10 @@ function setupTerminalListener(ctx) {
                                     exitCode,
                                     project: vscode.workspace.workspaceFolders?.[0]?.name,
                                 });
-                            } catch (_) {}
+                            } catch (_) { }
                         })
                     );
-                } catch (_) {}
+                } catch (_) { }
             })
         );
     }
@@ -1816,7 +1811,7 @@ function startBridge() {
                 _totalClicks = Object.values(_stats).reduce((a, b) => a + b, 0);
                 refreshBar();
                 if (_ctx) { _ctx.globalState.update('stats', _stats); _ctx.globalState.update('totalClicks', _totalClicks); }
-            } catch (_) {}
+            } catch (_) { }
         }
 
         // Click log
@@ -1837,7 +1832,7 @@ function startBridge() {
                     if (d.source === 'grav') _sessionState.approveCount++;
 
                     // Push realtime update to dashboard
-                    if (_dashboard) try { _dashboard.webview.postMessage({ command: 'logUpdated', log: _log }); } catch (_) {}
+                    if (_dashboard) try { _dashboard.webview.postMessage({ command: 'logUpdated', log: _log }); } catch (_) { }
 
                     // Feed auto-approve clicks to learning engine
                     // When runtime clicks "Run" or "Allow", the button text often contains the command
@@ -1851,7 +1846,7 @@ function startBridge() {
                             });
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
                 res.writeHead(200); res.end('{"ok":true}');
             });
             return;
@@ -1930,7 +1925,7 @@ function startBridge() {
                     // Push to dashboard immediately
                     if (_dashboard) try {
                         _dashboard.webview.postMessage({ command: 'quotaDetected', ts: Date.now() });
-                    } catch (_) {}
+                    } catch (_) { }
                 }
                 res.writeHead(200); res.end('{"notified":true}');
             });
@@ -1958,7 +1953,7 @@ function startBridge() {
                         }
                         // Wiki log
                         const ts = new Date(now).toISOString().slice(0, 19).replace('T', ' ');
-                        _wiki.log.push({ time: ts, op: 'msg', detail: `#${_sessionState.msgCount} ${d.responseMs ? Math.round(d.responseMs/1000) + 's' : ''}` });
+                        _wiki.log.push({ time: ts, op: 'msg', detail: `#${_sessionState.msgCount} ${d.responseMs ? Math.round(d.responseMs / 1000) + 's' : ''}` });
                         if (_wiki.log.length > 200) _wiki.log = _wiki.log.slice(-200);
 
                     } else if (d.type === 'tool-call') {
@@ -1993,9 +1988,9 @@ function startBridge() {
                     // Push session update to dashboard (immediate, not waiting for tick)
                     if (_dashboard) try {
                         _dashboard.webview.postMessage({ command: 'sessionUpdated', session: safeSession() });
-                    } catch (_) {}
+                    } catch (_) { }
 
-                } catch (_) {}
+                } catch (_) { }
                 res.writeHead(200); res.end('{"ok":true}');
             });
             return;
@@ -2028,10 +2023,10 @@ function startBridge() {
                             // Push to dashboard
                             if (_dashboard) try {
                                 _dashboard.webview.postMessage({ command: 'termLogUpdated', termLog: _termLog.slice(0, 30) });
-                            } catch (_) {}
+                            } catch (_) { }
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
                 res.writeHead(200); res.end('{"ok":true}');
             });
             return;
@@ -2071,10 +2066,10 @@ function startBridge() {
                             try {
                                 const wb = workbenchPath();
                                 if (wb) elevatedWrite(path.join(path.dirname(wb), RUNTIME_FILE), buildRuntime());
-                            } catch (_) {}
+                            } catch (_) { }
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
                 res.writeHead(200); res.end('{"ok":true}');
             });
             return;
@@ -2115,13 +2110,13 @@ function startBridge() {
 //  Status bar
 // ═════════════════════════════════════════════════════════════
 function createBar() {
-    _sbMain   = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
+    _sbMain = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
     _sbClicks = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
     _sbScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
-    _sbMain.command   = 'grav.dashboard';
+    _sbMain.command = 'grav.dashboard';
     _sbClicks.command = 'grav.dashboard';
     _sbScroll.command = 'grav.dashboard';
-    _sbClicks.color   = '#f9e2af';
+    _sbClicks.color = '#f9e2af';
     _ctx.subscriptions.push(_sbMain, _sbClicks, _sbScroll);
     refreshBar();
     _sbMain.show(); _sbClicks.show(); _sbScroll.show();
@@ -2129,11 +2124,11 @@ function createBar() {
 
 function refreshBar() {
     if (!_sbMain) return;
-    _sbMain.text  = _enabled ? '$(rocket) Grav' : '$(circle-slash) Grav';
+    _sbMain.text = _enabled ? '$(rocket) Grav' : '$(circle-slash) Grav';
     _sbMain.color = _enabled ? '#94e2d5' : '#f38ba8';
     _sbMain.backgroundColor = _enabled ? undefined : new vscode.ThemeColor('statusBarItem.errorBackground');
     if (_sbScroll) {
-        _sbScroll.text  = _scrollOn ? '$(fold-down) Scroll' : '$(circle-slash) Scroll';
+        _sbScroll.text = _scrollOn ? '$(fold-down) Scroll' : '$(circle-slash) Scroll';
         _sbScroll.color = _scrollOn ? '#94e2d5' : '#f38ba8';
     }
     if (_sbClicks) _sbClicks.text = '$(target) ' + _totalClicks;
@@ -2224,7 +2219,7 @@ function openDashboard() {
 
     // Tier 1: Stats + click log — 1s for snappy realtime feedback
     const statsTicker = setInterval(() => {
-        try { panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); } catch (_) {}
+        try { panel.webview.postMessage({ command: 'statsUpdated', stats: _stats, totalClicks: _totalClicks }); } catch (_) { }
     }, 1000);
 
     // Tier 2: Brain/Wiki — 5s, heavier serialization
@@ -2239,7 +2234,7 @@ function openDashboard() {
             msg.patterns = (_patternCache || []).length;
             msg.wikiPages = Object.keys((_wiki && _wiki.index) || {}).length;
             msg.wikiConcepts = Object.keys((_wiki && _wiki.concepts) || {}).length;
-            msg.wikiContradictions = ((_wiki && _wiki.contradictions) || []).filter(function(c) { return !c.resolved; }).length;
+            msg.wikiContradictions = ((_wiki && _wiki.contradictions) || []).filter(function (c) { return !c.resolved; }).length;
 
             // Safe concept serialization
             var concepts = {};
@@ -2252,7 +2247,7 @@ function openDashboard() {
             msg.concepts = concepts;
 
             // 30 entries — consistent with init payload
-            msg.wikiLog = ((_wiki && _wiki.log) || []).slice(-30).map(function(l) {
+            msg.wikiLog = ((_wiki && _wiki.log) || []).slice(-30).map(function (l) {
                 return { time: l.time || '', op: l.op || '', cmd: l.cmd || '', action: l.action || '', conf: l.conf, detail: l.detail || '' };
             });
 
@@ -2260,7 +2255,7 @@ function openDashboard() {
             try { msg.session = safeSession(); } catch (_) { msg.session = null; }
 
             // Terminal log (last 30 entries)
-            msg.termLog = (_termLog || []).slice(0, 30).map(function(t) {
+            msg.termLog = (_termLog || []).slice(0, 30).map(function (t) {
                 return { time: t.time || '', cmd: t.cmd || '', source: t.source || 'ui' };
             });
 
@@ -2270,7 +2265,7 @@ function openDashboard() {
         }
     }, 5000);
 
-    panel.onDidDispose(function() { clearInterval(statsTicker); clearInterval(brainTicker); });
+    panel.onDidDispose(function () { clearInterval(statsTicker); clearInterval(brainTicker); });
 }
 
 function getDashboardHtml(c) {
@@ -2308,23 +2303,23 @@ function getDashboardHtml(c) {
 // ═════════════════════════════════════════════════════════════
 function activate(ctx) {
     _ctx = ctx;
-    _stats       = ctx.globalState.get('stats', {});
+    _stats = ctx.globalState.get('stats', {});
     _totalClicks = ctx.globalState.get('totalClicks', 0);
-    _log         = ctx.globalState.get('clickLog', []) || [];
-    _enabled     = cfg('enabled', true);
-    _scrollOn    = cfg('autoScroll', true);
+    _log = ctx.globalState.get('clickLog', []) || [];
+    _enabled = cfg('enabled', true);
+    _scrollOn = cfg('autoScroll', true);
 
     // Inject runtime — ALWAYS re-inject on activate to ensure latest patterns
-    const ver     = ctx.extension?.packageJSON?.version || '0';
+    const ver = ctx.extension?.packageJSON?.version || '0';
     const lastVer = ctx.globalState.get('grav-version', '0');
     const needsReload = !isInjected() || ver !== lastVer;
-    
+
     // Always hot-update runtime file (patterns may have changed)
     try {
         const wb = workbenchPath();
         if (wb) elevatedWrite(path.join(path.dirname(wb), RUNTIME_FILE), buildRuntime());
     } catch (e) { console.error('[Grav] hot-update runtime:', e.message); }
-    
+
     if (needsReload) {
         try {
             inject();
@@ -2441,7 +2436,7 @@ function activate(ctx) {
                     _userWhitelist.push(name);
                     await c.update('terminalWhitelist', _userWhitelist, vscode.ConfigurationTarget.Global);
                     setupSafeApprove();
-                    vscode.window.showInformationMessage(`[Grav] ✓ "${name}" → whitelist`);
+                    vscode.window.showInformationMessage(`[Grav] "${name}" → whitelist`);
                     break;
                 }
                 case 'removeWhite': {
@@ -2464,7 +2459,7 @@ function activate(ctx) {
                     _userBlacklist.push(pattern);
                     await c.update('terminalBlacklist', _userBlacklist, vscode.ConfigurationTarget.Global);
                     setupSafeApprove();
-                    vscode.window.showInformationMessage(`[Grav] ✗ "${pattern}" → blacklist`);
+                    vscode.window.showInformationMessage(`[Grav] "${pattern}" → blacklist`);
                     break;
                 }
                 case 'removeBlack': {
@@ -2646,11 +2641,11 @@ function activate(ctx) {
 }
 
 function deactivate() {
-    if (_sbMain)   _sbMain.dispose();
+    if (_sbMain) _sbMain.dispose();
     if (_sbClicks) _sbClicks.dispose();
     if (_sbScroll) _sbScroll.dispose();
     if (_acceptTimer) clearInterval(_acceptTimer);
-    if (_httpServer) try { _httpServer.close(); } catch (_) {}
+    if (_httpServer) try { _httpServer.close(); } catch (_) { }
     // Flush pending learn data + wiki to prevent data loss
     if (_ctx) {
         try {
@@ -2660,7 +2655,7 @@ function deactivate() {
             _ctx.globalState.update('stats', _stats);
             _ctx.globalState.update('totalClicks', _totalClicks);
             _ctx.globalState.update('clickLog', _log);
-        } catch (_) {}
+        } catch (_) { }
     }
 }
 

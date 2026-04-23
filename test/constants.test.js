@@ -7,7 +7,7 @@
 let _passed = 0, _failed = 0;
 function assert(condition, msg) {
     if (condition) { _passed++; }
-    else { _failed++; console.error(`  ✗ FAIL: ${msg}`); }
+    else { _failed++; console.error(`  x FAIL: ${msg}`); }
 }
 function section(name) { console.log(`\n── ${name} ──`); }
 
@@ -27,14 +27,10 @@ catch (_) { assert(true, 'push throws on frozen array'); }
 
 section('Pattern completeness');
 assert(C.DEFAULT_PATTERNS.includes('Accept all'), 'has Accept all');
-assert(C.DEFAULT_PATTERNS.includes('Accept All'), 'has Accept All');
-assert(C.DEFAULT_PATTERNS.includes('Accept'), 'has Accept');
-assert(C.DEFAULT_PATTERNS.includes('Run'), 'has Run');
-assert(C.DEFAULT_PATTERNS.includes('Allow'), 'has Allow');
-assert(C.DEFAULT_PATTERNS.includes('Allow this conversation'), 'has Allow this conversation');
-assert(C.DEFAULT_PATTERNS.includes('Allow Once'), 'has Allow Once');
-assert(C.DEFAULT_PATTERNS.includes('Keep All Edits'), 'has Keep All Edits');
-assert(C.DEFAULT_PATTERNS.includes('Keep & Continue'), 'has Keep & Continue');
+assert(C.DEFAULT_PATTERNS.includes('Retry'), 'has Retry');
+assert(C.DEFAULT_PATTERNS.includes('Proceed'), 'has Proceed');
+assert(C.DEFAULT_PATTERNS.includes('Approve'), 'has Approve');
+assert(C.DEFAULT_PATTERNS.includes('Expand'), 'has Expand');
 
 // No duplicates
 const uniquePatterns = new Set(C.DEFAULT_PATTERNS);
@@ -55,7 +51,8 @@ assert(C.PORT_END - C.PORT_START >= 10, 'at least 10 ports in range');
 section('Blacklist safety');
 assert(C.DEFAULT_BLACKLIST.includes('rm -rf /'), 'blocks rm -rf /');
 assert(C.DEFAULT_BLACKLIST.includes(':(){:|:&};:'), 'blocks fork bomb');
-assert(C.DEFAULT_BLACKLIST.includes('format c:'), 'blocks format c:');
+assert(C.DEFAULT_BLACKLIST.includes('kill -9 -1'), 'blocks kill all processes');
+assert(C.DEFAULT_BLACKLIST.includes('dd if=/dev/zero'), 'blocks disk wipe');
 
 section('Command categories');
 const allCategorized = Object.values(C.COMMAND_CATEGORIES).flat();

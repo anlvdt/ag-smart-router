@@ -149,6 +149,8 @@ function extractCommands(cmdLine) {
 
 /**
  * Check if a command line matches any blacklist pattern.
+ * Multi-word patterns use substring match (specific enough).
+ * Single-word patterns use word-boundary match (avoid false positives).
  * @param {string} cmdLine
  * @param {string[]} blacklist
  * @returns {string|null} matched pattern or null
@@ -158,12 +160,30 @@ function matchesBlacklist(cmdLine, blacklist) {
     for (const pattern of blacklist) {
         const p = pattern.toLowerCase().trim();
         if (!p) continue;
-        if (lower.includes(p)) return pattern;
+
+        // Regex patterns: /pattern/
         if (p.startsWith('/') && p.endsWith('/')) {
             try {
                 if (new RegExp(p.slice(1, -1), 'i').test(cmdLine)) return pattern;
             } catch (_) {}
+            continue;
         }
+
+        // Multi-word patterns → match at start of command or after separator
+        if (p.includes(' ') || p.includes('|')) {
+            // Must match at: start of string, or after a command separator (;|&)
+            const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`(?:^|[;|&]\\s*|\\b(?:sudo|nohup|time|env)\\s+)${escaped}`, 'i');
+            if (re.test(lower)) return pattern;
+            continue;
+        }
+
+        // Single-word patterns → word-boundary match
+        // "shutdown" should match "shutdown" or "shutdown -h now"
+        // but NOT "shutdown-handler" or "myshutdown"
+        const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`(?:^|[\\s;|&/\\\\])${escaped}(?:$|[\\s;|&])`, 'i');
+        if (re.test(lower) || lower === p) return pattern;
     }
     return null;
 }

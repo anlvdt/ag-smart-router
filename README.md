@@ -1,374 +1,149 @@
-# Grav — Autopilot + AI Learning Engine for Antigravity
+# Grav
 
-Autopilot thông minh cho Antigravity IDE. Auto-approve, auto-scroll, quota radar, và một AI learning engine lấy cảm hứng từ Andrej Karpathy — tự học thói quen của bạn, tự quản lý whitelist/blacklist, tự compile knowledge vào persistent wiki.
+Autopilot for Antigravity IDE. Zero-config CDP-first auto-approve with adaptive safety.
 
----
+## What it does
 
-## Tổng quan kiến trúc
+Grav watches the Antigravity agent panel and automatically clicks approval buttons (Accept All, Run, Approve, Resume, etc.) so you can let the AI work uninterrupted. It uses Chrome DevTools Protocol to reach buttons inside sandboxed OOPIF webviews — the only reliable method since Antigravity v1.19.6+.
 
-```
-┌─────────────────────────────────────────────────┐
-│              GRAV v1.0.0                        │
-├────────────────────┬────────────────────────────┤
-│   AUTOPILOT        │   AI LEARNING ENGINE       │
-│                    │                            │
-│  Auto-Approve      │  Karpathy Training Recipe  │
-│  Stick-to-Bottom   │  ├ SGD + Momentum          │
-│  Quota Radar       │  ├ RLVR (Verifiable Rewards)│
-│  Corrupt Banner    │  ├ Weight Decay            │
-│  Suppression       │  └ Pattern Generalization  │
-│                    │                            │
-│                    │  Second Brain (LLM Wiki)   │
-│                    │  ├ Wiki Pages + Index       │
-│                    │  ├ Concept Map             │
-│                    │  ├ Contradiction Detection  │
-│                    │  └ Periodic Lint           │
-├────────────────────┴────────────────────────────┤
-│  Terminal Command Management                    │
-│  Whitelist (130+ built-in) + Blacklist + Learned│
-│  Compound command parsing (&&, |, ;)            │
-├─────────────────────────────────────────────────┤
-│  Dashboard (3-tab webview)                      │
-│  Autopilot | Second Brain | Stats               │
-└─────────────────────────────────────────────────┘
-```
+When the agent asks to run a terminal command, Grav's Safety Guard checks it against a blacklist of destructive patterns before clicking. A learning engine tracks your approve/reject behavior over time and adapts.
 
-Grav gồm 2 phần chính:
-
-- **Autopilot** — tự động hóa các thao tác lặp lại: bấm nút, cuộn chat, phát hiện quota, đổi model.
-- **AI Learning Engine** — hệ thống tự học dựa trên phương pháp của Andrej Karpathy, theo dõi thói quen approve/reject terminal commands, tự compile knowledge, tự suggest whitelist/blacklist.
-
----
-
-## Tính năng
-
-### Autopilot
-
-| Tính năng | Mô tả |
-|-----------|-------|
-| Auto-Approve | Tự bấm Run, Allow, Accept, Always Allow, Keep Waiting, Continue, Retry |
-| Stick-to-Bottom | Giữ chat cuộn xuống cuối, tự dừng khi bạn kéo lên đọc |
-| Quota Radar | Phát hiện 25+ cụm từ hết quota, hiện cảnh báo |
-| Corrupt Banner | Tự tắt thông báo "corrupt/reinstall" sau khi inject |
-| Accept Loop | Gọi VS Code command API mỗi 2s để accept agent steps |
-| Win32 Handler | Tự bấm "Keep Waiting" trên Windows native dialogs |
-
-### Terminal Command Management
-
-| Tính năng | Mô tả |
-|-----------|-------|
-| Built-in Whitelist | 130+ lệnh an toàn (npm, git, docker, python, cargo, kubectl...) |
-| Built-in Blacklist | 18 patterns nguy hiểm (rm -rf /, fork bomb, dd if=...) |
-| User Whitelist | Thêm lệnh tùy chỉnh qua settings hoặc Command Palette |
-| User Blacklist | Chặn lệnh/pattern (hỗ trợ substring và `/regex/`) |
-| Compound Parsing | Phân tích lệnh ghép: `npm build && docker push` → kiểm tra từng lệnh |
-| Sudo Stripping | Tự strip sudo, nohup, env vars trước khi kiểm tra |
-
-### AI Learning Engine (Karpathy-inspired)
-
-Hệ thống tự học dựa trên 2 framework của Andrej Karpathy:
-
-#### Framework 1: Neural Network Training Recipe
-
-Mỗi terminal command được coi như một "neuron" với confidence weight:
-
-| Thành phần | Giá trị mặc định | Mô tả |
-|------------|-------------------|-------|
-| Learning rate (α) | 0.15 | Tốc độ cập nhật confidence mỗi event |
-| Momentum | 0.9 | Smooth out noise giữa các events |
-| Weight decay (γ) | 0.97/ngày | Confidence giảm dần nếu không dùng |
-| Promote threshold | 0.75 | Confidence đủ cao → suggest whitelist |
-| Demote threshold | -0.50 | Confidence quá thấp → suggest blacklist |
-| Min observations | 5 | Tối thiểu events trước khi suggest |
-| Batch size | 10 | Mini-batch averaging giảm variance |
-
-Công thức cập nhật (SGD with momentum):
-```
-reward = approve ? +1.0 : -1.0
-reward += exit_code_bonus          ← RLVR: verifiable reward
-batch_reward = avg(recent_rewards) ← mini-batch SGD
-gradient = α × batch_reward
-velocity = momentum × velocity + gradient
-confidence += velocity × (1 - momentum)
-confidence = clamp(-1, +1)
-```
-
-Khi confidence vượt threshold → Grav tự suggest thêm vào whitelist hoặc blacklist.
-
-#### Framework 2: Second Brain (LLM Wiki)
-
-Thay vì chỉ lưu raw data, Grav compile knowledge vào persistent wiki:
+## Architecture
 
 ```
-Layer 1 (Raw)   → Immutable observations (approve/reject events)
-Layer 2 (Wiki)  → Compiled knowledge (pages, concepts, synthesis)
-Layer 3 (Schema)→ Rules (hyperparameters, thresholds)
+extension.js          entry point, lifecycle, commands
+  |
+  +-- cdp.js          CDP engine (primary) — WebSocket to Electron debug port
+  |     |-- observer   injected JS that scans buttons + auto-scrolls
+  |     |-- heartbeat  5s self-healing, auto-reconnect
+  |     +-- native click  Input.dispatchMouseEvent fallback
+  |
+  +-- injection.js    workbench.html runtime (fallback for pre-OOPIF)
+  +-- bridge.js       HTTP server on localhost for runtime <-> host sync
+  +-- learning.js     SGD confidence engine (approve/reject = reward signal)
+  +-- wiki.js         knowledge base — concepts, sequences, contradictions
+  +-- terminal.js     shell execution listener (5 capture methods)
+  +-- quota.js        Antigravity Language Server quota monitor
+  +-- roi.js          time-saved tracker, productivity metrics
+  +-- idle.js         typing detection — pauses auto-accept while editing
+  +-- dashboard.js    webview panel controller
+  +-- constants.js    patterns, blacklists, hyperparameters
+  +-- utils.js        regex escape, path safety, command parsing
 ```
 
-3 operations:
-- **Ingest** — mỗi event ripple qua wiki: update command page, concept page, cross-references, detect contradictions
-- **Query** — `evaluateCommand()` đọc wiki (compiled) thay vì scan raw data
-- **Lint** — periodic health check: tìm orphans, stale entries, contradictions, unclassified commands
+## How it works
 
-Wiki tự duy trì:
-- **Index** — catalog tất cả commands đã biết, với summary, risk level, tags
-- **Concepts** — nhóm commands theo category (package-manager, build-tool, database...)
-- **Synthesis** — high-level patterns (peak activity time, trusted categories)
-- **Contradictions** — phát hiện khi behavior thay đổi bất thường
-- **Activity Log** — timeline mọi ingest/lint events
+1. On activation, Grav patches `argv.json` to enable `--remote-debugging-port=9333`
+2. CDP connects to Electron, discovers webview targets, attaches to agent panel
+3. A self-contained observer is injected into each target via `Runtime.evaluate`
+4. The observer scans for buttons matching configured patterns every cycle
+5. Before clicking "Run", the Safety Guard extracts the command text and checks it
+6. If CDP click fails, it escalates to `Input.dispatchMouseEvent` (trusted browser events)
+7. A fallback runtime in `workbench.html` handles older Antigravity versions
+
+## Features
+
+### Core
+- CDP auto-click with OOPIF support
+- Auto-scroll (stick-to-bottom) for agent chat
+- Connection recovery — auto-clicks Resume, Try Again, Reconnect
+- Idle detection — pauses when you type, resumes after 3s idle
+- Dynamic command discovery via `vscode.commands.getCommands()`
+
+### Safety
+- Destructive command blacklist (rm -rf, drop database, fork bomb, etc.)
+- Word-boundary matching prevents false positives
+- Per-command confidence tracking with promotion/demotion suggestions
+- Risky patterns disabled by default (Always Allow, Enable Overages, etc.)
+
+### Learning Engine
+- Mini-batch SGD with momentum — each command is a neuron with confidence weight
+- Temporal decay for stale commands
+- Context-aware: project, time-of-day, exit code signals
+- Pattern generalization from co-occurrence clusters
+- Automatic promotion to whitelist at 75% confidence after 5 observations
+
+### Knowledge Base (Wiki)
+- 3-layer architecture: raw events, compiled wiki, system rules
+- Semantic command classification (16 categories)
+- Sequence learning (command A followed by B)
+- Contradiction detection (trusted command suddenly rejected)
+- Periodic lint: orphan detection, stale pruning, auto-resolve
+
+### Quota Monitor
+- Polls Antigravity Language Server on localhost
+- Per-model usage bars with status indicators
+- Usage rate calculation (%/hour)
+- Runway prediction — estimated time until quota exhaustion
+- Reset countdown timers
+
+### ROI Tracker
+- Time saved per click (weighted by button type)
+- Session and lifetime statistics
+- Productivity gain percentage
+- Projected daily savings
 
 ### Dashboard
+- Collapsible sections: Control, Targets, Session, Quota, ROI, Brain, Memory, Stats, Log
+- Real-time updates via webview messaging (1s stats, 5s brain/wiki)
+- Click log, terminal log, wiki event log
+- Concept map with confidence bars
+- Pattern toggle grid
 
-Dashboard 3 tab, mở bằng `Cmd+Shift+D`:
+## Install
 
-| Tab | Nội dung |
-|-----|----------|
-| Autopilot | Module toggles, timing sliders, pattern chips |
-| Second Brain | 6 hero metrics, Knowledge Wiki overview, Concept Map với confidence bars + risk badges, Wiki Activity Log |
-| Stats | Click statistics, pattern distribution bars, click log |
+Install the `.vsix` file in Antigravity:
 
----
+```
+Extensions sidebar > ... > Install from VSIX > select grav-3.4.1.vsix
+```
+
+First launch requires a full quit and restart of Antigravity (Cmd+Q / Alt+F4) for CDP port activation. After that, everything is automatic.
 
 ## Commands
 
-| Command | Phím tắt | Mô tả |
-|---------|----------|-------|
-| Grav: Inject Runtime | — | Inject runtime vào workbench.html |
-| Grav: Eject Runtime | — | Gỡ runtime |
-| Grav: Dashboard | `Cmd+Shift+D` | Mở dashboard 3 tab |
-| Grav: Diagnostics | — | Xem thông tin debug + learning stats |
-| Grav: Manage Terminal Commands | — | Menu quản lý whitelist/blacklist/wiki |
-| Grav: View Learning Stats | — | Xem learning data |
+| Command | Shortcut | Description |
+|---------|----------|-------------|
+| Grav: Dashboard | Cmd+Shift+D | Open/close dashboard |
+| Grav: Diagnostics | — | CDP status, targets, learning stats |
+| Grav: Manage Terminal | — | Whitelist/blacklist/test commands |
+| Grav: Refresh Observer | — | Force re-inject CDP observer |
+| Grav: Pause Auto-Accept | — | Temporarily stop clicking |
+| Grav: Resume Auto-Accept | — | Resume clicking |
+| Grav: Stop All Terminals | Cmd+Shift+Q | Send Ctrl+C to all terminals |
+| Grav: Force Accept All | — | Trigger all accept commands now |
 
-Menu "Manage Terminal Commands" bao gồm:
-- Thêm/xóa whitelist
-- Thêm/xóa blacklist
-- Kiểm tra lệnh (test nếu lệnh sẽ được allow)
-- Xem tất cả (whitelist + blacklist + learned + patterns)
-- Learning Stats (confidence, velocity, observations, status)
-- Second Brain Wiki (full wiki view)
-- Contradictions (xem mâu thuẫn)
-- Lint Wiki (health check)
-- Reset Learning (xóa toàn bộ data)
+## Configuration
 
----
+All settings under `grav.*` in VS Code settings:
 
-## Settings
+| Setting | Default | Description |
+|---------|---------|-------------|
+| enabled | true | Master on/off |
+| autoScroll | true | Stick chat to bottom |
+| approvePatterns | [Accept all, Run, ...] | Button labels to click |
+| approveIntervalMs | 1000 | Click scan interval |
+| scrollIntervalMs | 500 | Scroll scan interval |
+| scrollPauseMs | 15000 | Pause scroll when user scrolls up |
+| cdpEnabled | true | Enable CDP engine |
+| cdpPort | 9333 | CDP debug port |
+| learnEnabled | true | Enable learning engine |
+| terminalWhitelist | [] | Additional safe commands |
+| terminalBlacklist | [] | Additional blocked commands |
+| skipTerminalAccept | true | Skip blind terminal accept via API |
 
-| Setting | Type | Default | Mô tả |
-|---------|------|---------|-------|
-| `grav.enabled` | boolean | `true` | Bật/tắt Grav |
-| `grav.autoScroll` | boolean | `true` | Stick-to-bottom scroll |
-| `grav.approvePatterns` | string[] | `["Run","Allow","Always Allow","Keep Waiting","Continue","Retry"]` | Nút tự bấm |
-| `grav.scrollPauseMs` | number | `7000` | Nghỉ cuộn khi user kéo lên (ms) |
-| `grav.scrollIntervalMs` | number | `500` | Tốc độ quét cuộn (ms) |
-| `grav.approveIntervalMs` | number | `1000` | Tốc độ quét nút (ms) |
-| `grav.language` | enum | `"vi"` | Ngôn ngữ: vi, en, zh |
-| `grav.terminalWhitelist` | string[] | `[]` | Lệnh thêm vào whitelist |
-| `grav.terminalBlacklist` | string[] | `[]` | Lệnh/pattern bị chặn |
-| `grav.learnEnabled` | boolean | `true` | Bật/tắt AI learning |
-| `grav.learnThreshold` | number | `3` | Số lần approve để suggest |
+## Target detection
 
----
+Grav only activates on Antigravity IDE (and its predecessors Windsurf/Codeium). Detection checks `vscode.env.appName`, `vscode.env.appRoot`, and `~/.antigravity/argv.json` existence. On VS Code, Cursor, or other editors, the extension loads but does nothing.
 
-## Cài đặt
+## Safety model
 
-### Từ VSIX file
+The blacklist uses two matching strategies:
+- Multi-word patterns match at command start or after separators/sudo prefixes
+- Single-word patterns use word-boundary matching to avoid false positives
 
-```bash
-# Antigravity CLI
-antigravity --install-extension grav-1.0.0.vsix --force
-
-# Hoặc trong IDE
-# Cmd+Shift+P → "Extensions: Install from VSIX..." → chọn file
-```
-
-### Build từ source
-
-```bash
-git clone https://github.com/anlvdt/grav
-cd grav
-npm install
-npx vsce package --no-dependencies
-# → grav-1.0.0.vsix
-```
-
----
-
-## Cách hoạt động
-
-### Runtime Injection
-
-Grav inject một file JavaScript (`grav-runtime.js`) vào `workbench.html` của Antigravity. Runtime chạy trong renderer process và thực hiện:
-
-1. Quét DOM tìm buttons matching patterns → click
-2. Theo dõi scroll position → auto-scroll to bottom
-3. Scan text tìm quota phrases → báo host
-4. Dismiss corrupt/reinstall banners
-
-### HTTP Bridge
-
-Runtime và host (extension process) giao tiếp qua HTTP bridge trên port 48787-48850:
-
-- Runtime gửi: click stats, quota detection
-- Host gửi: config updates, enable/disable
-- API endpoints: `/api/click-log`, `/api/quota-detected`, `/api/eval-command`, `/api/learn-command`, `/api/wiki-query`, `/api/wiki-status`
-
-### Checksum Patching
-
-Sau khi inject, Grav tự patch `product.json` checksums để Antigravity không hiện warning "corrupt installation". Code Cache cũng được clear để force reload.
-
----
-
-## AI Learning — Chi tiết kỹ thuật
-
-### Data Flow
-
-```
-User approve/reject terminal command
-        │
-        ▼
-  extractCommands()     ← parse compound commands
-        │
-        ▼
-  recordCommandAction() ← gradient step (SGD + momentum)
-        │
-        ├──▶ Update _learnData (raw observations)
-        ├──▶ wikiIngest() (compile vào wiki)
-        │      ├── Update command page (summary, risk, tags)
-        │      ├── Update concept page (category avg confidence)
-        │      ├── Build cross-references (backlinks)
-        │      ├── Detect contradictions
-        │      ├── Update synthesis (high-level patterns)
-        │      └── Append activity log
-        ├──▶ suggestPromotion() (nếu conf ≥ 0.75)
-        └──▶ suggestDemotion() (nếu conf ≤ -0.50)
-```
-
-### Evaluation Flow
-
-```
-evaluateCommand("npm run build && docker push myapp")
-        │
-        ▼
-  Check blacklist (hard block)     ← highest priority
-        │
-        ▼
-  extractCommands() → ["npm", "docker"]
-        │
-        ▼
-  For each command:
-    1. In whitelist? → ALLOW
-    2. wikiQuery() → page.riskLevel == "safe"? → ALLOW
-    3. In _learnData with conf > 0? → ALLOW (low confidence)
-    4. Unknown → BLOCK
-        │
-        ▼
-  Return { allowed, reason, commands, confidence, wiki }
-```
-
-### Concept Categories
-
-Hệ thống tự phân loại commands vào 14 categories:
-
-| Category | Commands |
-|----------|----------|
-| package-manager | npm, yarn, pip, cargo, brew, apt... |
-| version-control | git |
-| container-ops | docker, podman, kubectl, helm |
-| build-tool | make, gcc, tsc, webpack, vite... |
-| test-runner | jest, vitest, mocha, playwright |
-| linter-formatter | eslint, prettier, ruff, black |
-| file-ops | ls, cp, mv, find, tar, zip... |
-| network | curl, wget, ping, dig... |
-| system-info | ps, top, df, uname, whoami... |
-| text-processing | grep, sed, awk, jq... |
-| database | sqlite3, psql, mysql, mongosh... |
-| language-runtime | node, python, java, rustc... |
-| infra | terraform, ansible |
-| crypto-encoding | base64, openssl, sha256sum... |
-
----
-
-## Ngôn ngữ
-
-Dashboard hỗ trợ 3 ngôn ngữ: Tiếng Việt (mặc định), English, 中文.
-
-Thay đổi: Settings → `grav.language` hoặc trong Dashboard footer.
-
----
-
-## Yêu cầu
-
-- Antigravity IDE (VS Code fork) v1.60.0+
-- macOS, Linux, hoặc Windows
-- Không cần CDP, không cần thêm dependencies
-
----
-
-## Troubleshooting
-
-| Vấn đề | Giải pháp |
-|--------|-----------|
-| Runtime không inject | Chạy `Grav: Inject Runtime`, reload IDE |
-| Nút không tự bấm | Kiểm tra `grav.enabled` = true, pattern có trong danh sách |
-| Lệnh terminal bị block | Chạy `Grav: Manage Terminal Commands` → "Kiểm tra lệnh" |
-| Corrupt warning | Grav tự patch checksums, nếu vẫn hiện → `Grav: Inject Runtime` lại |
-| Learning không hoạt động | Kiểm tra `grav.learnEnabled` = true |
-| Dashboard trống | Reload IDE sau khi inject |
-
----
-
-## Credits & Tham khảo mã nguồn
-
-Grav được xây dựng dựa trên nghiên cứu và tham khảo từ nhiều dự án mã nguồn mở trong cộng đồng Antigravity auto-accept. Dưới đây là danh sách đầy đủ:
-
-### Mã nguồn tham khảo chính
-
-- **[zixfel/ag-auto-click-scroll](https://github.com/zixfelw/ag-auto-click-scroll)** (MIT) — by Zixfel
-  - "Safe Click" pattern: chỉ click button khi có nút Reject/Deny/Cancel bên cạnh (`isApprovalButton()`)
-  - WeakSet one-shot click tracking (mỗi button chỉ click 1 lần, không re-click)
-  - Tách rõ chat-only commands: chỉ dùng `acceptAgentStep` + `terminalCommand.accept`, loại bỏ editor accept commands
-  - `span.cursor-pointer` selector cho Antigravity React buttons
-  - Smart Auto Scroll với MutationObserver + content activity detection
-  - Editor protection: block list `['Accept Changes', 'Accept All', 'Accept Incoming', ...]`
-  - HTTP bridge port discovery (48787-48850) + live config sync
-
-- **[YazanBaker/AntiGravity-AutoAccept](https://github.com/yazanbaker94/AntiGravity-AutoAccept)** (40k+ installs) — by Yazan Baker
-  - CDP (Chrome DevTools Protocol) architecture: WebSocket → Target discovery → MutationObserver injection
-  - Antigravity command IDs từ decompiled source: `antigravity.agent.acceptAgentStep`, `antigravity.terminalCommand.accept`
-  - Priority matching: Run > Accept > Always Allow > Allow
-  - Word-boundary matching (`startsWith` + next char check) tránh false positive
-  - `.react-app-container` Webview Guard — chỉ click trong agent panel React app
-  - Heartbeat self-healing (10s) — tự re-inject observer khi bị kill
-  - Expand button loop prevention (`expandedOnce` Set)
-  - Phát hiện limitation: Antigravity Agent Manager dùng single shared webview, background conversations bị unmount
-
-- **[cotamatcotam/auto-accept.js](https://gist.github.com/cotamatcotam/2b080b7c34a5d07c314a4c2978d7f0cd)** — by cotamatcotam
-  - Antigravity React UI class matching: `hover:bg-ide-button-hover`, `bg-ide-button-bac`
-  - Iframe scanning approach cho Antigravity OOPIF buttons
-
-- **[avilum/antigravity-reverse-engineering](https://gist.github.com/avilum/ae9e694e97a2575a19878a879d72ca07)** — by Avi Lumelsky
-  - Reverse engineering Antigravity binary: ParseToolArgs structs, Cortex state machine
-  - Tool definitions: browser.*, terminal.*, fs.*, search.*, memory.* tools
-  - Cortex step states: GENERATING, PENDING, RUNNING, WAITING, DONE, HALTED, etc.
-
-- **[Ricco6/always-accept-antigravity](https://github.com/Ricco6/always-accept-antigravity)** — by Ricco6
-  - Minimal approach: auto-proceed cho Antigravity terminal commands
-
-- **[timteh/antigravity-autopilot-os](https://marketplace.visualstudio.com/items?itemName=timteh.antigravity-autopilot-os)** — by timteh
-  - OS-level UI Automation approach (accessibility tree) — không dùng CDP
-  - `aria-label` fallback strategy cho button label extraction
-
-### AI Learning Engine
-
-- **[Andrej Karpathy](https://karpathy.ai)**:
-  - "A Recipe for Training Neural Networks" (2019) — SGD + Momentum training loop
-  - "LLM Wiki" / Second Brain pattern (2026) — persistent knowledge base
-  - RLVR — Reinforcement Learning from Verifiable Rewards (2025)
-
----
+Commands in `SAFE_TERMINAL_CMDS` (90+ common dev tools) are always allowed. The learning engine can promote frequently-approved commands to the whitelist and suggest blacklisting frequently-rejected ones.
 
 ## License
 
-MIT © ANLE
+MIT

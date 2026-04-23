@@ -8,7 +8,7 @@
 let _passed = 0, _failed = 0;
 function assert(condition, msg) {
     if (condition) { _passed++; }
-    else { _failed++; console.error(`  ✗ FAIL: ${msg}`); }
+    else { _failed++; console.error(`  x FAIL: ${msg}`); }
 }
 function eq(a, b, msg) { assert(JSON.stringify(a) === JSON.stringify(b), `${msg} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 function section(name) { console.log(`\n── ${name} ──`); }
@@ -76,12 +76,21 @@ eq(extractCommands('nohup time nice npm start'), ['npm'], 'multiple prefixes str
 
 // ── matchesBlacklist ─────────────────────────────────────────
 section('matchesBlacklist');
-eq(matchesBlacklist('rm -rf /', ['rm -rf /']), 'rm -rf /', 'exact match');
-eq(matchesBlacklist('sudo rm -rf /', ['rm -rf /']), 'rm -rf /', 'substring match');
+eq(matchesBlacklist('rm -rf /', ['rm -rf /']), 'rm -rf /', 'exact multi-word match');
+eq(matchesBlacklist('sudo rm -rf /', ['rm -rf /']), 'rm -rf /', 'multi-word substring match');
 eq(matchesBlacklist('npm install', ['rm -rf /']), null, 'no match');
 eq(matchesBlacklist('npm install', []), null, 'empty blacklist');
 eq(matchesBlacklist('eval bad code', ['/eval.*code/']), '/eval.*code/', 'regex match');
 eq(matchesBlacklist('safe command', ['/eval.*code/']), null, 'regex no match');
+// Word-boundary matching for single-word patterns
+eq(matchesBlacklist('shutdown', ['shutdown']), 'shutdown', 'single-word exact');
+eq(matchesBlacklist('shutdown -h now', ['shutdown']), 'shutdown', 'single-word at start');
+eq(matchesBlacklist('shutdown-handler.js', ['shutdown']), null, 'single-word no false positive on hyphenated');
+eq(matchesBlacklist('myshutdown', ['shutdown']), null, 'single-word no false positive on prefix');
+eq(matchesBlacklist('kill -9 -1', ['kill -9 -1']), 'kill -9 -1', 'multi-word destructive match');
+eq(matchesBlacklist('kill -9 1234', ['kill -9 -1']), null, 'kill specific PID not blocked');
+eq(matchesBlacklist('killall python', ['killall']), 'killall', 'killall with args matches word-boundary');
+eq(matchesBlacklist('mykillall', ['killall']), null, 'killall no false positive on prefix');
 
 // ── Summary ──────────────────────────────────────────────────
 console.log(`\n${'═'.repeat(40)}`);

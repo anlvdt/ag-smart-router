@@ -4,17 +4,41 @@
 'use strict';
 
 const vscode = require('vscode');
-const fs     = require('fs');
-const path   = require('path');
+const fs = require('fs');
+const path = require('path');
 
-const { DEFAULT_PATTERNS, SAFE_TERMINAL_CMDS, DEFAULT_BLACKLIST } = require('./constants');
+const { DEFAULT_PATTERNS, SAFE_TERMINAL_CMDS, DEFAULT_BLACKLIST, PATTERN_GROUPS, PATTERN_DISPLAY, RISKY_PATTERNS } = require('./constants');
 const { cfg } = require('./utils');
 
 let _panel = null;
-let _ctx   = null;
-let _deps  = null;
-let _statsTicker  = null;
-let _brainTicker  = null;
+let _ctx = null;
+let _deps = null;
+let _statsTicker = null;
+let _brainTicker = null;
+
+/**
+ * Get unique display patterns (hide variants, show only primary name)
+ */
+function getDisplayPatterns(allPatterns) {
+    const seen = new Set();
+    const result = [];
+    for (const p of allPatterns) {
+        const display = PATTERN_DISPLAY[p] || p;
+        if (!seen.has(display)) {
+            seen.add(display);
+            result.push(display);
+        }
+    }
+    return result;
+}
+
+/**
+ * Check if a display pattern is enabled (any of its variants is in patterns list)
+ */
+function isPatternEnabled(displayName, patterns) {
+    const variants = PATTERN_GROUPS[displayName] || [displayName];
+    return variants.some(v => patterns.includes(v));
+}
 
 /**
  * Open or close the dashboard panel.
@@ -23,7 +47,7 @@ let _brainTicker  = null;
  */
 function toggle(ctx, deps) {
     if (_panel) { _panel.dispose(); _panel = null; return; }
-    _ctx  = ctx;
+    _ctx = ctx;
     _deps = deps;
 
     _panel = vscode.window.createWebviewPanel(
@@ -46,7 +70,7 @@ function getPanel() { return _panel; }
 
 /** Push a message to the dashboard if open. */
 function postMessage(msg) {
-    if (_panel) try { _panel.webview.postMessage(msg); } catch (_) {}
+    if (_panel) try { _panel.webview.postMessage(msg); } catch (_) { }
 }
 
 function render() {
@@ -62,10 +86,9 @@ function render() {
         scrollOn: cfg('autoScroll', true),
         pauseMs: cfg('scrollPauseMs', 7000),
         scrollMs: cfg('scrollIntervalMs', 500),
-        approveMs: cfg('approveIntervalMs', 1000),
         patterns: cfg('approvePatterns', DEFAULT_PATTERNS),
         disabledPatterns: dp,
-        language: cfg('language', 'vi'),
+        language: 'en',
         stats: state.stats,
         totalClicks: state.totalClicks,
         whiteCount: SAFE_TERMINAL_CMDS.length + learning.getWhitelist().length,
@@ -79,36 +102,42 @@ function render() {
         wikiContradictions: wiki.getContradictions().length,
         concepts: w.concepts,
         wikiLog: (w.log || []).slice(-30),
+        allPatterns: getDisplayPatterns([...DEFAULT_PATTERNS, ...RISKY_PATTERNS]),
+        patternGroups: PATTERN_GROUPS,
     });
 }
 
 function buildHtml(c) {
     let h = fs.readFileSync(path.join(__dirname, '..', 'media', 'dashboard.html'), 'utf8');
-    const lang = c.language || 'vi';
-    h = h.replace(/\{\{LANG\}\}/g, lang);
-    h = h.replace('{{TOTAL}}', String(c.totalClicks || 0));
-    h = h.replace('{{ENABLED_CHK}}', c.enabled ? 'checked' : '');
-    h = h.replace('{{SCROLL_CHK}}', c.scrollOn !== false ? 'checked' : '');
-    h = h.replace(/\{\{APPROVE_MS\}\}/g, String(c.approveMs || 1000));
-    h = h.replace(/\{\{SCROLL_MS\}\}/g, String(c.scrollMs || 500));
-    h = h.replace(/\{\{PAUSE_MS\}\}/g, String(c.pauseMs || 7000));
-    h = h.replace('{{LANG_VI}}', lang === 'vi' ? 'selected' : '');
-    h = h.replace('{{LANG_EN}}', lang === 'en' ? 'selected' : '');
-    h = h.replace('{{LANG_ZH}}', lang === 'zh' ? 'selected' : '');
-    h = h.replace('{{PATTERNS_JSON}}', JSON.stringify(c.patterns));
-    h = h.replace('{{DISABLED_JSON}}', JSON.stringify(c.disabledPatterns));
-    h = h.replace('{{STATS_JSON}}', JSON.stringify(c.stats || {}));
-    h = h.replace('{{WHITE_COUNT}}', String(c.whiteCount || 0));
-    h = h.replace('{{BLACK_COUNT}}', String(c.blackCount || 0));
-    h = h.replace('{{LEARN_COUNT}}', String(c.learnCount || 0));
-    h = h.replace('{{LEARN_EPOCH}}', String(c.learnEpoch || 0));
-    h = h.replace('{{LEARN_TRACKING}}', String(c.learnTracking || 0));
-    h = h.replace('{{LEARN_PATTERNS}}', String(c.learnPatterns || 0));
-    h = h.replace('{{WIKI_PAGES}}', String(c.wikiPages || 0));
-    h = h.replace('{{WIKI_CONCEPTS}}', String(c.wikiConcepts || 0));
-    h = h.replace('{{WIKI_CONTRADICTIONS}}', String(c.wikiContradictions || 0));
-    h = h.replace('{{CONCEPTS_JSON}}', JSON.stringify(c.concepts || {}));
-    h = h.replace('{{WIKI_LOG_JSON}}', JSON.stringify(c.wikiLog || []));
+    const lang = 'en';
+    function replaceTag(str, tag, val) {
+        return str.replace(new RegExp('\\{\\{\\s*' + tag + '\\s*\\}\\}', 'g'), () => val);
+    }
+
+    h = replaceTag(h, 'LANG', lang);
+    h = replaceTag(h, 'TOTAL', String(c.totalClicks || 0));
+    h = replaceTag(h, 'ENABLED_CHK', c.enabled ? 'checked' : '');
+    h = replaceTag(h, 'SCROLL_CHK', c.scrollOn !== false ? 'checked' : '');
+    h = replaceTag(h, 'APPROVE_MS', String(c.approveMs || 1000));
+    h = replaceTag(h, 'SCROLL_MS', String(c.scrollMs || 500));
+    h = replaceTag(h, 'PAUSE_MS', String(c.pauseMs || 7000));
+
+    h = replaceTag(h, 'PATTERNS_JSON', JSON.stringify(c.patterns || []));
+    h = replaceTag(h, 'DISABLED_JSON', JSON.stringify(c.disabledPatterns || []));
+    h = replaceTag(h, 'PATTERN_GROUPS_JSON', JSON.stringify(c.patternGroups || {}));
+    h = replaceTag(h, 'STATS_JSON', JSON.stringify(c.stats || {}));
+    h = replaceTag(h, 'WHITE_COUNT', String(c.whiteCount || 0));
+    h = replaceTag(h, 'BLACK_COUNT', String(c.blackCount || 0));
+    h = replaceTag(h, 'LEARN_COUNT', String(c.learnCount || 0));
+    h = replaceTag(h, 'LEARN_EPOCH', String(c.learnEpoch || 0));
+    h = replaceTag(h, 'LEARN_TRACKING', String(c.learnTracking || 0));
+    h = replaceTag(h, 'LEARN_PATTERNS', String(c.learnPatterns || 0));
+    h = replaceTag(h, 'WIKI_PAGES', String(c.wikiPages || 0));
+    h = replaceTag(h, 'WIKI_CONCEPTS', String(c.wikiConcepts || 0));
+    h = replaceTag(h, 'WIKI_CONTRADICTIONS', String(c.wikiContradictions || 0));
+    h = replaceTag(h, 'CONCEPTS_JSON', JSON.stringify(c.concepts || {}));
+    h = replaceTag(h, 'WIKI_LOG_JSON', JSON.stringify(c.wikiLog || []));
+    h = replaceTag(h, 'ALL_PATTERNS_JSON', JSON.stringify(c.allPatterns || []));
     return h;
 }
 
@@ -205,6 +234,10 @@ function startTickers() {
                 action: l.action || '', conf: l.conf, detail: l.detail || '',
             }));
             msg.session = _deps.getSessionSafe();
+            // Quota + ROI data
+            if (_deps.quota) msg.quota = _deps.quota.getSummary();
+            if (_deps.roi) msg.roi = _deps.roi.getSummary();
+            if (_deps.idle) msg.idle = _deps.idle.isIdle();
             msg.termLog = (state.termLog || []).slice(0, 30).map(t => ({
                 time: t.time || '', cmd: t.cmd || '', source: t.source || 'ui',
             }));

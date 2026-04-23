@@ -2,7 +2,7 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "Autopilot cho Antigravity AI. CDP-first auto-approve, auto-scroll, safety guard, AI learning engine. Just install and use.",
-    "version": "3.3.0",
+    "version": "3.4.2",
     "icon": "icons/icon.png",
     "publisher": "ANLE",
     "repository": {
@@ -25,14 +25,6 @@
     "contributes": {
         "commands": [
             {
-                "command": "grav.inject",
-                "title": "Grav: Inject Runtime"
-            },
-            {
-                "command": "grav.eject",
-                "title": "Grav: Eject Runtime"
-            },
-            {
                 "command": "grav.dashboard",
                 "title": "Grav: Dashboard"
             },
@@ -49,12 +41,12 @@
                 "title": "Grav: View Learning Stats"
             },
             {
-                "command": "grav.toggleCDP",
-                "title": "Grav: Toggle CDP Mode (OOPIF Reach)"
-            },
-            {
                 "command": "grav.refreshObserver",
                 "title": "Grav: Refresh Observer (Force re-inject)"
+            },
+            {
+                "command": "grav.forceReconnect",
+                "title": "Grav: Force Reconnect CDP"
             },
             {
                 "command": "grav.pauseAccept",
@@ -113,30 +105,17 @@
                         "Accept all",
                         "Accept All",
                         "Accept",
-                        "Accept & Run",
-                        "Keep All Edits",
-                        "Keep All",
-                        "Keep & Continue",
-                        "Keep",
-                        "Continue",
                         "Retry",
-                        "Keep Waiting",
                         "Proceed",
-                        "Run Task",
                         "Run",
-                        "Allow",
-                        "Allow Once",
-                        "Allow in this Session",
-                        "Allow this conversation",
-                        "Allow and Review",
-                        "Approve Tool Result",
-                        "Approve all"
+                        "Approve",
+                        "Expand"
                     ],
                     "description": "Danh sách nút tự bấm | Button labels to auto-approve"
                 },
                 "grav.scrollPauseMs": {
                     "type": "number",
-                    "default": 7000,
+                    "default": 15000,
                     "description": "Nghỉ cuộn khi user kéo lên (ms)"
                 },
                 "grav.scrollIntervalMs": {

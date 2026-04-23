@@ -1,0 +1,31 @@
+{
+  "output": {
+    "filePath": "repomix-output.md",
+    "style": "markdown",
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 10,
+    "showLineNumbers": true,
+    "copyToClipboard": false
+  },
+  "include": [
+    "src/**/*.js",
+    "media/**/*.html",
+    "media/**/*.js",
+    "test/**/*.js",
+    "scripts/**/*.sh",
+    "package.json",
+    "README.md"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "node_modules/**",
+      "*.vsix",
+      "*.log",
+      "repomix-output.*",
+      ".git/**"
+    ]
+  }
+}
