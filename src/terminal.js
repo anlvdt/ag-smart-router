@@ -46,9 +46,6 @@ function setup(ctx, learning) {
                     if (/^\d+$/.test(cmdLine.trim())) return;  // pure number output, not a command
                     const id = e.execution?.id || Date.now().toString();
                     _pendingExecs.set(id, { command: cmdLine, startTime: Date.now() });
-                    if (cfg('learnEnabled', true)) {
-                        safeRecord(cmdLine, 'approve', { project: getProject() });
-                    }
                 } catch (_) { /* non-critical */ }
             })
         );

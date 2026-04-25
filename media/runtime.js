@@ -4,7 +4,8 @@
     window.__gravLoaded = true;
 
     // Cleanup existing timers and handlers
-    if (window.__gravTimers) { window.__gravTimers.forEach(clearInterval); window.__gravTimers = []; }
+    if (window.__gravTimers) { window.__gravTimers.forEach(clearInterval); }
+    window.__gravTimers = [];
     if (window.__gravScrollHandler) { window.removeEventListener('scroll', window.__gravScrollHandler, true); window.__gravScrollHandler = null; }
     if (window.__gravApproveObserver) { try { window.__gravApproveObserver.disconnect(); } catch (_) { } window.__gravApproveObserver = null; }
 
