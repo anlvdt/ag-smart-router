@@ -86,6 +86,7 @@ function render() {
         enabled: cfg('enabled', true),
         scrollOn: cfg('autoScroll', true),
         dryRun: cfg('dryRun', false),
+        approveMs: cfg('approveIntervalMs', 1000),
         pauseMs: cfg('scrollPauseMs', 7000),
         scrollMs: cfg('scrollIntervalMs', 500),
         patterns: cfg('approvePatterns', DEFAULT_PATTERNS),
