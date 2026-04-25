@@ -37,13 +37,15 @@ function createBar() {
     state.sbMain   = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
     state.sbClicks = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
     state.sbScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
+    state.sbBridge = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10003);
     state.sbMain.command   = 'grav.dashboard';
     state.sbClicks.command = 'grav.dashboard';
     state.sbScroll.command = 'grav.dashboard';
+    state.sbBridge.command = 'grav.diagnostics';
     state.sbClicks.color   = '#f9e2af';
-    state.ctx.subscriptions.push(state.sbMain, state.sbClicks, state.sbScroll);
+    state.ctx.subscriptions.push(state.sbMain, state.sbClicks, state.sbScroll, state.sbBridge);
     refreshBar();
-    state.sbMain.show(); state.sbClicks.show(); state.sbScroll.show();
+    state.sbMain.show(); state.sbClicks.show(); state.sbScroll.show(); state.sbBridge.show();
 }
 
 function refreshBar() {
@@ -56,6 +58,12 @@ function refreshBar() {
         state.sbScroll.color = state.scrollOn ? '#94e2d5' : '#f38ba8';
     }
     if (state.sbClicks) state.sbClicks.text = '$(target) ' + state.totalClicks;
+    if (state.sbBridge) {
+        const connected = !!state.httpPort;
+        state.sbBridge.text = connected ? '$(radio-tower) :' + state.httpPort : '$(circle-slash) Bridge';
+        state.sbBridge.color = connected ? '#94e2d5' : '#f38ba8';
+        state.sbBridge.tooltip = connected ? 'HTTP bridge on port ' + state.httpPort : 'Bridge disconnected';
+    }
 }
 
 // ── Language Server quota monitoring ─────────────────────────
@@ -214,16 +222,21 @@ function activate(ctx) {
         }),
         vscode.commands.registerCommand('grav.manageTerminal', async () => {
             const actions = [
+                { label: 'Whitelist', kind: vscode.QuickPickItemKind.Separator },
                 { label: '$(add) Th\u00eam v\u00e0o Whitelist', description: 'Add command to whitelist', action: 'addWhite' },
                 { label: '$(remove) X\u00f3a kh\u1ecfi Whitelist', description: 'Remove from whitelist', action: 'removeWhite' },
+                { label: 'Blacklist', kind: vscode.QuickPickItemKind.Separator },
                 { label: '$(shield) Th\u00eam v\u00e0o Blacklist', description: 'Block a command', action: 'addBlack' },
                 { label: '$(trash) X\u00f3a kh\u1ecfi Blacklist', description: 'Unblock a command', action: 'removeBlack' },
+                { label: 'Tools', kind: vscode.QuickPickItemKind.Separator },
                 { label: '$(search) Ki\u1ec3m tra l\u1ec7nh', description: 'Test if a command would be allowed', action: 'test' },
                 { label: '$(book) Xem t\u1ea5t c\u1ea3', description: 'View all whitelist/blacklist', action: 'viewAll' },
+                { label: 'Learning & Wiki', kind: vscode.QuickPickItemKind.Separator },
                 { label: '$(graph) Learning Stats', description: 'View adaptive learning data', action: 'learnStats' },
                 { label: '$(notebook) Second Brain Wiki', description: 'View compiled knowledge wiki', action: 'viewWiki' },
                 { label: '$(warning) Contradictions', description: 'View detected contradictions', action: 'viewContradictions' },
                 { label: '$(checklist) Lint Wiki', description: 'Health-check the knowledge base', action: 'lintWiki' },
+                { label: '', kind: vscode.QuickPickItemKind.Separator },
                 { label: '$(clear-all) Reset Learning', description: 'Clear all learned data', action: 'resetLearn' },
             ];
             const pick = await vscode.window.showQuickPick(actions, { placeHolder: 'Qu\u1ea3n l\u00fd Terminal Commands' });
@@ -424,6 +437,56 @@ function activate(ctx) {
         vscode.commands.registerCommand('grav.learnStats', async () => {
             vscode.commands.executeCommand('grav.manageTerminal');
         }),
+        vscode.commands.registerCommand('grav.viewWiki', async () => {
+            const pages = Object.entries(state.wiki.index)
+                .sort((a, b) => b[1].totalEvents - a[1].totalEvents);
+            if (pages.length === 0) { vscode.window.showInformationMessage('[Grav] Wiki tr\u1ed1ng \u2014 ch\u01b0a c\u00f3 d\u1eef li\u1ec7u'); return; }
+            const lines = [
+                '\u2550\u2550\u2550 SECOND BRAIN \u2014 KNOWLEDGE WIKI \u2550\u2550\u2550',
+                `Pages: ${pages.length} | Concepts: ${Object.keys(state.wiki.concepts).length} | Contradictions: ${state.wiki.contradictions.filter(c => !c.resolved).length}`,
+                '',
+                '\u2500\u2500 INDEX (sorted by activity) \u2500\u2500',
+                'Command'.padEnd(20) + 'Events'.padEnd(8) + 'Conf'.padEnd(8) + 'Risk'.padEnd(10) + 'Links'.padEnd(7) + 'Summary',
+                '\u2500'.repeat(90),
+                ...pages.map(([cmd, p]) =>
+                    cmd.padEnd(20) +
+                    String(p.totalEvents).padEnd(8) +
+                    (p.confidence >= 0 ? '+' : '') + String(Math.round(p.confidence * 100) / 100).padEnd(7) +
+                    p.riskLevel.padEnd(10) +
+                    String(p.links.length).padEnd(7) +
+                    (p.summary || '').substring(0, 50)
+                ), '',
+                '\u2500\u2500 CONCEPTS \u2500\u2500',
+                ...Object.entries(state.wiki.concepts).map(([name, c]) =>
+                    `  ${name}: ${c.commands.length} cmds, avg conf ${Math.round(c.avgConfidence * 100)}%, risk: ${c.riskLevel}`
+                ), '',
+                '\u2500\u2500 SYNTHESIS \u2500\u2500',
+                ...Object.entries(state.wiki.synthesis).map(([name, s]) =>
+                    `  ${name}: ${s.description}`
+                ), '',
+                '\u2500\u2500 RECENT LOG (last 15) \u2500\u2500',
+                ...(state.wiki.log || []).slice(-15).reverse().map(l =>
+                    `  [${l.time}] ${l.op} ${l.cmd || ''} ${l.action || ''} ${l.detail || ''}`
+                ),
+            ];
+            const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+            await vscode.window.showTextDocument(doc);
+        }),
+        vscode.commands.registerCommand('grav.lintWiki', async () => {
+            const issues = wikiLint();
+            if (issues.length === 0) { vscode.window.showInformationMessage('[Grav] Wiki s\u1ea1ch \u2014 kh\u00f4ng c\u00f3 v\u1ea5n \u0111\u1ec1'); return; }
+            const lines = [
+                '\u2550\u2550\u2550 WIKI LINT REPORT \u2550\u2550\u2550',
+                `Time: ${new Date().toLocaleString()}`,
+                `Issues found: ${issues.length}`, '',
+                ...issues.map(issue => [
+                    `\u26a0 ${issue.type.toUpperCase()}: ${issue.detail}`,
+                    ...issue.items.map(item => `    \u2022 ${typeof item === 'string' ? item : JSON.stringify(item)}`), '',
+                ].join('\n')),
+            ];
+            const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+            await vscode.window.showTextDocument(doc);
+        }),
     );
 }
 
@@ -431,6 +494,7 @@ function deactivate() {
     if (state.sbMain)   state.sbMain.dispose();
     if (state.sbClicks) state.sbClicks.dispose();
     if (state.sbScroll) state.sbScroll.dispose();
+    if (state.sbBridge) state.sbBridge.dispose();
     if (state.acceptTimer) clearInterval(state.acceptTimer);
     if (state.httpServer) try { state.httpServer.close(); } catch (_) {}
 }

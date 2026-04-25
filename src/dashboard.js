@@ -15,16 +15,24 @@ function refreshBar() {
     refresh();
 }
 
+function fmtMs(v) { return v >= 1000 ? (v / 1000) + 's' : v + 'ms'; }
+
 function getDashboardHtml(c) {
     let h = fs.readFileSync(path.join(__dirname, '..', 'media', 'dashboard.html'), 'utf8');
     const lang = c.language || 'vi';
+    const approveMs = c.approveMs || 1000;
+    const scrollMs = c.scrollMs || 500;
+    const pauseMs = c.pauseMs || 7000;
     h = h.replace(/\{\{LANG\}\}/g, lang);
     h = h.replace('{{TOTAL}}', String(c.totalClicks || 0));
     h = h.replace('{{ENABLED_CHK}}', c.enabled ? 'checked' : '');
     h = h.replace('{{SCROLL_CHK}}', c.scrollOn !== false ? 'checked' : '');
-    h = h.replace(/\{\{APPROVE_MS\}\}/g, String(c.approveMs || 1000));
-    h = h.replace(/\{\{SCROLL_MS\}\}/g, String(c.scrollMs || 500));
-    h = h.replace(/\{\{PAUSE_MS\}\}/g, String(c.pauseMs || 7000));
+    h = h.replace(/\{\{APPROVE_MS\}\}/g, String(approveMs));
+    h = h.replace(/\{\{SCROLL_MS\}\}/g, String(scrollMs));
+    h = h.replace(/\{\{PAUSE_MS\}\}/g, String(pauseMs));
+    h = h.replace('{{APPROVE_LABEL}}', fmtMs(approveMs));
+    h = h.replace('{{SCROLL_LABEL}}', fmtMs(scrollMs));
+    h = h.replace('{{PAUSE_LABEL}}', fmtMs(pauseMs));
     h = h.replace('{{LANG_VI}}', lang === 'vi' ? 'selected' : '');
     h = h.replace('{{LANG_EN}}', lang === 'en' ? 'selected' : '');
     h = h.replace('{{LANG_ZH}}', lang === 'zh' ? 'selected' : '');
@@ -122,6 +130,10 @@ function openDashboard() {
                 panel.webview.postMessage({ command: 'statsUpdated', stats: state.stats, totalClicks: state.totalClicks }); break;
             case 'manageTerminal':
                 vscode.commands.executeCommand('grav.manageTerminal'); break;
+            case 'viewWiki':
+                vscode.commands.executeCommand('grav.viewWiki'); break;
+            case 'lintWiki':
+                vscode.commands.executeCommand('grav.lintWiki'); break;
         }
     }, undefined, state.ctx.subscriptions);
 

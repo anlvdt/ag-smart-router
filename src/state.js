@@ -45,6 +45,7 @@ const state = {
     sbMain:   null,
     sbClicks: null,
     sbScroll: null,
+    sbBridge: null,
 };
 
 module.exports = { state, createEmptyWiki };

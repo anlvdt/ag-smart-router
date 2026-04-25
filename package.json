@@ -46,6 +46,14 @@
             {
                 "command": "grav.learnStats",
                 "title": "Grav: View Learning Stats"
+            },
+            {
+                "command": "grav.viewWiki",
+                "title": "Grav: View Knowledge Wiki"
+            },
+            {
+                "command": "grav.lintWiki",
+                "title": "Grav: Lint Knowledge Wiki"
             }
         ],
         "keybindings": [
@@ -137,7 +145,40 @@
                     "description": "Số lần approve để suggest whitelist | Approvals needed to suggest whitelisting"
                 }
             }
-        }
+        },
+        "walkthroughs": [
+            {
+                "id": "grav.getStarted",
+                "title": "Get Started with Grav",
+                "description": "Set up Grav Autopilot and AI Learning Engine for Antigravity IDE",
+                "steps": [
+                    {
+                        "id": "grav.step.inject",
+                        "title": "Inject Runtime",
+                        "description": "Inject the Grav runtime into Antigravity to enable auto-approve and scroll features.\n\n[Inject Runtime](command:grav.inject)",
+                        "media": { "markdown": "media/walkthrough-inject.md" }
+                    },
+                    {
+                        "id": "grav.step.dashboard",
+                        "title": "Open Dashboard",
+                        "description": "Open the Grav dashboard to configure Autopilot, view learning stats, and manage terminal commands.\n\n[Open Dashboard](command:grav.dashboard)",
+                        "media": { "markdown": "media/walkthrough-dashboard.md" }
+                    },
+                    {
+                        "id": "grav.step.terminal",
+                        "title": "Manage Terminal Commands",
+                        "description": "Customize which terminal commands are auto-approved or blocked.\n\n[Manage Commands](command:grav.manageTerminal)",
+                        "media": { "markdown": "media/walkthrough-terminal.md" }
+                    },
+                    {
+                        "id": "grav.step.learn",
+                        "title": "AI Learning Engine",
+                        "description": "Grav learns from your approve/reject patterns to automatically manage commands over time.\n\n[View Learning Stats](command:grav.learnStats)",
+                        "media": { "markdown": "media/walkthrough-learn.md" }
+                    }
+                ]
+            }
+        ]
     },
     "scripts": {
         "vscode:prepublish": "echo ok",
