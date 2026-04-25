@@ -91,7 +91,7 @@ function render() {
         patterns: cfg('approvePatterns', DEFAULT_PATTERNS),
         disabledPatterns: dp,
         projectPatterns: state.projectPatterns || [],
-        language: 'en',
+        language: cfg('language', 'vi'),
         stats: state.stats,
         totalClicks: state.totalClicks,
         whiteCount: SAFE_TERMINAL_CMDS.length + learning.getWhitelist().length,
@@ -112,7 +112,7 @@ function render() {
 
 function buildHtml(c) {
     let h = fs.readFileSync(path.join(__dirname, '..', 'media', 'dashboard.html'), 'utf8');
-    const lang = 'en';
+    const lang = c.language || 'vi';
     function replaceTag(str, tag, val) {
         return str.replace(new RegExp('\\{\\{\\s*' + tag + '\\s*\\}\\}', 'g'), () => val);
     }

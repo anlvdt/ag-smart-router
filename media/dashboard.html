@@ -9,7 +9,7 @@
 :root{
   --bg:#111;--surface:#191919;--surface2:#222;
   --border:#2a2a2a;--border2:#333;
-  --t3:#555;--t2:#888;--t1:#bbb;--t0:#e5e5e5;
+  --t3:#8888a8;--t2:#999;--t1:#bbb;--t0:#e5e5e5;
   --accent:#6ee7b7;--accent2:#34d399;--warn:#fbbf24;--danger:#f87171;--blue:#60a5fa;--purple:#a78bfa;
   --r:8px;--r2:12px;
 }
@@ -41,7 +41,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .tog-row+.tog-row{border-top:1px solid var(--border)}
 .tog-label{font-size:.85rem;color:var(--t1)}
 .tog{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
-.tog input{display:none}
+.tog input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .tog .track{position:absolute;inset:0;background:var(--border2);border-radius:10px;transition:background .2s}
 .tog .knob{position:absolute;left:2px;top:2px;width:16px;height:16px;background:var(--t3);border-radius:50%;transition:all .2s}
 .tog input:checked+.track{background:var(--accent2)}
@@ -72,6 +72,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .tag.on{color:var(--accent);border-color:rgba(110,231,183,.3);background:rgba(110,231,183,.06)}
 .tag.off{opacity:.35;border-style:dashed}
 .tag.off:hover{opacity:.55}
+.tog:focus-visible,.tag:focus-visible,.btn:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r)}
 .tag.project{border-color:rgba(167,139,250,.4);color:var(--purple)}
 .tag.dryrun{border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06);color:var(--purple)}
 .dryrun-banner{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);padding:8px 12px;font-size:.75rem;color:var(--purple);margin-bottom:10px;display:none}
@@ -116,6 +117,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(40px);background:var(--surface2);color:var(--t0);padding:8px 16px;font-size:.8rem;font-weight:500;border:1px solid var(--border2);border-radius:var(--r);opacity:0;transition:all .2s;pointer-events:none;z-index:99}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
+/* ── Reduced motion ── */
+@media(prefers-reduced-motion:reduce){*{transition-duration:0.01ms!important;animation-duration:0.01ms!important}}
+
 /* ── Responsive ── */
 @media(max-width:480px){.mgrid{grid-template-columns:repeat(2,1fr)}}
 </style>
@@ -137,18 +141,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 
 <!-- Controls -->
 <div class="sec">
-  <div class="sec-title">Controls</div>
+  <div class="sec-title" data-i18n="sec-controls">Controls</div>
   <div class="card">
     <div class="tog-row">
-      <span class="tog-label">Auto-Click</span>
+      <span class="tog-label" data-i18n="lbl-autoclick">Auto-Click</span>
       <label class="tog" tabindex="0" aria-label="Toggle Auto-Click" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('chkEnabled').click()}"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="toggleEnabled()" tabindex="-1"><div class="track"></div><div class="knob"></div></label>
     </div>
     <div class="tog-row">
-      <span class="tog-label">Auto-Scroll</span>
+      <span class="tog-label" data-i18n="lbl-autoscroll">Auto-Scroll</span>
       <label class="tog" tabindex="0" aria-label="Toggle Auto-Scroll" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('chkScroll').click()}"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="toggleScroll()" tabindex="-1"><div class="track"></div><div class="knob"></div></label>
     </div>
     <div class="tog-row">
-      <span class="tog-label" title="Scan buttons but don't click — safe for debugging">Dry Run</span>
+      <span class="tog-label" data-i18n="lbl-dryrun" title="Scan buttons but don't click — safe for debugging">Dry Run</span>
       <label class="tog" tabindex="0" aria-label="Toggle Dry Run" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('chkDryRun').click()}"><input type="checkbox" id="chkDryRun" {{DRYRUN_CHK}} onchange="toggleDryRun()" tabindex="-1"><div class="track"></div><div class="knob"></div></label>
     </div>
   </div>
@@ -173,7 +177,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 
 <!-- Metrics -->
 <div class="sec">
-  <div class="sec-title">Session</div>
+  <div class="sec-title" data-i18n="sec-session">Session</div>
   <div class="mgrid">
     <div class="mbox accent"><div class="val" id="statTotal">{{TOTAL}}</div><div class="lbl">Clicks</div></div>
     <div class="mbox blue"><div class="val" id="sessDuration">0m</div><div class="lbl">Uptime</div></div>
@@ -189,45 +193,45 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 
 <!-- Patterns -->
 <div class="sec">
-  <div class="sec-title">Patterns <span id="projPatBadge" style="display:none;font-size:.6rem;color:var(--purple);font-weight:600;margin-left:6px;background:rgba(167,139,250,.1);padding:2px 7px;border-radius:10px;border:1px solid rgba(167,139,250,.2)">+project</span></div>
+  <div class="sec-title" data-i18n="sec-patterns">Patterns</div><div style="margin-bottom:10px"><span id="projPatBadge" style="display:none;font-size:.6rem;color:var(--purple);font-weight:600;background:rgba(167,139,250,.1);padding:2px 7px;border-radius:10px;border:1px solid rgba(167,139,250,.2)">+project</span></div>
   <div class="tags" id="patGrid"></div>
 </div>
 
 <!-- Stats -->
 <div class="sec">
-  <div class="sec-title">Click Stats</div>
+  <div class="sec-title" data-i18n="sec-stats">Click Stats</div>
   <div id="statBars"></div>
 </div>
 
 <!-- Brain -->
 <div class="sec">
-  <div class="sec-title">Brain</div>
+  <div class="sec-title" data-i18n="sec-brain">Brain</div>
   <div class="mgrid" style="grid-template-columns:repeat(2,1fr)">
     <div class="mbox"><div class="val" id="brainWhite">{{WHITE_COUNT}}</div><div class="lbl">Allowed</div></div>
     <div class="mbox"><div class="val" id="brainBlack">{{BLACK_COUNT}}</div><div class="lbl">Blocked</div></div>
     <div class="mbox"><div class="val" id="wikiPages">{{WIKI_PAGES}}</div><div class="lbl">Pages</div></div>
     <div class="mbox"><div class="val" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="lbl">Concepts</div></div>
   </div>
-  <div style="margin-top:8px"><button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" tabindex="0" aria-label="Manage Terminal Rules" style="width:100%;text-align:center">Manage Rules</button></div>
+  <div style="margin-top:8px"><button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" tabindex="0" aria-label="Manage Terminal Rules" style="width:100%;text-align:center" data-i18n="btn-manage">Manage Rules</button></div>
 </div>
 
 <!-- Log -->
 <div class="sec">
-  <div class="sec-title">Activity</div>
+  <div class="sec-title" data-i18n="sec-activity">Activity</div>
   <div class="feed" id="logFeed"><div class="feed-empty">No activity yet</div></div>
 </div>
 
 <!-- Actions -->
 <div class="btn-row">
-  <button class="btn" onclick="save()" tabindex="0">Save</button>
-  <button class="btn primary" onclick="vscode.postMessage({command:'reload'})" tabindex="0">Reload</button>
-  <button class="btn danger" onclick="confirmAction('Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast('Reset')})" tabindex="0">Reset</button>
+  <button class="btn" onclick="save()" tabindex="0" data-i18n="btn-save">Save</button>
+  <button class="btn primary" onclick="vscode.postMessage({command:'reload'})" tabindex="0" data-i18n="btn-reload">Reload</button>
+  <button class="btn danger" onclick="confirmAction(_i18n[_lang]['confirm-reset']||'Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast(_i18n[_lang]['toast-reset']||'Reset')})" tabindex="0" data-i18n="btn-reset">Reset</button>
 </div>
 
 </div>
 
 <!-- Overlays -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="overlay" id="confirmOverlay">
   <div class="dialog"><p id="confirmMsg">Are you sure?</p><div class="btn-row"><button class="btn" onclick="closeConfirm()">Cancel</button><button class="btn danger" id="confirmYes">Confirm</button></div></div>
 </div>
@@ -246,6 +250,22 @@ let _wikiLog={{WIKI_LOG_JSON}};
 let _total={{TOTAL}};
 let _projectPatterns={{PROJECT_PATTERNS_JSON}};
 let _dryRun={{DRYRUN_VAL}};
+let _lang='{{LANG}}';
+
+// i18n
+const _i18n={
+  en:{'sec-controls':'Controls','sec-session':'Session','sec-patterns':'Patterns','sec-stats':'Click Stats','sec-brain':'Brain','sec-activity':'Activity','lbl-autoclick':'Auto-Click','lbl-autoscroll':'Auto-Scroll','lbl-dryrun':'Dry Run','btn-save':'Save','btn-reload':'Reload','btn-reset':'Reset','btn-manage':'Manage Rules','confirm-reset':'Reset all stats?','toast-reset':'Reset','toast-saved':'Saved','status-active':'Active','status-off':'Off','feed-empty':'No activity yet','stats-empty':'No clicks yet'},
+  vi:{'sec-controls':'\u0110i\u1ec1u khi\u1ec3n','sec-session':'Phi\u00ean l\u00e0m vi\u1ec7c','sec-patterns':'M\u1eabu n\u00fat','sec-stats':'Th\u1ed1ng k\u00ea click','sec-brain':'B\u1ed9 n\u00e3o','sec-activity':'Ho\u1ea1t \u0111\u1ed9ng','lbl-autoclick':'T\u1ef1 \u0111\u1ed9ng click','lbl-autoscroll':'T\u1ef1 \u0111\u1ed9ng cu\u1ed9n','lbl-dryrun':'Ch\u1ea1y th\u1eed','btn-save':'L\u01b0u','btn-reload':'T\u1ea3i l\u1ea1i','btn-reset':'\u0110\u1eb7t l\u1ea1i','btn-manage':'Qu\u1ea3n l\u00fd lu\u1eadt','confirm-reset':'\u0110\u1eb7t l\u1ea1i th\u1ed1ng k\u00ea?','toast-reset':'\u0110\u00e3 \u0111\u1eb7t l\u1ea1i','toast-saved':'\u0110\u00e3 l\u01b0u','status-active':'Ho\u1ea1t \u0111\u1ed9ng','status-off':'T\u1eaft','feed-empty':'Ch\u01b0a c\u00f3 ho\u1ea1t \u0111\u1ed9ng','stats-empty':'Ch\u01b0a c\u00f3 click'},
+  zh:{'sec-controls':'\u63a7\u5236','sec-session':'\u4f1a\u8bdd','sec-patterns':'\u6309\u94ae\u6a21\u5f0f','sec-stats':'\u70b9\u51fb\u7edf\u8ba1','sec-brain':'\u5927\u8111','sec-activity':'\u6d3b\u52a8','lbl-autoclick':'\u81ea\u52a8\u70b9\u51fb','lbl-autoscroll':'\u81ea\u52a8\u6eda\u52a8','lbl-dryrun':'\u8bd5\u8fd0\u884c','btn-save':'\u4fdd\u5b58','btn-reload':'\u91cd\u65b0\u52a0\u8f7d','btn-reset':'\u91cd\u7f6e','btn-manage':'\u7ba1\u7406\u89c4\u5219','confirm-reset':'\u91cd\u7f6e\u6240\u6709\u7edf\u8ba1\uff1f','toast-reset':'\u5df2\u91cd\u7f6e','toast-saved':'\u5df2\u4fdd\u5b58','status-active':'\u6d3b\u52a8','status-off':'\u5173\u95ed','feed-empty':'\u6682\u65e0\u6d3b\u52a8','stats-empty':'\u6682\u65e0\u70b9\u51fb'}
+};
+function applyI18n(){
+  const s=_i18n[_lang]||_i18n['en'];
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k=el.getAttribute('data-i18n');
+    if(s[k])el.textContent=s[k];
+  });
+}
+applyI18n();
 
 // Toast
 let _tt;
@@ -257,7 +277,7 @@ function confirmAction(msg,fn){$('confirmMsg').textContent=msg;_cfn=fn;$('confir
 function closeConfirm(){$('confirmOverlay').classList.remove('show');_cfn=null}
 
 // Toggles
-function toggleEnabled(){const on=$('chkEnabled').checked;$('masterPill').className='pill '+(on?'on':'off');$('masterPill').innerHTML='<span class="dot"></span>'+(on?'Active':'Off');vscode.postMessage({command:'toggle',enabled:on})}
+function toggleEnabled(){const on=$('chkEnabled').checked;const s=_i18n[_lang]||_i18n['en'];$('masterPill').className='pill '+(on?'on':'off');$('masterPill').innerHTML='<span class="dot"></span>'+(on?s['status-active']:s['status-off']);vscode.postMessage({command:'toggle',enabled:on})}
 function toggleScroll(){vscode.postMessage({command:'scrollToggle',enabled:$('chkScroll').checked})}
 function toggleDryRun(){
   _dryRun=$('chkDryRun').checked;
@@ -304,14 +324,14 @@ function renderStats(){
     r.innerHTML='<span class="bar-name">'+k+'</span><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><span class="bar-num">'+v+'</span>';
     c.appendChild(r)
   }
-  if(entries.length===0)c.innerHTML='<div class="feed-empty">No clicks yet</div>';
+  if(entries.length===0){const s=_i18n[_lang]||_i18n['en'];c.innerHTML='<div class="feed-empty">'+(s['stats-empty']||'No clicks yet')+'</div>';}
   $('statTotal').textContent=String(_total||0)
 }
 
 // Log
 function renderLog(log){
   const f=$('logFeed');
-  if(!log||!log.length){f.innerHTML='<div class="feed-empty">No activity yet</div>';return}
+  if(!log||!log.length){const s=_i18n[_lang]||_i18n['en'];f.innerHTML='<div class="feed-empty">'+(s['feed-empty']||'No activity yet')+'</div>';return}
   f.innerHTML='';
   for(const l of log.slice(0,30)){
     const r=document.createElement('div');r.className='feed-row';
@@ -324,12 +344,23 @@ function renderLog(log){
 
 // Save
 function save(){
+  const s=_i18n[_lang]||_i18n['en'];
   vscode.postMessage({command:'save',data:{
     enabled:$('chkEnabled').checked,scrollOn:$('chkScroll').checked,
     pauseMs:parseInt($('rngPause').value),scrollMs:parseInt($('rngScroll').value),approveMs:parseInt($('rngApprove').value),
     patterns:_patterns,disabledPatterns:_disabled
-  }});toast('Saved')
+  }});toast(s['toast-saved']||'Saved')
 }
+
+// Auto-save sliders on change
+let _sliderSaveTimer;
+function autoSaveSliders(){
+  clearTimeout(_sliderSaveTimer);
+  _sliderSaveTimer=setTimeout(()=>save(),800);
+}
+$('rngApprove').addEventListener('change',autoSaveSliders);
+$('rngScroll').addEventListener('change',autoSaveSliders);
+$('rngPause').addEventListener('change',autoSaveSliders);
 
 // Duration format
 function fmtDur(ms){if(!ms||ms<1000)return'0s';const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);if(h>0)return h+'h '+m%60+'m';if(m>0)return m+'m';return s+'s'}

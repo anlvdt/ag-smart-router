@@ -102,8 +102,8 @@
         "keybindings": [
             {
                 "command": "grav.dashboard",
-                "key": "ctrl+shift+d",
-                "mac": "cmd+shift+d"
+                "key": "ctrl+shift+g",
+                "mac": "cmd+shift+g"
             },
             {
                 "command": "grav.pauseAccept",
