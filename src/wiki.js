@@ -15,8 +15,8 @@ const load = () => {
     else { _wiki = createEmptyWiki(); }
 };
 
-const save = () => { if (!_ctx || _saveTimer) return; _saveTimer = setTimeout(() => { _saveTimer = null; try { _ctx.globalState.update('wiki', _wiki); } catch (_) {} }, 2000); };
-const flush = () => { if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; } if (!_ctx) return; try { _ctx.globalState.update('wiki', _wiki); } catch (_) {} };
+const save = () => { if (!_ctx || _saveTimer) return; _saveTimer = setTimeout(() => { _saveTimer = null; try { _ctx.globalState.update('wiki', _wiki); } catch (_) { /* save failed */ } }, 2000); };
+const flush = () => { if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; } if (!_ctx) return; try { _ctx.globalState.update('wiki', _wiki); } catch (_) { /* save failed */ } };
 
 const classifyCommand = (cmd) => {
     for (const [concept, cmds] of Object.entries(COMMAND_CATEGORIES)) { if (cmds.includes(cmd)) return concept; }

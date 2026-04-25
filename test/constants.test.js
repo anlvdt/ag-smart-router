@@ -65,6 +65,39 @@ assert(allCategorized.includes('python3'), 'python3 categorized');
 const catSet = new Set(allCategorized);
 assert(catSet.size === allCategorized.length, `no cross-category duplicates (${catSet.size} unique vs ${allCategorized.length} total)`);
 
+section('Shared Observer Constants');
+assert(Object.isFrozen(C.HIGH_CONF), 'HIGH_CONF is frozen');
+assert(Object.isFrozen(C.COOLDOWN), 'COOLDOWN is frozen');
+assert(Object.isFrozen(C.REJECT_WORDS), 'REJECT_WORDS is frozen');
+assert(Object.isFrozen(C.EDITOR_SKIP), 'EDITOR_SKIP is frozen');
+assert(Object.isFrozen(C.SUPPRESS_KEYWORDS), 'SUPPRESS_KEYWORDS is frozen');
+assert(Object.isFrozen(C.LIMITS), 'LIMITS is frozen');
+
+section('HIGH_CONF patterns');
+assert(C.HIGH_CONF['Accept All'] === 1, 'Accept All in HIGH_CONF');
+assert(C.HIGH_CONF['Run'] === 1, 'Run in HIGH_CONF');
+assert(!C.HIGH_CONF['Continue'], 'Continue NOT in HIGH_CONF');
+assert(!C.HIGH_CONF['Resume Conversation'], 'Resume Conversation NOT in HIGH_CONF');
+
+section('COOLDOWN values');
+assert(C.COOLDOWN['Run'] === 5000, 'Run cooldown 5s');
+assert(C.COOLDOWN['Continue'] === 15000, 'Continue cooldown 15s');
+assert(C.COOLDOWN['Resume Conversation'] === 15000, 'Resume Conversation cooldown 15s');
+assert(C.COOLDOWN.DEFAULT === 1000, 'DEFAULT cooldown 1s');
+assert(C.COOLDOWN.GLOBAL === 500, 'GLOBAL cooldown 500ms');
+
+section('RISKY_PATTERNS protection');
+assert(C.RISKY_PATTERNS.includes('Continue'), 'Continue in RISKY_PATTERNS');
+assert(C.RISKY_PATTERNS.includes('Resume Conversation'), 'Resume Conversation in RISKY_PATTERNS');
+assert(!C.DEFAULT_PATTERNS.includes('Continue'), 'Continue NOT in DEFAULT_PATTERNS');
+assert(!C.DEFAULT_PATTERNS.includes('Resume Conversation'), 'Resume Conversation NOT in DEFAULT_PATTERNS');
+
+section('LIMITS numeric values');
+assert(C.LIMITS.BUTTON_LABEL_MIN === 2, 'BUTTON_LABEL_MIN is 2');
+assert(C.LIMITS.BUTTON_LABEL_MAX === 60, 'BUTTON_LABEL_MAX is 60');
+assert(C.LIMITS.CLICK_DEDUP_TIMEOUT === 30000, 'CLICK_DEDUP_TIMEOUT is 30s');
+assert(C.LIMITS.POLL_STANDARD_MS === 1500, 'POLL_STANDARD_MS is 1.5s');
+
 console.log(`\n${'═'.repeat(40)}`);
 console.log(`Results: ${_passed} passed, ${_failed} failed`);
 process.exit(_failed > 0 ? 1 : 0);

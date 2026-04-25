@@ -42,13 +42,14 @@ function setup(ctx, learning) {
             vscode.window.onDidStartTerminalShellExecution(e => {
                 try {
                     const cmdLine = e.execution?.commandLine?.value || e.execution?.commandLine || '';
-                    if (!cmdLine || cmdLine.length < 2) return;
+                    if (!cmdLine || cmdLine.length < 3) return;
+                    if (/^\d+$/.test(cmdLine.trim())) return;  // pure number output, not a command
                     const id = e.execution?.id || Date.now().toString();
                     _pendingExecs.set(id, { command: cmdLine, startTime: Date.now() });
                     if (cfg('learnEnabled', true)) {
                         safeRecord(cmdLine, 'approve', { project: getProject() });
                     }
-                } catch (_) {}
+                } catch (_) { /* non-critical */ }
             })
         );
     }
@@ -75,7 +76,7 @@ function setup(ctx, learning) {
                             });
                         }
                     }
-                } catch (_) {}
+                } catch (_) { /* non-critical */ }
             })
         );
     }
@@ -103,7 +104,7 @@ function setup(ctx, learning) {
                     } else {
                         _termBuffers.set(tid, buf.slice(-1000));
                     }
-                } catch (_) {}
+                } catch (_) { /* non-critical */ }
             })
         );
     }
@@ -119,7 +120,7 @@ function setup(ctx, learning) {
                         safeRecord(name, 'approve', { project: getProject() });
                     }
                 }
-            } catch (_) {}
+            } catch (_) { /* non-critical */ }
         })
     );
 
@@ -145,13 +146,16 @@ function setup(ctx, learning) {
                     }
                 }
             }
-            // Prevent memory leak
-            if (_seenCmds.size > 5000) {
-                const arr = [..._seenCmds];
-                _seenCmds.clear();
-                for (let i = arr.length - 2000; i < arr.length; i++) _seenCmds.add(arr[i]);
+            // Prevent memory leak — gradual eviction instead of spike-and-clear
+            if (_seenCmds.size > 3000) {
+                const iter = _seenCmds.values();
+                // Delete oldest 1000 entries (Set preserves insertion order)
+                for (let i = 0; i < 1000; i++) {
+                    const val = iter.next().value;
+                    if (val) _seenCmds.delete(val);
+                }
             }
-        } catch (_) {}
+        } catch (_) { /* non-critical */ }
     }, 3000);
     ctx.subscriptions.push({ dispose: () => clearInterval(pollTimer) });
 
@@ -174,10 +178,10 @@ function setup(ctx, learning) {
                                 safeRecord(cmdLine, exitCode === undefined || exitCode === 0 ? 'approve' : 'reject', {
                                     exitCode, project: getProject(),
                                 });
-                            } catch (_) {}
+                            } catch (_) { /* non-critical */ }
                         })
                     );
-                } catch (_) {}
+                } catch (_) { /* non-critical */ }
             })
         );
     }

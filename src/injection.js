@@ -9,7 +9,10 @@ const path   = require('path');
 const os     = require('os');
 const crypto = require('crypto');
 
-const { TAG, LEGACY_TAGS, LEGACY_SCRIPTS, RUNTIME_FILE, CONFIG_FILE, DEFAULT_PATTERNS } = require('./constants');
+const {
+    TAG, LEGACY_TAGS, LEGACY_SCRIPTS, RUNTIME_FILE, CONFIG_FILE, DEFAULT_PATTERNS,
+    HIGH_CONF, COOLDOWN, REJECT_WORDS, EDITOR_SKIP, LIMITS,
+} = require('./constants');
 const { escapeRegex, elevatedWrite, workbenchPath, cfg } = require('./utils');
 
 /**
@@ -21,11 +24,18 @@ function buildRuntime(ctx) {
     const dp = ctx.globalState.get('disabledPatterns', []);
     const pats = cfg('approvePatterns', DEFAULT_PATTERNS).filter(p => !dp.includes(p));
     let src = fs.readFileSync(path.join(ctx.extensionPath, 'media', 'runtime.js'), 'utf8');
+    // Config values
     src = src.replace(/\/\*\{\{PAUSE_MS\}\}\*\/\d+/,    String(cfg('scrollPauseMs', 7000)));
     src = src.replace(/\/\*\{\{SCROLL_MS\}\}\*\/\d+/,   String(cfg('scrollIntervalMs', 500)));
     src = src.replace(/\/\*\{\{APPROVE_MS\}\}\*\/\d+/,  String(cfg('approveIntervalMs', 1000)));
     src = src.replace(/\/\*\{\{PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(pats));
     src = src.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/,     String(cfg('enabled', true)));
+    // Shared constants from constants.js
+    src = src.replace(/\/\*\{\{REJECT_WORDS\}\}\*\/\[.*?\]/, JSON.stringify(REJECT_WORDS));
+    src = src.replace(/\/\*\{\{EDITOR_SKIP\}\}\*\/\[.*?\]/, JSON.stringify(EDITOR_SKIP));
+    src = src.replace(/\/\*\{\{HIGH_CONF\}\}\*\/\{.*?\}/, JSON.stringify(HIGH_CONF));
+    src = src.replace(/\/\*\{\{COOLDOWN\}\}\*\/\{.*?\}/, JSON.stringify(COOLDOWN));
+    src = src.replace(/\/\*\{\{LIMITS\}\}\*\/\{.*?\}/, JSON.stringify(LIMITS));
     return src;
 }
 
@@ -50,7 +60,7 @@ function inject(ctx) {
         // Remove legacy script files
         for (const f of [...LEGACY_SCRIPTS, RUNTIME_FILE]) {
             const p = path.join(dir, f);
-            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {}
+            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) { /* file cleanup */ }
         }
         // Write runtime
         elevatedWrite(path.join(dir, RUNTIME_FILE), buildRuntime(ctx));
@@ -80,7 +90,7 @@ function eject() {
         elevatedWrite(wb, html);
         for (const f of [...LEGACY_SCRIPTS, RUNTIME_FILE]) {
             const p = path.join(dir, f);
-            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) {}
+            if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (_) { /* file cleanup */ }
         }
         return true;
     } catch (e) {
@@ -130,7 +140,7 @@ function patchChecksums() {
             if (pj.checksums[rp] !== h) { pj.checksums[rp] = h; dirty = true; }
         }
         if (dirty) elevatedWrite(pjp, JSON.stringify(pj, null, '\t'));
-    } catch (_) {}
+    } catch (_) { /* non-critical */ }
 }
 
 /** Clear IDE code cache to force reload of injected runtime. */
@@ -143,7 +153,7 @@ function clearCodeCache() {
                 : path.join(os.homedir(), '.config', 'Antigravity');
         const d = path.join(base, 'Code Cache', 'js');
         if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
-    } catch (_) {}
+    } catch (_) { /* non-critical */ }
 }
 
 /** Write runtime config file for hot-reload without re-injection. */
@@ -162,7 +172,7 @@ function writeRuntimeConfig(ctx) {
             scrollMs: cfg('scrollIntervalMs', 500),
             approveMs: cfg('approveIntervalMs', 1000),
         }));
-    } catch (_) {}
+    } catch (_) { /* non-critical */ }
 }
 
 /** Hot-update runtime file without full re-injection. */

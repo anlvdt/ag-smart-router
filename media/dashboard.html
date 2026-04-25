@@ -7,615 +7,364 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#1e2030;
-  --card:#262a3e;
-  --card2:#2d3250;
-  --border:#3b4063;
-  --border2:#4d5380;
-  --mute:#8890b0;
-  --text:#cdd2e4;
-  --bright:#e2e6f5;
-  --white:#f0f2ff;
-  --blue:#7aa2f7;
-  --green:#73daca;
-  --yellow:#ffc777;
-  --red:#ff757f;
-  --purple:#c3a6ff;
-  --cyan:#86e1fc;
-  --orange:#ff966c;
-  --radius:8px;
+  --bg:#111;--surface:#191919;--surface2:#222;
+  --border:#2a2a2a;--border2:#333;
+  --t3:#555;--t2:#888;--t1:#bbb;--t0:#e5e5e5;
+  --accent:#6ee7b7;--accent2:#34d399;--warn:#fbbf24;--danger:#f87171;--blue:#60a5fa;--purple:#a78bfa;
+  --r:8px;--r2:12px;
 }
-html{font-size:14px}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
-  background:var(--bg);color:var(--text);
-  line-height:1.55;-webkit-font-smoothing:antialiased;
-}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+html{font-size:13px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--t1);line-height:1.5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-.root{max-width:700px;margin:0 auto;padding:18px 22px 32px}
+.root{max-width:640px;margin:0 auto;padding:24px 20px 48px}
 
 /* ── Header ── */
-.hdr{
-  display:flex;align-items:center;justify-content:space-between;
-  padding-bottom:14px;margin-bottom:16px;
-  border-bottom:1px solid var(--border);
-}
-.hdr-brand{display:flex;align-items:baseline;gap:8px}
-.hdr-name{font-size:1.2rem;font-weight:800;color:var(--white);letter-spacing:.5px}
-.hdr-ver{font-size:.75rem;color:var(--mute);font-weight:500}
-.hdr-r{display:flex;align-items:center;gap:8px}
-
-/* ── Pill buttons ── */
-.pill{
-  font-size:.8rem;font-weight:700;padding:5px 12px;
-  border:1.5px solid var(--border);border-radius:var(--radius);
-  color:var(--text);cursor:pointer;background:transparent;
-  font-family:inherit;transition:all .15s;
-}
-.pill:hover{border-color:var(--bright);color:var(--white)}
-.pill-on{border-color:var(--green);color:var(--green);background:rgba(115,218,202,.1)}
-.pill-off{border-color:var(--red);color:var(--red);background:rgba(255,117,127,.1)}
-.pill-num{color:var(--blue);border-color:var(--blue);cursor:default;background:rgba(122,162,247,.1);font-variant-numeric:tabular-nums}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.hdr-l h1{font-size:1.15rem;font-weight:700;color:var(--t0);letter-spacing:-.3px}
+.hdr-l span{font-size:.7rem;color:var(--t3);font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.7rem;font-weight:600;border:1px solid var(--border2)}
+.pill.on{color:var(--accent);border-color:rgba(110,231,183,.25);background:rgba(110,231,183,.06)}
+.pill.off{color:var(--danger);border-color:rgba(248,113,113,.25);background:rgba(248,113,113,.06)}
+.pill .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
 
 /* ── Section ── */
-.sec{margin-bottom:10px}
-.sec-head{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 14px;background:var(--card);
-  border:1px solid var(--border);border-radius:var(--radius);
-  cursor:pointer;user-select:none;transition:all .12s;
-}
-.sec-head:hover{background:var(--card2);border-color:var(--border2)}
-.sec-lbl{font-size:.85rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--white)}
-.sec-arrow{font-size:.65rem;color:var(--mute);transition:transform .15s}
-.sec-arrow.open{transform:rotate(90deg)}
-.sec-body{
-  border:1px solid var(--border);border-top:none;
-  border-radius:0 0 var(--radius) var(--radius);
-  background:var(--card);padding:14px;display:none;
-}
-.sec-body.open{display:block}
-.sec-head:has(+.sec-body.open){border-radius:var(--radius) var(--radius) 0 0}
+.sec{margin-bottom:24px}
+.sec-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px}
 
-/* ── Gauge row ── */
-.gauge{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:8px 0;border-bottom:1px solid var(--border);
-}
-.gauge:last-child{border-bottom:none}
-.gauge-k{font-size:.9rem;color:var(--text);min-width:90px}
-.gauge-v{font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--white)}
-.gauge-v.blue{color:var(--blue)}
-.gauge-v.green{color:var(--green)}
-.gauge-v.yellow{color:var(--yellow)}
-.gauge-v.red{color:var(--red)}
-.gauge-v.purple{color:var(--purple)}
-.gauge-v.cyan{color:var(--cyan)}
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px 18px;margin-bottom:10px}
 
-/* ── Toggle row ── */
-.trow{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 0;border-bottom:1px solid var(--border);
-}
-.trow:last-child{border-bottom:none}
-.trow-info{flex:1}
-.trow-name{font-size:1rem;font-weight:600;color:var(--white)}
-.trow-desc{font-size:.8rem;color:var(--text);margin-top:2px}
-
-/* ── Toggle switch ── */
-.tog{position:relative;width:40px;height:22px;flex-shrink:0}
+/* ── Toggle ── */
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+.tog-row+.tog-row{border-top:1px solid var(--border)}
+.tog-label{font-size:.85rem;color:var(--t1)}
+.tog{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
 .tog input{display:none}
-.tog span{
-  position:absolute;inset:0;background:var(--border2);
-  border-radius:11px;transition:.2s;cursor:pointer;
-}
-.tog span::before{
-  content:'';position:absolute;left:3px;top:3px;
-  width:16px;height:16px;background:var(--mute);
-  border-radius:50%;transition:.2s;
-}
-.tog input:checked+span{background:var(--green)}
-.tog input:checked+span::before{transform:translateX(18px);background:#fff}
+.tog .track{position:absolute;inset:0;background:var(--border2);border-radius:10px;transition:background .2s}
+.tog .knob{position:absolute;left:2px;top:2px;width:16px;height:16px;background:var(--t3);border-radius:50%;transition:all .2s}
+.tog input:checked+.track{background:var(--accent2)}
+.tog input:checked+.track+.knob{transform:translateX(16px);background:#fff}
 
-/* ── Range slider ── */
-.rng{
-  display:flex;align-items:center;gap:10px;
-  padding:7px 0;border-bottom:1px solid var(--border);
-}
-.rng:last-child{border-bottom:none}
-.rng-lbl{font-size:.85rem;color:var(--text);min-width:56px}
-.rng input[type=range]{flex:1;height:5px;accent-color:var(--blue);border-radius:3px}
-.rng-val{font-size:.85rem;color:var(--blue);font-weight:700;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+/* ── Slider ── */
+.slider-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.slider-row+.slider-row{border-top:1px solid var(--border)}
+.slider-lbl{font-size:.75rem;color:var(--t2);min-width:48px}
+.slider-row input[type=range]{flex:1;height:3px;accent-color:var(--accent);cursor:pointer;border-radius:2px}
+.slider-val{font-size:.75rem;color:var(--t2);min-width:48px;text-align:right;font-variant-numeric:tabular-nums}
 
-/* ── Pattern tags ── */
-.pgrid{display:flex;flex-wrap:wrap;gap:6px}
-.ptag{
-  font-size:.85rem;font-weight:600;padding:6px 12px;
-  border:1.5px solid var(--border);border-radius:var(--radius);
-  color:var(--text);cursor:pointer;user-select:none;
-  transition:all .12s;background:transparent;font-family:inherit;
-}
-.ptag:hover{border-color:var(--bright);color:var(--white);background:var(--card2)}
-.ptag.on{border-color:var(--green);color:var(--green);background:rgba(115,218,202,.1)}
-.ptag.off{opacity:.4}
+/* ── Metrics Grid ── */
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mbox{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;text-align:center}
+.mbox .val{font-size:1.4rem;font-weight:700;color:var(--t0);font-variant-numeric:tabular-nums;line-height:1.2}
+.mbox .lbl{font-size:.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.mbox.accent .val{color:var(--accent)}
+.mbox.blue .val{color:var(--blue)}
+.mbox.purple .val{color:var(--purple)}
+.mbox.warn .val{color:var(--warn)}
 
-/* ── Bar chart ── */
-.bar-r{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.bar-k{font-size:.8rem;color:var(--text);min-width:76px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar-bg{flex:1;height:10px;background:var(--bg);border-radius:5px;overflow:hidden}
-.bar-fg{height:100%;border-radius:5px;transition:width .3s}
-.bar-n{font-size:.8rem;color:var(--bright);min-width:28px;font-variant-numeric:tabular-nums}
+/* ── Pattern Tags ── */
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:.75rem;font-weight:500;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);color:var(--t2);cursor:pointer;transition:all .15s;background:transparent;font-family:inherit;user-select:none}
+.tag:hover{border-color:var(--t3);color:var(--t1)}
+.tag.on{color:var(--accent);border-color:rgba(110,231,183,.3);background:rgba(110,231,183,.06)}
+.tag.off{opacity:.35;border-style:dashed}
+.tag.off:hover{opacity:.55}
+.tag.project{border-color:rgba(167,139,250,.4);color:var(--purple)}
+.tag.dryrun{border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06);color:var(--purple)}
+.dryrun-banner{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);padding:8px 12px;font-size:.75rem;color:var(--purple);margin-bottom:10px;display:none}
 
-/* ── Concept cards ── */
-.cpt{padding:9px 0;border-bottom:1px solid var(--border)}
-.cpt:last-child{border-bottom:none}
-.cpt-top{display:flex;justify-content:space-between;align-items:center}
-.cpt-name{font-size:.9rem;font-weight:700;color:var(--cyan)}
-.cpt-risk{
-  font-size:.7rem;font-weight:700;text-transform:uppercase;
-  padding:3px 8px;border-radius:4px;
-}
-.cpt-risk.safe{color:var(--green);background:rgba(115,218,202,.15)}
-.cpt-risk.caution{color:var(--yellow);background:rgba(255,199,119,.15)}
-.cpt-risk.danger{color:var(--red);background:rgba(255,117,127,.15)}
-.cpt-risk.unknown{color:var(--mute);background:rgba(136,144,176,.12)}
-.cpt-bar{height:4px;background:var(--bg);border-radius:2px;margin-top:6px;overflow:hidden}
-.cpt-fill{height:100%;border-radius:2px;transition:width .3s}
-.cpt-meta{font-size:.75rem;color:var(--text);display:flex;justify-content:space-between;margin-top:4px}
+/* ── Stats Bars ── */
+.bar-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.8rem}
+.bar-name{min-width:72px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:4px;background:var(--bg);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .3s}
+.bar-num{min-width:28px;text-align:right;color:var(--t1);font-weight:600;font-variant-numeric:tabular-nums}
 
-/* ── Feed (log) ── */
-.feed{
-  max-height:180px;overflow-y:auto;
-  background:var(--bg);border:1px solid var(--border);
-  border-radius:var(--radius);padding:3px 0;
-}
-.feed-row{
-  display:flex;align-items:baseline;gap:8px;
-  padding:5px 10px;font-size:.85rem;
-  border-bottom:1px solid rgba(59,64,99,.4);
-}
+/* ── Feed ── */
+.feed{max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--bg)}
+.feed-row{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:.75rem;border-bottom:1px solid var(--border)}
 .feed-row:last-child{border-bottom:none}
-.feed-ts{color:var(--mute);min-width:52px;font-size:.75rem;font-variant-numeric:tabular-nums}
-.feed-op{font-weight:700;min-width:44px}
-.feed-op.ingest{color:var(--green)}
-.feed-op.lint{color:var(--yellow)}
-.feed-op.approve{color:var(--green)}
-.feed-op.reject{color:var(--red)}
-.feed-cmd{color:var(--bright);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.feed-conf{color:var(--text);min-width:36px;text-align:right;font-variant-numeric:tabular-nums}
-.feed-empty{color:var(--mute);padding:12px;text-align:center;font-size:.85rem}
-.feed-new{animation:pulse .4s ease}
-@keyframes pulse{from{background:rgba(122,162,247,.12)}to{background:transparent}}
+.feed-ts{color:var(--t3);min-width:44px;font-variant-numeric:tabular-nums;flex-shrink:0}
+.feed-op{font-size:.6rem;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:3px;flex-shrink:0}
+.feed-op.approve{color:var(--accent);background:rgba(110,231,183,.1)}
+.feed-op.reject{color:var(--danger);background:rgba(248,113,113,.1)}
+.feed-op.block{color:var(--danger);background:rgba(248,113,113,.1)}
+.feed-op.ingest{color:var(--blue);background:rgba(96,165,250,.1)}
+.feed-cmd{color:var(--t1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.feed-empty{color:var(--t3);padding:20px;text-align:center;font-size:.8rem}
 
-/* ── Footer ── */
-.foot{
-  display:flex;align-items:center;justify-content:flex-end;
-  gap:8px;margin-top:14px;padding-top:14px;
-  border-top:1px solid var(--border);
-}
-.fbtn{
-  font-size:.85rem;font-weight:700;padding:7px 16px;
-  border:1.5px solid var(--border);border-radius:var(--radius);
-  background:transparent;color:var(--bright);cursor:pointer;
-  font-family:inherit;transition:all .12s;
-}
-.fbtn:hover{border-color:var(--white);color:var(--white);background:var(--card2)}
-.fbtn-go{border-color:var(--blue);color:var(--blue)}
-.fbtn-go:hover{background:var(--blue);color:var(--bg)}
-.fbtn-x{border-color:var(--red);color:var(--red)}
-.fbtn-x:hover{background:var(--red);color:var(--bg)}
+/* ── Buttons ── */
+.btn{font-size:.75rem;font-weight:600;padding:6px 14px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface);color:var(--t2);cursor:pointer;font-family:inherit;transition:all .15s}
+.btn:hover{border-color:var(--t3);color:var(--t1);background:var(--surface2)}
+.btn.primary{border-color:rgba(110,231,183,.3);color:var(--accent);background:rgba(110,231,183,.06)}
+.btn.primary:hover{background:rgba(110,231,183,.12)}
+.btn.danger{border-color:rgba(248,113,113,.3);color:var(--danger)}
+.btn.danger:hover{background:rgba(248,113,113,.08)}
+.btn-row{display:flex;gap:6px;justify-content:flex-end;margin-top:16px}
+
+/* ── Confirm Dialog ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .15s}
+.overlay.show{opacity:1;pointer-events:auto}
+.dialog{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r2);padding:24px;max-width:300px;text-align:center}
+.dialog p{color:var(--t0);font-size:.9rem;margin-bottom:16px}
+.dialog .btn-row{justify-content:center}
 
 /* ── Toast ── */
-.toast{
-  position:fixed;bottom:16px;left:50%;
-  transform:translateX(-50%) translateY(40px);
-  background:var(--card2);color:var(--white);
-  padding:8px 18px;font-size:.85rem;font-weight:700;
-  border:1px solid var(--border2);border-radius:var(--radius);
-  opacity:0;transition:all .15s;pointer-events:none;z-index:99;
-}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(40px);background:var(--surface2);color:var(--t0);padding:8px 16px;font-size:.8rem;font-weight:500;border:1px solid var(--border2);border-radius:var(--r);opacity:0;transition:all .2s;pointer-events:none;z-index:99}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
-/* ── Typing indicator ── */
-.typing{display:none;align-items:center;gap:7px;padding:8px 0;font-size:.85rem;color:var(--blue)}
-.typing.on{display:flex}
-.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:blink 1.2s infinite}
-.typing-dot:nth-child(2){animation-delay:.2s}
-.typing-dot:nth-child(3){animation-delay:.4s}
-@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
-
-/* ── Sub-label ── */
-.sub-lbl{font-size:.75rem;color:var(--text);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+/* ── Responsive ── */
+@media(max-width:480px){.mgrid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 <div class="root">
 
-<!-- HEADER -->
+<!-- Header -->
 <div class="hdr">
-  <div class="hdr-brand"><span class="hdr-name">Grav</span><span class="hdr-ver">v3.4.2</span></div>
-  <div class="hdr-r">
-    <span class="pill pill-num" id="totalCount">{{TOTAL}}</span>
-    <button class="pill pill-on" id="masterPill" onclick="toggleMaster()">ON</button>
+  <div class="hdr-l">
+    <h1>Grav</h1>
+    <span>v3.5</span>
+  </div>
+  <div style="display:flex;gap:6px">
+    <span class="pill on" id="masterPill"><span class="dot"></span>Active</span>
+    <span class="pill" id="cdpPill" style="display:none"><span class="dot"></span>CDP</span>
   </div>
 </div>
 
-<!-- CONTROL -->
+<!-- Controls -->
 <div class="sec">
-  <div class="sec-head" onclick="togSec('secCtrl')"><span class="sec-lbl">Control</span><span class="sec-arrow open" id="arrCtrl">▶</span></div>
-  <div class="sec-body open" id="secCtrl">
-    <div class="trow">
-      <div class="trow-info"><div class="trow-name">Auto-Click</div><div class="trow-desc">Automatically click accept / run buttons</div></div>
-      <label class="tog" onclick="event.stopPropagation()"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()"><span></span></label>
+  <div class="sec-title">Controls</div>
+  <div class="card">
+    <div class="tog-row">
+      <span class="tog-label">Auto-Click</span>
+      <label class="tog"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="toggleEnabled()"><div class="track"></div><div class="knob"></div></label>
     </div>
-    <div class="trow">
-      <div class="trow-info"><div class="trow-name">Auto-Scroll</div><div class="trow-desc">Keep chat scrolled to bottom</div></div>
-      <label class="tog" onclick="event.stopPropagation()"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()"><span></span></label>
+    <div class="tog-row">
+      <span class="tog-label">Auto-Scroll</span>
+      <label class="tog"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="toggleScroll()"><div class="track"></div><div class="knob"></div></label>
     </div>
-    <div style="margin-top:8px">
-      <div class="rng"><span class="rng-lbl">Click</span><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'"><span class="rng-val" id="valApprove">{{APPROVE_MS}}ms</span></div>
-      <div class="rng"><span class="rng-lbl">Scroll</span><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'"><span class="rng-val" id="valScroll">{{SCROLL_MS}}ms</span></div>
-      <div class="rng"><span class="rng-lbl">Pause</span><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'"><span class="rng-val" id="valPause">{{PAUSE_MS}}ms</span></div>
+    <div class="tog-row">
+      <span class="tog-label" title="Scan buttons but don't click — safe for debugging">Dry Run</span>
+      <label class="tog"><input type="checkbox" id="chkDryRun" {{DRYRUN_CHK}} onchange="toggleDryRun()"><div class="track"></div><div class="knob"></div></label>
     </div>
   </div>
-</div>
-
-<!-- TARGETS -->
-<div class="sec">
-  <div class="sec-head" onclick="togSec('secPat')"><span class="sec-lbl">Targets</span><span class="sec-arrow open" id="arrPat">▶</span></div>
-  <div class="sec-body open" id="secPat"><div class="pgrid" id="patGrid"></div></div>
-</div>
-
-<!-- SESSION -->
-<div class="sec">
-  <div class="sec-head" onclick="togSec('secSess')"><span class="sec-lbl">Session</span><span class="sec-arrow open" id="arrSess">▶</span></div>
-  <div class="sec-body open" id="secSess">
-    <div class="typing" id="aiTyping"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span><span style="margin-left:3px">AI is thinking...</span></div>
-    <div class="gauge"><span class="gauge-k">Uptime</span><span class="gauge-v blue" id="sessDuration">0m</span></div>
-    <div class="gauge"><span class="gauge-k">Messages</span><span class="gauge-v" id="sessMsg">0</span></div>
-    <div class="gauge"><span class="gauge-k">Clicks</span><span class="gauge-v green" id="sessApprove">0</span></div>
-    <div class="gauge"><span class="gauge-k">Avg Response</span><span class="gauge-v" id="sessAvgResp">—</span></div>
-    <div class="gauge"><span class="gauge-k">Health</span><span class="gauge-v" id="healthBadge">—</span></div>
-    <div id="toolBreakdown" style="margin-top:6px"></div>
-    <div class="gauge" style="margin-top:4px"><span class="gauge-k">Idle</span><span class="gauge-v" id="idleStatus">—</span></div>
-  </div>
-</div>
-
-<!-- QUOTA -->
-<div class="sec">
-  <div class="sec-head" onclick="togSec('secQuota')"><span class="sec-lbl">Quota</span><span class="sec-arrow" id="arrQuota">▶</span></div>
-  <div class="sec-body" id="secQuota">
-    <div class="gauge"><span class="gauge-k">Overall</span><span class="gauge-v" id="quotaPct">—</span></div>
-    <div class="gauge"><span class="gauge-k">Usage Rate</span><span class="gauge-v" id="quotaRate">—</span></div>
-    <div class="gauge"><span class="gauge-k">Runway</span><span class="gauge-v" id="quotaRunway">—</span></div>
-    <div class="gauge"><span class="gauge-k">Next Reset</span><span class="gauge-v" id="quotaReset">—</span></div>
-    <div id="quotaModels" style="margin-top:6px"></div>
-    <div class="gauge" style="margin-top:4px"><span class="gauge-k">LS Port</span><span class="gauge-v" id="quotaPort" style="font-size:.8rem">—</span></div>
-  </div>
-</div>
-
-<!-- ROI -->
-<div class="sec">
-  <div class="sec-head" onclick="togSec('secRoi')"><span class="sec-lbl">ROI</span><span class="sec-arrow" id="arrRoi">▶</span></div>
-  <div class="sec-body" id="secRoi">
-    <div class="gauge"><span class="gauge-k">Time Saved</span><span class="gauge-v green" id="roiSaved">0s</span></div>
-    <div class="gauge"><span class="gauge-k">Clicks</span><span class="gauge-v blue" id="roiClicks">0</span></div>
-    <div class="gauge"><span class="gauge-k">Productivity</span><span class="gauge-v" id="roiGain">0%</span></div>
-    <div class="gauge"><span class="gauge-k">Daily Estimate</span><span class="gauge-v cyan" id="roiDaily">0m</span></div>
-    <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
-      <div class="sub-lbl" style="margin-bottom:4px">Lifetime</div>
-      <div class="gauge"><span class="gauge-k">Total Saved</span><span class="gauge-v green" id="roiLifeSaved">0m</span></div>
-      <div class="gauge"><span class="gauge-k">Total Clicks</span><span class="gauge-v" id="roiLifeClicks">0</span></div>
-      <div class="gauge"><span class="gauge-k">Sessions</span><span class="gauge-v" id="roiLifeSessions">0</span></div>
+  <div class="card">
+    <div class="slider-row">
+      <span class="slider-lbl">Click</span>
+      <input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'">
+      <span class="slider-val" id="valApprove">{{APPROVE_MS}}ms</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-lbl">Scroll</span>
+      <input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'">
+      <span class="slider-val" id="valScroll">{{SCROLL_MS}}ms</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-lbl">Pause</span>
+      <input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'">
+      <span class="slider-val" id="valPause">{{PAUSE_MS}}ms</span>
     </div>
   </div>
 </div>
 
-<!-- BRAIN -->
+<!-- Metrics -->
 <div class="sec">
-  <div class="sec-head" onclick="togSec('secBrain')"><span class="sec-lbl">Brain</span><span class="sec-arrow" id="arrBrain">▶</span></div>
-  <div class="sec-body" id="secBrain">
-    <div class="gauge"><span class="gauge-k">Epoch</span><span class="gauge-v blue" id="brainEpoch">{{LEARN_EPOCH}}</span></div>
-    <div class="gauge"><span class="gauge-k">Tracking</span><span class="gauge-v" id="brainTracking">{{LEARN_TRACKING}}</span></div>
-    <div class="gauge"><span class="gauge-k">Allowed</span><span class="gauge-v green" id="brainWhite">{{WHITE_COUNT}}</span></div>
-    <div class="gauge"><span class="gauge-k">Blocked</span><span class="gauge-v red" id="brainBlack">{{BLACK_COUNT}}</span></div>
-    <div class="gauge"><span class="gauge-k">Promoted</span><span class="gauge-v purple" id="brainPromoted">{{LEARN_COUNT}}</span></div>
-    <div class="gauge"><span class="gauge-k">Patterns</span><span class="gauge-v" id="brainPatterns">{{LEARN_PATTERNS}}</span></div>
-    <div style="margin-top:8px"><button class="fbtn" onclick="vscode.postMessage({command:'manageTerminal'})" style="width:100%">Manage Rules</button></div>
+  <div class="sec-title">Session</div>
+  <div class="mgrid">
+    <div class="mbox accent"><div class="val" id="statTotal">{{TOTAL}}</div><div class="lbl">Clicks</div></div>
+    <div class="mbox blue"><div class="val" id="sessDuration">0m</div><div class="lbl">Uptime</div></div>
+    <div class="mbox"><div class="val" id="sessMsg">0</div><div class="lbl">Messages</div></div>
+    <div class="mbox purple"><div class="val" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="lbl">Epoch</div></div>
+    <div class="mbox"><div class="val" id="brainTracking">{{LEARN_TRACKING}}</div><div class="lbl">Tracking</div></div>
+    <div class="mbox warn"><div class="val" id="brainPromoted">{{LEARN_COUNT}}</div><div class="lbl">Promoted</div></div>
   </div>
 </div>
 
-<!-- MEMORY -->
+<!-- Dry Run Banner -->
+<div class="dryrun-banner" id="dryRunBanner">DRY RUN active — buttons are detected but NOT clicked. Check Activity log to see what would be clicked.</div>
+
+<!-- Patterns -->
 <div class="sec">
-  <div class="sec-head" onclick="togSec('secMem')"><span class="sec-lbl">Memory</span><span class="sec-arrow" id="arrMem">▶</span></div>
-  <div class="sec-body" id="secMem">
-    <div class="gauge"><span class="gauge-k">Pages</span><span class="gauge-v blue" id="wikiPages">{{WIKI_PAGES}}</span></div>
-    <div class="gauge"><span class="gauge-k">Concepts</span><span class="gauge-v cyan" id="wikiConcepts">{{WIKI_CONCEPTS}}</span></div>
-    <div class="gauge"><span class="gauge-k">Conflicts</span><span class="gauge-v yellow" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</span></div>
-    <div id="conceptMap" style="margin-top:8px"></div>
-  </div>
+  <div class="sec-title">Patterns <span id="projPatBadge" style="display:none;font-size:.6rem;color:var(--purple);font-weight:600;margin-left:6px;background:rgba(167,139,250,.1);padding:2px 7px;border-radius:10px;border:1px solid rgba(167,139,250,.2)">+project</span></div>
+  <div class="tags" id="patGrid"></div>
 </div>
 
-<!-- STATS -->
+<!-- Stats -->
 <div class="sec">
-  <div class="sec-head" onclick="togSec('secStats')"><span class="sec-lbl">Stats</span><span class="sec-arrow" id="arrStats">▶</span></div>
-  <div class="sec-body" id="secStats">
-    <div class="gauge"><span class="gauge-k">Total Clicks</span><span class="gauge-v blue" id="statTotal">{{TOTAL}}</span></div>
-    <div class="gauge"><span class="gauge-k">Active Buttons</span><span class="gauge-v green" id="statActive">0</span></div>
-    <div id="statBars" style="margin-top:6px"></div>
-    <div style="margin-top:8px"><button class="fbtn fbtn-x" onclick="resetStats()" style="width:100%">Reset Stats</button></div>
-  </div>
+  <div class="sec-title">Click Stats</div>
+  <div id="statBars"></div>
 </div>
 
-<!-- LOG -->
+<!-- Brain -->
 <div class="sec">
-  <div class="sec-head" onclick="togSec('secLog')"><span class="sec-lbl">Log</span><span class="sec-arrow" id="arrLog">▶</span></div>
-  <div class="sec-body" id="secLog">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span class="sub-lbl">Click Log</span>
-      <button class="fbtn fbtn-x" style="font-size:.7rem;padding:2px 8px" onclick="clearLog()">Clear</button>
-    </div>
-    <div class="feed" id="logList"><div class="feed-empty">No clicks yet</div></div>
-    <div style="margin-top:10px;margin-bottom:6px"><span class="sub-lbl">Terminal</span></div>
-    <div class="feed" id="termLogList"><div class="feed-empty">No terminal activity</div></div>
-    <div style="margin-top:10px;margin-bottom:6px"><span class="sub-lbl">Events</span></div>
-    <div class="feed" id="wikiLog"><div class="feed-empty">No events yet</div></div>
+  <div class="sec-title">Brain</div>
+  <div class="mgrid" style="grid-template-columns:repeat(2,1fr)">
+    <div class="mbox"><div class="val" id="brainWhite">{{WHITE_COUNT}}</div><div class="lbl">Allowed</div></div>
+    <div class="mbox"><div class="val" id="brainBlack">{{BLACK_COUNT}}</div><div class="lbl">Blocked</div></div>
+    <div class="mbox"><div class="val" id="wikiPages">{{WIKI_PAGES}}</div><div class="lbl">Pages</div></div>
+    <div class="mbox"><div class="val" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="lbl">Concepts</div></div>
   </div>
+  <div style="margin-top:8px"><button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" style="width:100%;text-align:center">Manage Rules</button></div>
 </div>
 
-<!-- FOOTER -->
-<div class="foot">
-  <button class="fbtn" onclick="vscode.postMessage({command:'reload'})">Reload</button>
-  <button class="fbtn fbtn-go" onclick="saveAll()">Save</button>
+<!-- Log -->
+<div class="sec">
+  <div class="sec-title">Activity</div>
+  <div class="feed" id="logFeed"><div class="feed-empty">No activity yet</div></div>
+</div>
+
+<!-- Actions -->
+<div class="btn-row">
+  <button class="btn" onclick="save()">Save</button>
+  <button class="btn primary" onclick="vscode.postMessage({command:'reload'})">Reload</button>
+  <button class="btn danger" onclick="confirmAction('Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast('Reset')})">Reset</button>
 </div>
 
 </div>
+
+<!-- Overlays -->
 <div class="toast" id="toast"></div>
+<div class="overlay" id="confirmOverlay">
+  <div class="dialog"><p id="confirmMsg">Are you sure?</p><div class="btn-row"><button class="btn" onclick="closeConfirm()">Cancel</button><button class="btn danger" id="confirmYes">Confirm</button></div></div>
+</div>
 
 <script>
-var vscode=acquireVsCodeApi();
-var $=function(id){return document.getElementById(id)};
-var ALL_PATTERNS={{ALL_PATTERNS_JSON}};
-var patterns={{PATTERNS_JSON}};
-var disabledPatterns={{DISABLED_JSON}};
-var PATTERN_GROUPS={{PATTERN_GROUPS_JSON}};
+const vscode=acquireVsCodeApi();
+const $=id=>document.getElementById(id);
 
-// Build reverse mapping: variant → display name
-var PATTERN_DISPLAY={};
-for(var display in PATTERN_GROUPS){
-  PATTERN_GROUPS[display].forEach(function(v){PATTERN_DISPLAY[v]=display;});
+let _patterns={{PATTERNS_JSON}};
+let _disabled={{DISABLED_JSON}};
+let _stats={{STATS_JSON}};
+let _allPatterns={{ALL_PATTERNS_JSON}};
+let _groups={{PATTERN_GROUPS_JSON}};
+let _concepts={{CONCEPTS_JSON}};
+let _wikiLog={{WIKI_LOG_JSON}};
+let _total={{TOTAL}};
+let _projectPatterns={{PROJECT_PATTERNS_JSON}};
+let _dryRun={{DRYRUN_VAL}};
+
+// Toast
+let _tt;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),1200)}
+
+// Confirm
+let _cfn=null;
+function confirmAction(msg,fn){$('confirmMsg').textContent=msg;_cfn=fn;$('confirmOverlay').classList.add('show');$('confirmYes').onclick=()=>{closeConfirm();if(_cfn)_cfn()}}
+function closeConfirm(){$('confirmOverlay').classList.remove('show');_cfn=null}
+
+// Toggles
+function toggleEnabled(){const on=$('chkEnabled').checked;$('masterPill').className='pill '+(on?'on':'off');$('masterPill').innerHTML='<span class="dot"></span>'+(on?'Active':'Off');vscode.postMessage({command:'toggle',enabled:on})}
+function toggleScroll(){vscode.postMessage({command:'scrollToggle',enabled:$('chkScroll').checked})}
+function toggleDryRun(){
+  _dryRun=$('chkDryRun').checked;
+  $('dryRunBanner').style.display=_dryRun?'block':'none';
+  vscode.postMessage({command:'toggleDryRun',enabled:_dryRun});
 }
 
-// Get all variants for a display name
-function getVariants(displayName){return PATTERN_GROUPS[displayName]||[displayName];}
-
-// Check if any variant of a display pattern is enabled
-function isDisplayEnabled(displayName){
-  var variants=getVariants(displayName);
-  for(var i=0;i<variants.length;i++){if(patterns.indexOf(variants[i])!==-1)return true;}
-  return false;
-}
-
-// Initialize: ensure variants are synced
-ALL_PATTERNS.forEach(function(p){if(patterns.indexOf(p)===-1&&disabledPatterns.indexOf(p)===-1)disabledPatterns.push(p)});
-var CONCEPTS_DATA={{CONCEPTS_JSON}};
-var WIKI_LOG_DATA={{WIKI_LOG_JSON}};
-
-function togSec(id){
-  var body=$(id);var arr=$('arr'+id.replace('sec',''));
-  var open=body.classList.toggle('open');
-  if(arr)arr.classList.toggle('open',open);
-}
-
-var _tt;
-function toast(m){var t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(function(){t.classList.remove('show')},900)}
-
-function updateMasterUI(){
-  var on=$('chkEnabled').checked;var p=$('masterPill');
-  p.className='pill '+(on?'pill-on':'pill-off');p.textContent=on?'ON':'OFF';
-}
-function toggleMaster(){var c=$('chkEnabled');c.checked=!c.checked;instantToggle()}
-function instantToggle(){vscode.postMessage({command:'toggle',enabled:$('chkEnabled').checked});updateMasterUI();toast($('chkEnabled').checked?'Enabled':'Disabled')}
-function scrollToggle(){vscode.postMessage({command:'scrollToggle',enabled:$('chkScroll').checked});toast('Scroll '+($('chkScroll').checked?'ON':'OFF'))}
-
+// Patterns
 function renderPatterns(){
-  var grid=$('patGrid');
-  var h='',active=0;
-  // Only show unique display names (hide variants)
-  ALL_PATTERNS.forEach(function(displayName){
-    var on=isDisplayEnabled(displayName);
-    if(on)active++;
-    h+='<button class="ptag '+(on?'on':'off')+'" onclick="togPat(\''+displayName.replace(/'/g,"\\'")+'\')">'+displayName+'</button>';
-  });
-  grid.innerHTML=h;$('statActive').textContent=active;
-}
-function togPat(displayName){
-  var variants=getVariants(displayName);
-  var wasOn=isDisplayEnabled(displayName);
-  if(wasOn){
-    // Turn OFF: remove all variants from patterns, add to disabled
-    variants.forEach(function(v){
-      patterns=patterns.filter(function(x){return x!==v;});
-      if(disabledPatterns.indexOf(v)===-1)disabledPatterns.push(v);
-    });
-  }else{
-    // Turn ON: add all variants to patterns, remove from disabled
-    variants.forEach(function(v){
-      disabledPatterns=disabledPatterns.filter(function(x){return x!==v;});
-      if(patterns.indexOf(v)===-1)patterns.push(v);
-    });
+  const g=$('patGrid');g.innerHTML='';
+  // Project-specific patterns first (purple)
+  for(const p of _projectPatterns){
+    if(_allPatterns.includes(p))continue; // avoid duplicate
+    const b=document.createElement('button');
+    b.className='tag project on';b.textContent=p;
+    b.title='Project pattern from .vscode/grav.json';
+    b.onclick=()=>toast('Edit .vscode/grav.json to change project patterns');
+    g.appendChild(b);
   }
-  renderPatterns();toast(displayName+' '+(isDisplayEnabled(displayName)?'ON':'OFF'));
+  if(_projectPatterns.length>0&&$('projPatBadge'))$('projPatBadge').style.display='inline';
+  // Global patterns
+  for(const p of _allPatterns){
+    const vars=_groups[p]||[p];
+    const on=vars.some(v=>_patterns.includes(v)&&!_disabled.includes(v));
+    const b=document.createElement('button');
+    b.className='tag '+(on?'on':'off');b.textContent=p;
+    b.onclick=()=>{
+      if(on){for(const v of vars)if(!_disabled.includes(v))_disabled.push(v)}
+      else{_disabled=_disabled.filter(d=>!vars.includes(d));for(const v of vars)if(!_patterns.includes(v))_patterns.push(v)}
+      renderPatterns()
+    };
+    g.appendChild(b)
+  }
 }
-renderPatterns();updateMasterUI();
 
-function saveAll(){
+// Stats bars
+function renderStats(){
+  const c=$('statBars');c.innerHTML='';
+  const entries=Object.entries(_stats||{}).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const max=entries.length>0?entries[0][1]:1;
+  for(const[k,v]of entries){
+    const pct=Math.round(v/max*100);
+    const r=document.createElement('div');r.className='bar-row';
+    r.innerHTML='<span class="bar-name">'+k+'</span><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><span class="bar-num">'+v+'</span>';
+    c.appendChild(r)
+  }
+  if(entries.length===0)c.innerHTML='<div class="feed-empty">No clicks yet</div>';
+  $('statTotal').textContent=String(_total||0)
+}
+
+// Log
+function renderLog(log){
+  const f=$('logFeed');
+  if(!log||!log.length){f.innerHTML='<div class="feed-empty">No activity yet</div>';return}
+  f.innerHTML='';
+  for(const l of log.slice(0,30)){
+    const r=document.createElement('div');r.className='feed-row';
+    const op=(l.op||l.pattern||'').toLowerCase();
+    const cls=op.includes('approve')||op.includes('click')?'approve':op.includes('reject')?'reject':op.includes('block')?'block':'ingest';
+    r.innerHTML='<span class="feed-ts">'+(l.time||'')+'</span><span class="feed-op '+cls+'">'+(l.op||l.pattern||'')+'</span><span class="feed-cmd">'+(l.cmd||l.button||'')+'</span>';
+    f.appendChild(r)
+  }
+}
+
+// Save
+function save(){
   vscode.postMessage({command:'save',data:{
     enabled:$('chkEnabled').checked,scrollOn:$('chkScroll').checked,
-    pauseMs:parseInt($('rngPause').value)||7000,scrollMs:parseInt($('rngScroll').value)||500,
-    approveMs:parseInt($('rngApprove').value)||1000,patterns:patterns,disabledPatterns:disabledPatterns,language:'en'
-  }});toast('Saved');
+    pauseMs:parseInt($('rngPause').value),scrollMs:parseInt($('rngScroll').value),approveMs:parseInt($('rngApprove').value),
+    patterns:_patterns,disabledPatterns:_disabled
+  }});toast('Saved')
 }
 
-var BC=['var(--blue)','var(--green)','var(--yellow)','var(--red)','var(--purple)','var(--cyan)'];
-function renderBars(stats){
-  var el=$('statBars');var max=0;
-  ALL_PATTERNS.forEach(function(p){var c=stats[p]||0;if(c>max)max=c});
-  if(!el.children.length){
-    var h='';ALL_PATTERNS.forEach(function(p,i){
-      h+='<div class="bar-r"><span class="bar-k">'+p+'</span><div class="bar-bg"><div class="bar-fg" id="bf-'+i+'" style="width:0%;background:'+BC[i%6]+'"></div></div><span class="bar-n" id="bn-'+i+'">0</span></div>';
-    });el.innerHTML=h;
-  }
-  ALL_PATTERNS.forEach(function(p,i){
-    var c=stats[p]||0;var pct=max>0?Math.round(c/max*100):0;
-    var f=$('bf-'+i),t=$('bn-'+i);
-    if(f)f.style.width=pct+'%';if(t&&t.textContent!==String(c))t.textContent=c;
-  });
-}
+// Duration format
+function fmtDur(ms){if(!ms||ms<1000)return'0s';const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);if(h>0)return h+'h '+m%60+'m';if(m>0)return m+'m';return s+'s'}
 
-var _lk=null;
-function renderLog(log){
-  var el=$('logList');
-  if(!log||!log.length){if(_lk!==''){_lk='';el.innerHTML='<div class="feed-empty">No clicks yet</div>'}return}
-  var key=(log[0]&&(log[0].time+log[0].pattern))||'';if(_lk===key)return;
-  var isNew=_lk!==null;_lk=key;
-  var h='';log.forEach(function(c,i){
-    var cls=(i===0&&isNew)?' feed-new':'';
-    h+='<div class="feed-row'+cls+'"><span class="feed-ts">'+(c.time||'')+'</span><span class="feed-op" style="color:var(--green)">'+(c.pattern||'')+'</span><span class="feed-cmd">'+(c.button||'')+'</span></div>';
-  });el.innerHTML=h;el.scrollTop=0;
-}
-function resetStats(){vscode.postMessage({command:'resetStats'});$('totalCount').textContent='0';$('statTotal').textContent='0';renderBars({});toast('Reset')}
-function clearLog(){vscode.postMessage({command:'clearLog'});renderLog([]);toast('Cleared')}
-
-function renderConcepts(data){
-  var el=$('conceptMap');
-  if(!data||!Object.keys(data).length){el.innerHTML='<div class="feed-empty">Concepts appear as the system learns</div>';return}
-  var entries=Object.entries(data).sort(function(a,b){return b[1].commands.length-a[1].commands.length});
-  var h='';entries.forEach(function(e){
-    var name=e[0],c=e[1];
-    var pct=Math.max(0,Math.min(100,Math.round((c.avgConfidence+1)/2*100)));
-    var col=c.avgConfidence>=0.5?'var(--green)':c.avgConfidence>=0?'var(--yellow)':'var(--red)';
-    h+='<div class="cpt"><div class="cpt-top"><span class="cpt-name">'+name+'</span><span class="cpt-risk '+(c.riskLevel||'unknown')+'">'+(c.riskLevel||'?')+'</span></div>';
-    h+='<div class="cpt-bar"><div class="cpt-fill" style="width:'+pct+'%;background:'+col+'"></div></div>';
-    h+='<div class="cpt-meta"><span>'+c.commands.length+' cmds</span><span>'+Math.round(c.avgConfidence*100)+'%</span></div></div>';
-  });el.innerHTML=h;
-}
-
-var _wk=null;
-function renderWikiLog(log){
-  var el=$('wikiLog');
-  if(!log||!log.length){if(_wk!==''){_wk='';el.innerHTML='<div class="feed-empty">No events yet</div>'}return}
-  var key=(log[log.length-1]&&(log[log.length-1].time+(log[log.length-1].cmd||'')))||'';
-  if(_wk===key)return;var isNew=_wk!==null;_wk=key;
-  var h='';log.slice().reverse().forEach(function(l,i){
-    var cls=(i===0&&isNew)?' feed-new':'';
-    h+='<div class="feed-row'+cls+'"><span class="feed-ts">'+(l.time||'').slice(11,19)+'</span>';
-    h+='<span class="feed-op '+(l.op||l.action||'')+'">'+(l.op||'')+'</span>';
-    h+='<span class="feed-cmd">'+(l.cmd||l.detail||'')+'</span>';
-    if(l.conf!==undefined)h+='<span class="feed-conf">'+Math.round(l.conf*100)+'%</span>';
-    h+='</div>';
-  });el.innerHTML=h;el.scrollTop=0;
-}
-
-var _tk=null;
-function renderTermLog(log){
-  var el=$('termLogList');if(!el)return;
-  if(!log||!log.length){if(_tk!==''){_tk='';el.innerHTML='<div class="feed-empty">No terminal activity</div>'}return}
-  var key=(log[0]&&(log[0].time+log[0].cmd))||'';if(_tk===key)return;
-  var isNew=_tk!==null;_tk=key;
-  var h='';log.forEach(function(t,i){
-    var cls=(i===0&&isNew)?' feed-new':'';
-    h+='<div class="feed-row'+cls+'"><span class="feed-ts">'+(t.time||'')+'</span><span class="feed-op" style="color:var(--mute)">'+(t.source||'')+'</span><span class="feed-cmd">'+(t.cmd||'').slice(0,80)+'</span></div>';
-  });el.innerHTML=h;el.scrollTop=0;
-}
-
-function fmtMs(ms){if(!ms||ms<=0)return'\u2014';if(ms<1000)return ms+'ms';if(ms<60000)return Math.round(ms/1000)+'s';return Math.floor(ms/60000)+'m'}
-var HC={healthy:{c:'green',l:'Healthy'},learning:{c:'yellow',l:'Learning'},degrading:{c:'red',l:'Degrading'},new:{c:'',l:'New'}};
-function renderSession(s){
-  if(!s)return;
-  $('sessDuration').textContent=fmtMs(s.sessionMs);
-  $('sessMsg').textContent=s.msgCount||0;
-  $('sessApprove').textContent=s.approveCount||0;
-  $('sessAvgResp').textContent=s.avgResponseMs?fmtMs(s.avgResponseMs):'\u2014';
-  var ty=$('aiTyping');if(ty)ty.classList.toggle('on',!!s.aiTyping);
-  var hb=$('healthBadge');if(hb&&s.learningHealth){var hc=HC[s.learningHealth]||HC['new'];hb.className='gauge-v'+(hc.c?' '+hc.c:'');hb.textContent=hc.l}
-  var bd=$('toolBreakdown');
-  if(bd&&s.toolBreakdown&&Object.keys(s.toolBreakdown).length>0){
-    var entries=Object.entries(s.toolBreakdown).sort(function(a,b){return b[1].count-a[1].count});
-    var mx=entries[0][1].count;var h='';
-    entries.forEach(function(e,i){
-      var tool=e[0],td=e[1];var pct=mx>0?Math.round(td.count/mx*100):0;
-      var avgMs=td.count>0?Math.round(td.totalMs/td.count):0;
-      h+='<div class="bar-r"><span class="bar-k">'+tool+'</span><div class="bar-bg"><div class="bar-fg" style="width:'+pct+'%;background:'+BC[i%6]+'"></div></div><span class="bar-n">'+td.count+(avgMs?' \u00b7 '+fmtMs(avgMs):'')+'</span></div>';
-    });bd.innerHTML=h;
-  }
-}
-
-/* ── Quota ── */
-function renderQuota(q){
-  if(!q)return;
-  var pp=$('quotaPct');if(pp){var c=q.overallPct>=90?'red':q.overallPct>=70?'yellow':'green';pp.className='gauge-v '+c;pp.textContent=q.overallPct+'%'}
-  var rr=$('quotaRate');if(rr)rr.textContent=q.usageRate>0?q.usageRate+'%/h':'\u2014';
-  var rw=$('quotaRunway');if(rw){if(q.runwayMin===Infinity||q.runwayMin>9999)rw.textContent='\u221E';else if(q.runwayMin<=0){rw.textContent='Exhausted';rw.className='gauge-v red'}else if(q.runwayMin<60){rw.textContent=q.runwayMin+'m';rw.className='gauge-v'+(q.runwayMin<=30?' red':' yellow')}else{rw.textContent=Math.round(q.runwayMin/60*10)/10+'h';rw.className='gauge-v'}}
-  var nr=$('quotaReset');if(nr){if(q.nextReset>0){var d=q.nextReset-Date.now();nr.textContent=d>0?fmtMs(d):'Now'}else nr.textContent='\u2014'}
-  var pt=$('quotaPort');if(pt)pt.textContent=q.lsPort||'scanning...';
-  var ml=$('quotaModels');if(ml&&q.models&&Object.keys(q.models).length>0){
-    var h='';Object.entries(q.models).forEach(function(e){
-      var n=e[0],m=e[1];var col=m.status==='critical'?'var(--red)':m.status==='warning'?'var(--yellow)':'var(--green)';
-      h+='<div class="bar-r"><span class="bar-k">'+(m.name||n)+'</span><div class="bar-bg"><div class="bar-fg" style="width:'+m.pct+'%;background:'+col+'"></div></div><span class="bar-n">'+m.pct+'%</span></div>';
-    });ml.innerHTML=h;
-  }else if(ml&&q.error){ml.innerHTML='<div class="feed-empty">'+q.error+'</div>'}
-}
-
-/* ── ROI ── */
-function renderROI(r){
-  if(!r)return;var s=r.session,l=r.lifetime;
-  if(s){
-    var sv=$('roiSaved');if(sv)sv.textContent=s.savedSec>=60?s.savedMin+'m':s.savedSec+'s';
-    var rc=$('roiClicks');if(rc)rc.textContent=s.clicks;
-    var rg=$('roiGain');if(rg){rg.textContent=s.gainPct+'%';rg.className='gauge-v'+(s.gainPct>=10?' green':s.gainPct>=5?' yellow':'')}
-    var rd=$('roiDaily');if(rd)rd.textContent=s.dailySavedMin+'m';
-  }
-  if(l){
-    var ls=$('roiLifeSaved');if(ls)ls.textContent=l.savedHours>=1?l.savedHours+'h':l.savedMin+'m';
-    var lc=$('roiLifeClicks');if(lc)lc.textContent=l.totalClicks;
-    var ln=$('roiLifeSessions');if(ln)ln.textContent=l.sessions;
-  }
-}
-
-/* ── Idle ── */
-function renderIdle(isIdle){
-  var el=$('idleStatus');if(!el)return;
-  if(isIdle===undefined||isIdle===null){el.textContent='\u2014';return}
-  el.textContent=isIdle?'Idle (auto-accept active)':'Typing (paused)';
-  el.className='gauge-v'+(isIdle?' green':' yellow');
-}
-
-window.addEventListener('message',function(e){
-  var m=e.data;
-  if(m.command==='statsUpdated'){$('totalCount').textContent=m.totalClicks||0;$('statTotal').textContent=m.totalClicks||0;renderBars(m.stats||{})}
-  if(m.command==='logUpdated')renderLog(m.log);
-  if(m.command==='termLogUpdated')renderTermLog(m.termLog);
-  if(m.command==='sessionUpdated')renderSession(m.session);
-  if(m.command==='quotaUpdated')renderQuota(m.quota);
-  if(m.command==='idleChanged')renderIdle(m.idle);
-  if(m.command==='brainUpdated'){
-    $('brainEpoch').textContent=m.epoch||0;$('brainTracking').textContent=m.tracking||0;
-    $('brainWhite').textContent=m.whiteCount||0;$('brainBlack').textContent=m.blackCount||0;
-    $('brainPromoted').textContent=m.promoted||0;$('brainPatterns').textContent=m.patterns||0;
-    $('wikiPages').textContent=m.wikiPages||0;$('wikiConcepts').textContent=m.wikiConcepts||0;
-    $('wikiContradictions').textContent=m.wikiContradictions||0;
-    if(m.concepts)renderConcepts(m.concepts);if(m.wikiLog)renderWikiLog(m.wikiLog);
-    if(m.session)renderSession(m.session);if(m.termLog)renderTermLog(m.termLog);
-    if(m.quota)renderQuota(m.quota);if(m.roi)renderROI(m.roi);
-    if(m.idle!==undefined)renderIdle(m.idle);
+// Messages from extension
+window.addEventListener('message',e=>{
+  const m=e.data;
+  switch(m.command){
+    case'statsUpdated':_stats=m.stats||{};_total=m.totalClicks||0;renderStats();break;
+    case'logUpdated':renderLog(m.log);break;
+    case'brainUpdated':
+      if($('brainEpoch'))$('brainEpoch').textContent=m.epoch||0;
+      if($('brainTracking'))$('brainTracking').textContent=m.tracking||0;
+      if($('brainWhite'))$('brainWhite').textContent=m.whiteCount||0;
+      if($('brainBlack'))$('brainBlack').textContent=m.blackCount||0;
+      if($('brainPromoted'))$('brainPromoted').textContent=m.promoted||0;
+      if($('wikiPages'))$('wikiPages').textContent=m.wikiPages||0;
+      if($('wikiConcepts'))$('wikiConcepts').textContent=m.wikiConcepts||0;
+      if(m.wikiLog)renderLog(m.wikiLog);
+      if(m.session){
+        if($('sessDuration'))$('sessDuration').textContent=fmtDur(m.session.sessionMs);
+        if($('sessMsg'))$('sessMsg').textContent=m.session.msgCount||0;
+      }
+      if(m.session&&m.session.cdpConnected!==undefined){
+        const cp=$('cdpPill');
+        cp.style.display='inline-flex';
+        cp.className='pill '+(m.session.cdpConnected?'on':'off');
+        cp.innerHTML='<span class="dot"></span>CDP '+(m.session.cdpConnected?m.session.cdpSessions:'off')
+      }
+      break;
+    case'commandBlocked':toast('Blocked: '+(m.reason||''));break;
   }
 });
-vscode.postMessage({command:'getStats'});vscode.postMessage({command:'getLog'});
-renderBars({{STATS_JSON}});renderConcepts(CONCEPTS_DATA);renderWikiLog(WIKI_LOG_DATA);
+
+renderPatterns();renderStats();renderLog(_wikiLog);
+if(_dryRun){$('dryRunBanner').style.display='block';if($('chkDryRun'))$('chkDryRun').checked=true;}
 </script>
 </body>
 </html>

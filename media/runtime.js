@@ -95,23 +95,20 @@
     }, 3000);
     window.__gravTimers.push(syncTimer);
 
-    // Button auto-click
-    var REJECT_WORDS = ['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline'];
-    var EDITOR_SKIP = ['Accept Changes', 'Accept Incoming', 'Accept Current', 'Accept Both', 'Accept Combination'];
-    var HIGH_CONF = { 'Accept All': 1, 'Accept all': 1, 'Approve': 1, 'Resume': 1, 'Try Again': 1, 'Reconnect': 1, 'Resume Conversation': 1, 'Continue': 1, 'Run': 1, 'Retry': 1, 'Proceed': 1 };
+    // Button auto-click — constants injected from shared config
+    var REJECT_WORDS = /*{{REJECT_WORDS}}*/['Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Decline', 'Reject all', 'Reject All', 'No', 'Disallow', 'Stop', 'Abort', 'Skip'];
+    var EDITOR_SKIP = /*{{EDITOR_SKIP}}*/['Accept Changes', 'Accept Incoming', 'Accept Current', 'Accept Both', 'Accept Combination', 'Accept Line', 'Accept Word', 'Accept Suggestion'];
+    var HIGH_CONF = /*{{HIGH_CONF}}*/{'Accept All': 1, 'Accept all': 1, 'Accept': 1, 'Approve': 1, 'Resume': 1, 'Run': 1, 'Retry': 1, 'Proceed': 1};
+    var LIM = /*{{LIMITS}}*/{BUTTON_LABEL_MIN: 2, BUTTON_LABEL_MAX: 60};
     var _clickedAt = new WeakSet();
     var _clickedIds = {};
     var _globalCooldown = 0;
     var _runCooldown = 0;
 
-    // Cooldown durations (ms)
-    var COOLDOWN = {
-        'Run': 5000, 'Accept': 1500, 'Accept all': 1500, 'Accept All': 1500,
-        'Approve': 2000, 'Allow Once': 3000, 'Allow This Conversation': 3000,
-        _default: 1000, _global: 500
-    };
+    // Cooldown durations (ms) — injected from shared config
+    var COOLDOWN = /*{{COOLDOWN}}*/{'Run': 5000, 'Accept': 1500, DEFAULT: 1000, GLOBAL: 500};
 
-    var getCooldown = function(text) { return COOLDOWN[text] || COOLDOWN._default; };
+    var getCooldown = function(text) { return COOLDOWN[text] || COOLDOWN.DEFAULT; };
 
     var isAlreadyClicked = function(btn, text) {
         if (_clickedAt.has(btn)) return true;
@@ -129,8 +126,9 @@
         var now = Date.now();
         var key = text + '|' + (btn.getBoundingClientRect().top | 0);
         _clickedIds[key] = now;
-        _clickedIds['pattern:' + text] = now;
-        _globalCooldown = now + COOLDOWN._global;
+        // Don't set pattern cooldown for Expand — it reveals new buttons that need immediate clicking
+        if (text !== 'Expand') _clickedIds['pattern:' + text] = now;
+        _globalCooldown = now + (text === 'Expand' ? 200 : COOLDOWN.GLOBAL);
         if (text === 'Run' || text.indexOf('Run ') === 0) _runCooldown = now + COOLDOWN['Run'];
     };
 
@@ -151,37 +149,101 @@
     };
 
     var labelOf = function (btn) {
+        // Strategy 1: aria-label (most explicit for accessibility)
+        var aria = (btn.getAttribute('aria-label') || '').trim();
+        if (aria.length >= 2 && aria.length <= 60) return aria;
+        
+        // Strategy 2: data-tooltip or data-title (common in VS Code)
+        var dataTip = (btn.getAttribute('data-tooltip') || btn.getAttribute('data-title') || '').trim();
+        if (dataTip.length >= 2 && dataTip.length <= 60) return dataTip;
+        
+        // Strategy 3: Direct text nodes (most accurate for simple buttons)
         var direct = '';
-        for (var i = 0; i < btn.childNodes.length; i++) { if (btn.childNodes[i].nodeType === 3) direct += btn.childNodes[i].nodeValue || ''; }
+        for (var i = 0; i < btn.childNodes.length; i++) { 
+            if (btn.childNodes[i].nodeType === 3) direct += btn.childNodes[i].nodeValue || ''; 
+        }
         direct = direct.trim();
         if (direct.length >= 2 && direct.length <= 60) return direct;
+        
+        // Strategy 4: innerText first line (most common)
         var raw = (btn.innerText || btn.textContent || '').trim();
         var first = raw.split('\n')[0].trim();
         if (first.length >= 2 && first.length <= 60) return first;
-        var aria = (btn.getAttribute('aria-label') || '').trim();
-        if (aria.length >= 2 && aria.length <= 60) return aria;
+        
+        // Strategy 5: title attribute
         var title = (btn.getAttribute('title') || '').trim();
         if (title.length >= 2 && title.length <= 60) return title;
-        var spans = btn.querySelectorAll('span, div, label');
+        
+        // Strategy 6: value attribute (for input buttons)
+        var value = (btn.getAttribute('value') || '').trim();
+        if (value.length >= 2 && value.length <= 60) return value;
+        
+        // Strategy 7: Nested spans/divs/labels (React/Vue common pattern)
+        var spans = btn.querySelectorAll('span, div, label, p, b, strong, em');
         var st = '';
         for (var j = 0; j < spans.length; j++) {
             var t = '';
-            for (var k = 0; k < spans[j].childNodes.length; k++) { if (spans[j].childNodes[k].nodeType === 3) t += spans[j].childNodes[k].nodeValue || ''; }
+            for (var k = 0; k < spans[j].childNodes.length; k++) { 
+                if (spans[j].childNodes[k].nodeType === 3) t += spans[j].childNodes[k].nodeValue || ''; 
+            }
             t = t.trim();
             if (t) st += (st ? ' ' : '') + t;
         }
         if (st.length >= 2 && st.length <= 60) return st;
+        
+        // Strategy 8: alt attribute (for image buttons)
+        var alt = (btn.getAttribute('alt') || '').trim();
+        if (alt.length >= 2 && alt.length <= 60) return alt;
+        
         return '';
     };
 
     var inEditorContext = function (btn) {
         if (!btn.closest) return false;
-        // Grav Dashboard detection (by page title)
+        
+        // Check page title first
         try {
             var pageTitle = (document.title || '').toLowerCase();
             if (pageTitle.indexOf('grav') !== -1 && pageTitle.indexOf('dashboard') !== -1) return true;
         } catch(_) {}
-        return !!(btn.closest('.monaco-editor') || btn.closest('.monaco-diff-editor') || btn.closest('.merge-editor-view') || btn.closest('.editor-actions') || btn.closest('.title-actions') || btn.closest('.monaco-toolbar') || btn.closest('.context-view') || btn.closest('.monaco-menu') || btn.closest('.quick-input-widget') || btn.closest('.sidebar') || btn.closest('.panel-header') || btn.closest('.terminal-tab') || btn.closest('.settings-editor') || btn.closest('.settings-body') || btn.closest('[class*=settings-editor]') || btn.closest('[class*=settings]') || btn.closest('[class*=preference]') || btn.closest('[id*=settings]') || btn.closest('.simple-browser') || btn.closest('[class*=simple-browser]') || btn.closest('[class*=browser-preview]') || btn.closest('.extensions-editor') || btn.closest('.extension-editor') || btn.closest('[class*=extension-editor]') || btn.closest('[class*=keybinding]') || btn.closest('.keybindings-editor') || btn.closest('[class*=accounts]') || btn.closest('[class*=authentication]') || btn.closest('[class*=welcome]') || btn.closest('[class*=walkthrough]') || btn.closest('[class*=output]') || btn.closest('[class*=notebook]'));
+        
+        // List of selectors that indicate non-agent contexts
+        var EDITOR_SELECTORS = [
+            // Monaco Editor (code editor, diff, merge)
+            '.monaco-editor', '.monaco-diff-editor', '.merge-editor-view',
+            '.editor-actions', '.title-actions', '.monaco-toolbar', '.monaco-editor-overlaymessage',
+            // Settings panels (all variants)
+            '.settings-editor', '.settings-body', '.settings-tree-container',
+            '[class*="settings-editor"]', '[class*="settings"]', '[class*="preference"]',
+            '[id*="settings"]', '.settings-widget',
+            // Browser panels
+            '.simple-browser', '[class*="simple-browser"]', '[class*="browser-preview"]', '[class*="webview-browser"]',
+            // Extensions
+            '.extensions-editor', '.extension-editor', '[class*="extension-editor"]', 
+            '[class*="extensions-list"]', '[class*="marketplace"]', '.extension-details',
+            // Keybindings
+            '[class*="keybinding"]', '.keybindings-editor',
+            // Context menus and quick input
+            '.context-view', '.monaco-menu', '.quick-input-widget', '.quick-input-list',
+            '.terminal-tab', '.terminal-outer-container',
+            // Auth/Accounts
+            '[class*="accounts"]', '[class*="authentication"]', '.account-picker',
+            // Welcome/Getting started
+            '[class*="welcome"]', '[class*="walkthrough"]', '[class*="getting-started"]',
+            // Output and debug
+            '[class*="output"]', '[class*="debug"]', '.debug-toolbar',
+            // Notebooks
+            '[class*="notebook"]', '.notebook-cell',
+            // Problems panel
+            '[class*="problems-panel"]', '[class*="markers-panel"]',
+            // Search panel
+            '[class*="search-view"]', '[class*="search-widget"]'
+        ];
+        
+        for (var i = 0; i < EDITOR_SELECTORS.length; i++) {
+            if (btn.closest(EDITOR_SELECTORS[i])) return true;
+        }
+        return false;
     };
 
     var hasRejectNearby = function (btn) {
@@ -198,34 +260,92 @@
         return false;
     };
 
+    var isVisible = function(el) {
+        if (!el) return false;
+        if (el.disabled) return false;
+        if (el.offsetWidth === 0 && el.offsetHeight === 0 && !el.closest('[class*="overlay"], [class*="popup"], [class*="dialog"], [class*="notification"]')) return false;
+        try {
+            var cs = getComputedStyle(el);
+            if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0' || cs.pointerEvents === 'none') return false;
+            // Check if element is in viewport or near it
+            var rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return false;
+            // Element should be within reasonable viewport bounds (allow some overflow)
+            if (rect.right < -100 || rect.left > window.innerWidth + 100 || rect.bottom < -100 || rect.top > window.innerHeight + 100) return false;
+        } catch (_) { return false; }
+        return true;
+    };
+
     var scanAndClick = function () {
         if (!window.__gravEnabled) return;
-        var btns = document.querySelectorAll('button, vscode-button, a.action-label, [role="button"]');
+        // Expanded selectors to catch more button types
+        var btns = document.querySelectorAll('button, vscode-button, a.action-label, [role="button"], [role="menuitem"], input[type="button"], input[type="submit"], .monaco-button, .button, [class*="button"], [class*="btn"], [class*="action-label"], [class*="cursor-pointer"], [class*="clickable"]');
+        var foundButtons = [];
         for (var i = 0; i < btns.length; i++) {
             var b = btns[i];
-            if (b.disabled || b.offsetWidth === 0) continue;
+            if (!isVisible(b)) continue;
             if (inEditorContext(b)) continue;
             var text = labelOf(b);
-            if (!text || text.length > 60) continue;
+            if (!text || text.length < 2 || text.length > 60) continue;
             if (isAlreadyClicked(b, text)) continue;
-            for (var s = 0; s < EDITOR_SKIP.length; s++) { if (matchPattern(text, EDITOR_SKIP[s])) { text = ''; break; } }
-            if (!text) continue;
+            
+            // Check editor skip patterns
+            var skipThis = false;
+            for (var s = 0; s < EDITOR_SKIP.length; s++) { 
+                if (matchPattern(text, EDITOR_SKIP[s])) { skipThis = true; break; } 
+            }
+            if (skipThis) continue;
+            
             var matched = findMatch(text);
             if (!matched) continue;
+            
             // Run cooldown check
             if ((matched === 'Run' || matched.indexOf('Run ') === 0) && isRunCooldown()) continue;
+            
+            // Validation: high confidence or has reject sibling
             var isHighConf = !!HIGH_CONF[matched];
-            if (!isHighConf && !hasRejectNearby(b)) continue;
+            if (!isHighConf && !hasRejectNearby(b)) {
+                // Additional check: is this a standalone approval button in agent context?
+                // Look for common agent panel indicators
+                var inAgentPanel = false;
+                try {
+                    var el = b;
+                    for (var up = 0; up < 5 && el; up++) {
+                        var cls = (el.className || '').toLowerCase();
+                        if (cls.indexOf('agent') !== -1 || cls.indexOf('chat') !== -1 || cls.indexOf('cascade') !== -1) {
+                            inAgentPanel = true; break;
+                        }
+                        el = el.parentElement;
+                    }
+                } catch(_) {}
+                if (!inAgentPanel) continue;
+            }
+            
             markClicked(b, text);
+            // After Expand: quick re-scan to catch newly revealed buttons
+            if (matched === 'Expand') {
+                setTimeout(scanAndClick, 400);
+                setTimeout(scanAndClick, 800);
+            }
             try { b.click(); } catch (_) { }
             try {
                 var rect = b.getBoundingClientRect();
                 var cx = rect.left + rect.width / 2;
                 var cy = rect.top + rect.height / 2;
+                // Full event sequence: mouseover → mouseenter → pointer/mouse events → click
+                b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }));
+                b.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, cancelable: false, view: window, clientX: cx, clientY: cy }));
                 ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(function (ev) {
                     var C = ev.indexOf('pointer') === 0 ? PointerEvent : MouseEvent;
-                    b.dispatchEvent(new C(ev, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, isPrimary: true }));
+                    b.dispatchEvent(new C(ev, { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, buttons: ev.indexOf('down') !== -1 ? 1 : 0, detail: 1, isPrimary: true, pointerId: 1, pointerType: 'mouse' }));
                 });
+                b.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, detail: 1 }));
+            } catch (_) { }
+            // Focus + keyboard Enter (for accessibility-driven buttons)
+            try {
+                b.focus();
+                b.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+                b.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
             } catch (_) { }
             if (BRIDGE_PORT > 0) {
                 try {
@@ -239,15 +359,52 @@
         }
     };
 
-    // MutationObserver with proper cleanup
+    // MutationObserver with smart throttling
     var _flushTimer = null;
+    var _pendingMutations = [];
+    var _observerActive = false;
+    
     try {
-        var observer = new MutationObserver(function () {
-            if (!_flushTimer) { scanAndClick(); _flushTimer = setTimeout(function () { _flushTimer = null; }, 100); }
+        var observer = new MutationObserver(function (mutations) {
+            // Only process if mutations actually added nodes or changed relevant attributes
+            var hasRelevantChange = false;
+            for (var m = 0; m < mutations.length; m++) {
+                var mut = mutations[m];
+                if (mut.type === 'childList' && (mut.addedNodes.length > 0 || mut.removedNodes.length > 0)) {
+                    // Check if added nodes contain buttons or containers
+                    for (var n = 0; n < mut.addedNodes.length; n++) {
+                        var node = mut.addedNodes[n];
+                        if (node.nodeType === 1) { // Element node
+                            if (node.tagName === 'BUTTON' || node.tagName === 'A' || node.tagName === 'DIV' || 
+                                node.tagName === 'SPAN' || node.tagName === 'VSCODE-BUTTON' ||
+                                node.querySelector && node.querySelector('button, [role="button"], vscode-button')) {
+                                hasRelevantChange = true;
+                                break;
+                            }
+                        }
+                    }
+                } else if (mut.type === 'attributes') {
+                    // Only care about class, disabled, style, aria-hidden
+                    var attr = mut.attributeName || '';
+                    if (attr === 'class' || attr === 'disabled' || attr === 'style' || attr === 'aria-hidden') {
+                        hasRelevantChange = true;
+                    }
+                }
+                if (hasRelevantChange) break;
+            }
+            
+            if (!hasRelevantChange) return;
+            
+            // Throttle scanAndClick calls
+            if (!_flushTimer) { 
+                scanAndClick(); 
+                _flushTimer = setTimeout(function () { _flushTimer = null; }, 150); 
+            }
         });
-        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'disabled', 'aria-hidden', 'style'] });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'disabled', 'aria-hidden', 'style', 'hidden'] });
         window.__gravApproveObserver = observer;
-    } catch (_) { }
+        _observerActive = true;
+    } catch (_) {} 
 
     // Initial scan with delay
     setTimeout(scanAndClick, 1000);

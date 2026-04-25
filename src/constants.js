@@ -21,17 +21,12 @@ const CONFIG_FILE = 'grav-config.json';
 const PORT_START = 48787;
 const PORT_END = 48850;
 
-// Accept commands are now discovered DYNAMICALLY at runtime
-// via vscode.commands.getCommands() — see extension.js discoverAcceptCommands()
-// This ensures compatibility across all Antigravity versions.
-const ACCEPT_CMDS = Object.freeze([]);
-
 const DEFAULT_PATTERNS = Object.freeze([
     // ── Antigravity Agent Panel — Button Labels ──
     // Source: YazanBaker priority matching + cotamatcotam iframe scan + Antigravity UI decompile
     //
     // Priority order (higher = matched first when multiple buttons visible):
-    //   Run > Accept > Always Allow > Allow > Continue > Retry
+    //   Run > Accept > Always Allow > Allow > Retry
     //
     // === SAFE: File edits — accept code changes, revertible ===
     'Accept all', 'Accept All', 'Accept',
@@ -45,12 +40,12 @@ const DEFAULT_PATTERNS = Object.freeze([
     'Approve', 'Expand',
     // === Connection Recovery — auto-click when connection fails ===
     'Resume', 'Try Again', 'Reconnect',
-    // === Conversation limit recovery ===
-    'Resume Conversation', 'Continue',
 ]);
 
 // Patterns disabled by default — irreversible, billing, or permanent permissions
 const RISKY_PATTERNS = Object.freeze([
+    'Continue',                         // can loop when AG needs user input
+    'Resume Conversation',              // can loop when AG needs user input
     'Always Allow',                     // permanent — never asks again
     'Allow in this Workspace',          // permanent for workspace
     'Allow This Conversation',          // session-scoped — safer than Always Allow
@@ -88,7 +83,8 @@ const SAFE_TERMINAL_CMDS = Object.freeze([
     'head', 'tail', 'wc', 'sort', 'uniq', 'diff', 'grep', 'find', 'xargs',
     'sed', 'awk', 'tr', 'cut', 'tee', 'date', 'whoami', 'id',
     'env', 'printenv', 'uname', 'hostname', 'df', 'du', 'free',
-    'kill', 'killall', 'pkill',
+    // NOTE: kill/killall/pkill removed from safe list — potentially destructive
+    // They are still learnable via the adaptive engine
     'ps', 'top', 'htop', 'lsof', 'netstat', 'ss', 'ping', 'dig', 'nslookup', 'host',
     'cargo', 'rustc', 'go', 'java', 'javac', 'mvn', 'gradle',
     'docker', 'docker-compose', 'podman', 'kubectl', 'helm', 'terraform', 'ansible',
@@ -149,6 +145,69 @@ const LEARN = Object.freeze({
     BATCH_SIZE: 10,
 });
 
+// ═══════════════════════════════════════════════════════════════
+//  Shared Observer Constants (used by both runtime.js and cdp.js)
+// ═══════════════════════════════════════════════════════════════
+
+// HIGH_CONF: Patterns auto-clicked WITHOUT requiring reject-sibling validation
+// These only appear in agent approval contexts
+const HIGH_CONF = Object.freeze({
+    'Accept All': 1, 'Accept all': 1, 'Accept': 1,
+    'Approve': 1, 'Approved': 1, 'Expand': 1,
+    'Run': 1, 'Run Task': 1, 'Execute': 1,
+    'Retry': 1, 'Proceed': 1, 'Go': 1,
+    'Resume': 1, 'Resumed': 1, 'Try Again': 1, 'Reconnect': 1,
+});
+
+// Cooldown durations (ms) — time to wait before clicking same pattern again
+const COOLDOWN = Object.freeze({
+    'Run': 5000,                    // 5s - terminal commands need time
+    'Accept': 1500,                 // 1.5s - file changes
+    'Accept all': 1500,
+    'Accept All': 1500,
+    'Approve': 2000,                // 2s
+    'Allow Once': 3000,             // 3s - permission dialogs
+    'Allow This Conversation': 3000,
+    'Continue': 15000,              // 15s - prevent rapid loop when AG needs input
+    'Resume Conversation': 15000,
+    DEFAULT: 1000,                  // 1s default
+    GLOBAL: 500,                    // 500ms minimum between ANY clicks
+});
+
+// Reject button labels — if found nearby, confirms this is an approval dialog
+const REJECT_WORDS = Object.freeze([
+    'Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow",
+    'Decline', 'Reject all', 'Reject All', 'No', 'Disallow',
+    'Stop', 'Abort', 'Skip',
+]);
+
+// Editor-specific patterns to skip (merge conflict buttons, etc.)
+const EDITOR_SKIP = Object.freeze([
+    'Accept Changes', 'Accept Incoming', 'Accept Current',
+    'Accept Both', 'Accept Combination', 'Accept Line',
+    'Accept Word', 'Accept Suggestion',
+]);
+
+// Notification keywords to suppress
+const SUPPRESS_KEYWORDS = Object.freeze([
+    'corrupt', 'reinstall', 'requires your input',
+    'step requires', 'requires input',
+]);
+
+// Numeric limits — replaces magic numbers
+const LIMITS = Object.freeze({
+    BUTTON_LABEL_MIN: 2,            // min chars for valid button label
+    BUTTON_LABEL_MAX: 60,           // max chars for valid button label
+    CLICK_DEDUP_TIMEOUT: 30000,     // 30s - cleanup old click tracking entries
+    SCAN_DEBUG_INTERVAL: 20,        // emit debug every N scans
+    EXPAND_RECLICK_DELAY: 5000,     // 5s - allow re-expand after this delay
+    SHADOW_ROOT_MAX: 200,           // max shadow roots to track
+    DEBUG_LOG_MAX: 20,              // max debug log entries
+    POLL_STANDARD_MS: 1500,         // standard polling interval
+    POLL_SLOW_MS: 5000,             // slow safety net polling
+    SCROLL_BOTTOM_THRESHOLD: 150,   // pixels from bottom = "at bottom"
+});
+
 // Semantic command categories for wiki classification
 const COMMAND_CATEGORIES = Object.freeze({
     'package-manager': ['npm', 'npx', 'yarn', 'pnpm', 'bun', 'pip', 'pip3', 'cargo', 'go', 'mvn', 'gradle', 'brew', 'apt', 'apt-get', 'yum', 'dnf', 'pacman', 'snap', 'uvx', 'uv', 'pipx', 'poetry', 'pdm'],
@@ -170,7 +229,9 @@ const COMMAND_CATEGORIES = Object.freeze({
 
 module.exports = {
     TAG, LEGACY_TAGS, LEGACY_SCRIPTS, RUNTIME_FILE, CONFIG_FILE,
-    PORT_START, PORT_END, ACCEPT_CMDS, DEFAULT_PATTERNS, RISKY_PATTERNS,
+    PORT_START, PORT_END, DEFAULT_PATTERNS, RISKY_PATTERNS,
     SAFE_TERMINAL_CMDS, DEFAULT_BLACKLIST, LEARN, COMMAND_CATEGORIES,
     PATTERN_GROUPS, PATTERN_DISPLAY,
+    // Shared observer constants
+    HIGH_CONF, COOLDOWN, REJECT_WORDS, EDITOR_SKIP, SUPPRESS_KEYWORDS, LIMITS,
 };

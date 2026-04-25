@@ -10,6 +10,26 @@ const { cfg } = require('./utils');
 let _server = null, _port = 0, _ctx = null, _deps = null;
 const MAX_BODY = 64 * 1024;
 
+// Rate limiting: max requests per IP per window
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX = 120;         // 120 requests per minute
+const _rateLimits = new Map();      // ip → { count, resetAt }
+
+function isRateLimited(ip) {
+    const now = Date.now();
+    let entry = _rateLimits.get(ip);
+    if (!entry || now > entry.resetAt) {
+        entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    }
+    entry.count++;
+    _rateLimits.set(ip, entry);
+    // Prune stale entries periodically
+    if (_rateLimits.size > 50) {
+        for (const [k, v] of _rateLimits) { if (now > v.resetAt) _rateLimits.delete(k); }
+    }
+    return entry.count > RATE_LIMIT_MAX;
+}
+
 const readBody = (req, cb) => {
     let body = '', size = 0;
     req.on('data', chunk => { size += chunk.length; if (size > MAX_BODY) { req.destroy(); return; } body += chunk; });
@@ -34,10 +54,18 @@ function start(ctx, deps) {
     tryPort(PORT_START);
 }
 
-function stop() { if (_server) try { _server.close(); } catch (_) {} _server = null; _port = 0; }
+function stop() { if (_server) try { _server.close(); } catch (_) { /* cleanup */ } _server = null; _port = 0; }
 function getPort() { return _port; }
 
 function handleRequest(req, res) {
+    // Rate limiting
+    const clientIp = req.socket.remoteAddress || '127.0.0.1';
+    if (isRateLimited(clientIp)) {
+        res.writeHead(429);
+        res.end('{"error":"rate limited"}');
+        return;
+    }
+
     const origin = req.headers.origin || '';
     const isLocal = !origin || origin.startsWith('vscode-webview://') || origin === 'http://127.0.0.1' || origin.startsWith('http://127.0.0.1:');
     res.setHeader('Access-Control-Allow-Origin', isLocal ? (origin || '*') : 'null');
@@ -52,7 +80,7 @@ function handleRequest(req, res) {
 
     // Stats from runtime
     if (u.query && u.query.stats) {
-        try { const inc = parseJSON(decodeURIComponent(u.query.stats)); if (inc && typeof inc === 'object') { for (const k in inc) { if (typeof inc[k] === 'number') state.stats[k] = (state.stats[k] || 0) + inc[k]; } state.totalClicks = Object.values(state.stats).reduce((a, b) => a + b, 0); _deps.onStatsUpdated(); } } catch (_) {}
+        try { const inc = parseJSON(decodeURIComponent(u.query.stats)); if (inc && typeof inc === 'object') { for (const k in inc) { if (typeof inc[k] === 'number') state.stats[k] = (state.stats[k] || 0) + inc[k]; } state.totalClicks = Object.values(state.stats).reduce((a, b) => a + b, 0); _deps.onStatsUpdated(); } } catch (_) { /* non-critical */ }
     }
 
     // Click log

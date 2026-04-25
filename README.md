@@ -1,149 +1,173 @@
-# Grav
+# Grav — AI Autopilot for Windsurf / Antigravity IDE
 
-Autopilot for Antigravity IDE. Zero-config CDP-first auto-approve with adaptive safety.
+**Stop babysitting your AI agent.** Grav auto-clicks approval buttons, keeps your chat pinned to the latest response, and blocks dangerous terminal commands — completely hands-free.
 
-## What it does
+[![Version](https://img.shields.io/badge/version-3.6.1-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-Grav watches the Antigravity agent panel and automatically clicks approval buttons (Accept All, Run, Approve, Resume, etc.) so you can let the AI work uninterrupted. It uses Chrome DevTools Protocol to reach buttons inside sandboxed OOPIF webviews — the only reliable method since Antigravity v1.19.6+.
+---
 
-When the agent asks to run a terminal command, Grav's Safety Guard checks it against a blacklist of destructive patterns before clicking. A learning engine tracks your approve/reject behavior over time and adapts.
+## Why Grav?
 
-## Architecture
+Windsurf / Antigravity runs its agent panel inside an Out-of-Process IFrame (OOPIF) — standard VS Code extensions can't reach it. Grav connects directly via **Chrome DevTools Protocol (CDP)**, injecting an observer into the webview to reliably interact with every button regardless of Shadow DOM or iframe boundaries.
 
-```
-extension.js          entry point, lifecycle, commands
-  |
-  +-- cdp.js          CDP engine (primary) — WebSocket to Electron debug port
-  |     |-- observer   injected JS that scans buttons + auto-scrolls
-  |     |-- heartbeat  5s self-healing, auto-reconnect
-  |     +-- native click  Input.dispatchMouseEvent fallback
-  |
-  +-- injection.js    workbench.html runtime (fallback for pre-OOPIF)
-  +-- bridge.js       HTTP server on localhost for runtime <-> host sync
-  +-- learning.js     SGD confidence engine (approve/reject = reward signal)
-  +-- wiki.js         knowledge base — concepts, sequences, contradictions
-  +-- terminal.js     shell execution listener (5 capture methods)
-  +-- quota.js        Antigravity Language Server quota monitor
-  +-- roi.js          time-saved tracker, productivity metrics
-  +-- idle.js         typing detection — pauses auto-accept while editing
-  +-- dashboard.js    webview panel controller
-  +-- constants.js    patterns, blacklists, hyperparameters
-  +-- utils.js        regex escape, path safety, command parsing
-```
+> **Works with:** Windsurf IDE, Antigravity IDE, any VS Code fork that exposes a CDP debug port.
 
-## How it works
-
-1. On activation, Grav patches `argv.json` to enable `--remote-debugging-port=9333`
-2. CDP connects to Electron, discovers webview targets, attaches to agent panel
-3. A self-contained observer is injected into each target via `Runtime.evaluate`
-4. The observer scans for buttons matching configured patterns every cycle
-5. Before clicking "Run", the Safety Guard extracts the command text and checks it
-6. If CDP click fails, it escalates to `Input.dispatchMouseEvent` (trusted browser events)
-7. A fallback runtime in `workbench.html` handles older Antigravity versions
+---
 
 ## Features
 
-### Core
-- CDP auto-click with OOPIF support
-- Auto-scroll (stick-to-bottom) for agent chat
-- Connection recovery — auto-clicks Resume, Try Again, Reconnect
-- Idle detection — pauses when you type, resumes after 3s idle
-- Dynamic command discovery via `vscode.commands.getCommands()`
+### 🤖 Auto-Click Agent Buttons
+Automatically clicks `Accept`, `Accept All`, `Run`, `Approve`, `Retry`, `Proceed`, `Continue`, `Resume`, `Try Again`, and more. Four-layer click strategy for maximum reliability across React, web components, and native DOM.
 
-### Safety
-- Destructive command blacklist (rm -rf, drop database, fork bomb, etc.)
-- Word-boundary matching prevents false positives
-- Per-command confidence tracking with promotion/demotion suggestions
-- Risky patterns disabled by default (Always Allow, Enable Overages, etc.)
+### 🛡️ Safety Guard (Terminal Protection)
+Reads every terminal command **before** clicking `Run`. Blocks 30+ destructive patterns:
+- `rm -rf /`, `rm -rf *`, `rm -rf ~`
+- `dd if=/dev/zero`, `kill -9 -1`, fork bombs
+- `DROP DATABASE`, `TRUNCATE TABLE`
+- `git push --force`, `git clean -fdx`
+- `curl | bash`, `wget | sh`
+- Docker prune, Windows registry deletes, and more
 
-### Learning Engine
-- Mini-batch SGD with momentum — each command is a neuron with confidence weight
-- Temporal decay for stale commands
-- Context-aware: project, time-of-day, exit code signals
-- Pattern generalization from co-occurrence clusters
-- Automatic promotion to whitelist at 75% confidence after 5 observations
+### 📜 Auto-Scroll
+Keeps the chat panel pinned to the bottom while AI responds. Automatically pauses when you scroll up and resumes when you scroll back down.
 
-### Knowledge Base (Wiki)
-- 3-layer architecture: raw events, compiled wiki, system rules
-- Semantic command classification (16 categories)
-- Sequence learning (command A followed by B)
-- Contradiction detection (trusted command suddenly rejected)
-- Periodic lint: orphan detection, stale pruning, auto-resolve
+### 🧠 Adaptive Learning
+Observes which terminal commands you approve or reject. Builds a confidence model and suggests promoting safe commands to the whitelist — fewer interruptions over time.
 
-### Quota Monitor
-- Polls Antigravity Language Server on localhost
-- Per-model usage bars with status indicators
-- Usage rate calculation (%/hour)
-- Runway prediction — estimated time until quota exhaustion
-- Reset countdown timers
+### 🗂️ Per-Project Patterns
+Define custom button patterns and blacklists per workspace via `.vscode/grav.json`. Changes reload live without restarting the extension.
 
-### ROI Tracker
-- Time saved per click (weighted by button type)
-- Session and lifetime statistics
-- Productivity gain percentage
-- Projected daily savings
-
-### Dashboard
-- Collapsible sections: Control, Targets, Session, Quota, ROI, Brain, Memory, Stats, Log
-- Real-time updates via webview messaging (1s stats, 5s brain/wiki)
-- Click log, terminal log, wiki event log
-- Concept map with confidence bars
-- Pattern toggle grid
-
-## Install
-
-Install the `.vsix` file in Antigravity:
-
-```
-Extensions sidebar > ... > Install from VSIX > select grav-3.4.1.vsix
+```json
+{
+  "patterns": ["Deploy", "Apply", "Confirm Deploy"],
+  "blacklist": ["Drop DB"],
+  "dryRun": false
+}
 ```
 
-First launch requires a full quit and restart of Antigravity (Cmd+Q / Alt+F4) for CDP port activation. After that, everything is automatic.
+### 🔍 Dry Run Mode
+Scan and match buttons without clicking. See exactly what Grav would click before enabling auto-approval on a new project.
+
+### 📊 Real-Time Dashboard (`Cmd+Shift+D`)
+- Click counter, session uptime, message count
+- Toggle Auto-Click, Auto-Scroll, Dry Run
+- Enable/disable individual button patterns
+- Live activity log, learning engine stats, CDP status
+
+---
+
+## Installation
+
+1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-3.6.1.vsix`
+2. Fully quit Windsurf/Antigravity (`Cmd+Q` on macOS, `Alt+F4` on Windows)
+3. Reopen the IDE — Grav auto-patches `argv.json` with the debug port
+4. Status bar shows `🚀 Grav` — you're done
+
+> **Status bar shows `CDP off`?** The IDE wasn't fully restarted. Quit completely and reopen.
+
+---
+
+## Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `grav.enabled` | `true` | Master on/off switch |
+| `grav.autoScroll` | `true` | Keep chat pinned to bottom |
+| `grav.dryRun` | `false` | Scan without clicking |
+| `grav.approvePatterns` | `[Accept, Run, ...]` | Button labels to auto-click |
+| `grav.approveIntervalMs` | `1000` | Scan interval (ms) |
+| `grav.scrollPauseMs` | `15000` | Pause duration after manual scroll-up (ms) |
+| `grav.learnEnabled` | `true` | Adaptive learning engine |
+| `grav.learnThreshold` | `3` | Approvals before whitelist suggestion |
+| `grav.terminalWhitelist` | `[]` | Always-allow command patterns |
+| `grav.terminalBlacklist` | `[]` | Always-block command patterns (supports `/regex/`) |
+| `grav.cdpEnabled` | `true` | CDP engine (required for OOPIF access) |
+| `grav.cdpPort` | `9333` | CDP debug port |
+
+---
 
 ## Commands
 
 | Command | Shortcut | Description |
-|---------|----------|-------------|
-| Grav: Dashboard | Cmd+Shift+D | Open/close dashboard |
-| Grav: Diagnostics | — | CDP status, targets, learning stats |
-| Grav: Manage Terminal | — | Whitelist/blacklist/test commands |
-| Grav: Refresh Observer | — | Force re-inject CDP observer |
-| Grav: Pause Auto-Accept | — | Temporarily stop clicking |
-| Grav: Resume Auto-Accept | — | Resume clicking |
-| Grav: Stop All Terminals | Cmd+Shift+Q | Send Ctrl+C to all terminals |
-| Grav: Force Accept All | — | Trigger all accept commands now |
+|---|---|---|
+| `Grav: Dashboard` | `Cmd+Shift+D` | Open monitoring dashboard |
+| `Grav: Diagnostics` | — | CDP sessions and button detection state |
+| `Grav: Pause Auto-Accept` | `Cmd+Shift+P` | Temporarily pause clicking |
+| `Grav: Resume Auto-Accept` | — | Resume clicking |
+| `Grav: Toggle Dry Run` | — | Toggle dry run |
+| `Grav: Toggle Auto-Scroll` | — | Toggle auto-scroll |
+| `Grav: Refresh Observer` | — | Force re-inject observer into all sessions |
+| `Grav: Force Reconnect CDP` | — | Manually reconnect CDP |
+| `Grav: Init Project Config` | — | Create `.vscode/grav.json` template |
+| `Grav: Purge Bad Learning Data` | — | Clean up incorrectly learned entries |
+| `Grav: Manage Terminal Commands` | — | Interactively manage whitelist/blacklist |
+| `Grav: Stop All Terminals` | `Cmd+Shift+Q` | Send Ctrl+C to all terminals |
 
-## Configuration
+---
 
-All settings under `grav.*` in VS Code settings:
+## Status Bar
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| enabled | true | Master on/off |
-| autoScroll | true | Stick chat to bottom |
-| approvePatterns | [Accept all, Run, ...] | Button labels to click |
-| approveIntervalMs | 1000 | Click scan interval |
-| scrollIntervalMs | 500 | Scroll scan interval |
-| scrollPauseMs | 15000 | Pause scroll when user scrolls up |
-| cdpEnabled | true | Enable CDP engine |
-| cdpPort | 9333 | CDP debug port |
-| learnEnabled | true | Enable learning engine |
-| terminalWhitelist | [] | Additional safe commands |
-| terminalBlacklist | [] | Additional blocked commands |
-| skipTerminalAccept | true | Skip blind terminal accept via API |
+| Display | Meaning |
+|---|---|
+| `🚀 Grav 42` | Active — 42 clicks this session |
+| `⏸ Grav` | Paused |
+| `👁 Grav DRY` | Dry Run mode |
+| `🚫 Grav` | Disabled |
+| `CDP 2` | CDP connected, 2 active sessions |
+| `CDP off` | CDP not connected |
 
-## Target detection
+---
 
-Grav only activates on Antigravity IDE (and its predecessors Windsurf/Codeium). Detection checks `vscode.env.appName`, `vscode.env.appRoot`, and `~/.antigravity/argv.json` existence. On VS Code, Cursor, or other editors, the extension loads but does nothing.
+## Troubleshooting
 
-## Safety model
+**CDP off / disconnected:** Fully quit the IDE (`Cmd+Q`), not just close the window. Reopen. If still failing: `Grav: Force Reconnect CDP`.
 
-The blacklist uses two matching strategies:
-- Multi-word patterns match at command start or after separators/sudo prefixes
-- Single-word patterns use word-boundary matching to avoid false positives
+**Buttons not being clicked:** Check Dry Run in Dashboard. Open Activity log. Run `Grav: Diagnostics`. Verify label case matches exactly.
 
-Commands in `SAFE_TERMINAL_CMDS` (90+ common dev tools) are always allowed. The learning engine can promote frequently-approved commands to the whitelist and suggest blacklisting frequently-rejected ones.
+**Learning store has garbage:** Run `Grav: Purge Bad Learning Data` (also runs automatically on startup).
 
-## License
+**"1 step requires input" notification persists:** Grav auto-excludes failed commands via `_failedCmds`. Use `Grav: Manage Terminal Commands` to blacklist manually if it keeps appearing.
 
-MIT
+---
+
+## Requirements
+
+- Windsurf IDE or Antigravity (VS Code fork with CDP debug port support)
+- No additional setup — `ws` WebSocket module is bundled in the VSIX
+
+---
+
+## Changelog
+
+### v3.6.1
+- Fixed adaptive learning ingesting invalid tokens (numbers, flags, version strings, filenames)
+- Added `Grav: Purge Bad Learning Data` command + auto-purge on startup
+- `extractCommands()` now rejects non-command tokens with explicit validation
+
+### v3.6.0
+- Per-project patterns via `.vscode/grav.json` with live file watcher
+- Dry Run mode with Dashboard toggle and status bar indicator
+- Notification suppression: replaced polling with debounced `MutationObserver`
+- Added `Grav: Init Project Config` and `Grav: Toggle Dry Run` commands
+
+### v3.5.1
+- Multi-layer click: added CDP `Input.dispatchMouseEvent` as Layer 4
+- RETRY mechanism: JS click verified, CDP native click as fallback
+- Shadow DOM and iframe scanning in `collectAllButtons`
+
+### v3.5.0
+- CDP engine rewrite: exponential backoff reconnect, session pruning, heartbeat re-inject
+- Safety Guard: reads `<code>` blocks adjacent to Run buttons
+- Adaptive Learning Engine: mini-batch SGD, confidence scoring, promote/demote
+- Knowledge Wiki: command sequence tracking and co-occurrence generalization
+
+---
+
+**Author:** An Le · [GitHub](https://github.com/anlvdt/grav) · [Issues](https://github.com/anlvdt/grav/issues) · dev@anlvdt.com
+
+---
+
+☕️ **Support the Developer**
+If Grav saves you time, consider buying me a coffee:
+- 💳 [Buy Me a Coffee](https://www.buymeacoffee.com/anlvdt) (Visa/Mastercard)
+- 📱 **Momo / VietQR**: Scan code or send to anlvdt via standard VietQR platforms.

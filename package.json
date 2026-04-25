@@ -1,14 +1,31 @@
 {
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
-    "description": "Autopilot cho Antigravity AI. CDP-first auto-approve, auto-scroll, safety guard, AI learning engine. Just install and use.",
-    "version": "3.4.2",
+    "description": "AI Autopilot for Windsurf / Antigravity IDE. Auto-click approvals, auto-scroll chat, and guard terminal commands automatically. Boost your workflow with adaptive learning and CDP-first reliability.",
+    "version": "3.6.1",
     "icon": "icons/icon.png",
-    "publisher": "ANLE",
+    "publisher": "anlvdt",
+    "author": {
+        "name": "An Le",
+        "email": "dev@anlvdt.com",
+        "url": "https://github.com/anlvdt"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/anlvdt/grav"
     },
+    "homepage": "https://github.com/anlvdt/grav#readme",
+    "bugs": {
+        "url": "https://github.com/anlvdt/grav/issues"
+    },
+    "keywords": [
+        "antigravity",
+        "windsurf",
+        "copilot",
+        "ai-assistant",
+        "automation"
+    ],
+    "license": "MIT",
     "engines": {
         "vscode": "^1.60.0"
     },
@@ -16,7 +33,8 @@
         "ui"
     ],
     "categories": [
-        "Other"
+        "Other",
+        "Machine Learning"
     ],
     "activationEvents": [
         "onStartupFinished"
@@ -50,19 +68,35 @@
             },
             {
                 "command": "grav.pauseAccept",
-                "title": "Grav: Pause Auto-Accept (Dừng tự bấm)"
+                "title": "Grav: Pause Auto-Accept"
+            },
+            {
+                "command": "grav.toggleScroll",
+                "title": "Grav: Toggle Auto-Scroll"
             },
             {
                 "command": "grav.resumeAccept",
-                "title": "Grav: Resume Auto-Accept (Tiếp tục tự bấm)"
+                "title": "Grav: Resume Auto-Accept"
             },
             {
                 "command": "grav.stopAllTerminals",
-                "title": "Grav: Stop All Terminals (Ctrl+C tất cả)"
+                "title": "Grav: Stop All Terminals"
             },
             {
                 "command": "grav.acceptAll",
                 "title": "Grav: Force Accept All"
+            },
+            {
+                "command": "grav.toggleDryRun",
+                "title": "Grav: Toggle Dry Run (scan without clicking)"
+            },
+            {
+                "command": "grav.initProjectConfig",
+                "title": "Grav: Init Project Config (.vscode/grav.json)"
+            },
+            {
+                "command": "grav.purgeLearning",
+                "title": "Grav: Purge Bad Learning Data"
             }
         ],
         "keybindings": [
@@ -89,12 +123,12 @@
                 "grav.enabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Bật/tắt Grav | Enable/disable Grav"
+                    "description": "Enable or disable Grav entirely."
                 },
                 "grav.autoScroll": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Tự cuộn chat xuống cuối | Stick-to-bottom"
+                    "description": "Keep chat panel scrolled to the bottom while the AI is responding. Pauses automatically when the user scrolls up."
                 },
                 "grav.approvePatterns": {
                     "type": "array",
@@ -111,22 +145,22 @@
                         "Approve",
                         "Expand"
                     ],
-                    "description": "Danh sách nút tự bấm | Button labels to auto-approve"
+                    "description": "List of button labels to auto-click in the agent panel. Case-sensitive. Add custom labels for per-project buttons."
                 },
                 "grav.scrollPauseMs": {
                     "type": "number",
                     "default": 15000,
-                    "description": "Nghỉ cuộn khi user kéo lên (ms)"
+                    "description": "How long to pause auto-scroll after the user manually scrolls up (milliseconds)."
                 },
                 "grav.scrollIntervalMs": {
                     "type": "number",
                     "default": 500,
-                    "description": "Tốc độ quét cuộn (ms)"
+                    "description": "Interval between scroll ticks (milliseconds)."
                 },
                 "grav.approveIntervalMs": {
                     "type": "number",
                     "default": 1000,
-                    "description": "Tốc độ quét nút (ms)"
+                    "description": "Interval between button scan cycles (milliseconds). Minimum enforced: 3000ms."
                 },
                 "grav.language": {
                     "type": "string",
@@ -136,7 +170,7 @@
                         "zh"
                     ],
                     "default": "vi",
-                    "description": "Ngôn ngữ | Language"
+                    "description": "UI language for Grav dashboard (vi = Vietnamese, en = English, zh = Chinese)."
                 },
                 "grav.terminalWhitelist": {
                     "type": "array",
@@ -144,7 +178,7 @@
                         "type": "string"
                     },
                     "default": [],
-                    "description": "Lệnh terminal thêm vào whitelist | Additional whitelisted terminal commands"
+                    "description": "Additional terminal commands to always allow. Supplements the built-in safe command list."
                 },
                 "grav.terminalBlacklist": {
                     "type": "array",
@@ -152,34 +186,39 @@
                         "type": "string"
                     },
                     "default": [],
-                    "description": "Lệnh terminal bị chặn | Blocked terminal commands (supports substring & /regex/)"
+                    "description": "Terminal commands to always block. Supports plain substrings and /regex/ patterns."
                 },
                 "grav.learnEnabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Tự học thói quen approve/reject | Adaptive learning from user behavior"
+                    "description": "Enable adaptive learning. Grav observes terminal command approve/reject behavior and suggests whitelist/blacklist entries."
                 },
                 "grav.learnThreshold": {
                     "type": "number",
                     "default": 3,
                     "minimum": 1,
                     "maximum": 50,
-                    "description": "Số lần approve để suggest whitelist | Approvals needed to suggest whitelisting"
+                    "description": "Number of approvals required before Grav suggests promoting a command to the whitelist."
                 },
                 "grav.cdpEnabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Bật CDP mode để reach OOPIF buttons (tự động cấu hình) | Enable CDP for OOPIF reach (auto-configured)"
+                    "description": "Enable Chrome DevTools Protocol engine. Required to reach buttons inside OOPIF webviews. Auto-configured on first install."
                 },
                 "grav.cdpPort": {
                     "type": "number",
                     "default": 9333,
-                    "description": "CDP debug port (mặc định 9333, tránh conflict với Antigravity Browser Control 9222)"
+                    "description": "CDP remote debugging port. Default 9333 avoids conflict with Antigravity Browser Control (9222)."
                 },
                 "grav.skipTerminalAccept": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Bỏ qua auto-accept terminal commands qua VS Code API (để Safety Guard xử lý) | Skip blind terminal accept via API, let runtime Safety Guard handle it"
+                    "description": "Skip blind terminal accept via VS Code API. Let the CDP Safety Guard handle Run button clicks instead."
+                },
+                "grav.dryRun": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Dry Run mode: scan and match buttons but do not click. Use for debugging. Activity log shows what would be clicked."
                 }
             }
         }
@@ -190,5 +229,9 @@
     },
     "dependencies": {
         "ws": "^8.20.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-react": "^6.0.1",
+        "vite": "^8.0.10"
     }
 }

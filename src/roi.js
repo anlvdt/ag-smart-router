@@ -37,14 +37,13 @@ function recordClick(pattern) {
 
 function save() {
     if (!_ctx) return;
-    _lifetime.totalSessionMs += 0; // updated on flush
-    try { _ctx.globalState.update('roiLifetime', _lifetime); } catch (_) {}
+    try { _ctx.globalState.update('roiLifetime', _lifetime); } catch (_) { /* save failed */ }
 }
 
 function flush() {
     if (!_ctx) return;
     _lifetime.totalSessionMs += Date.now() - _session.startMs;
-    try { _ctx.globalState.update('roiLifetime', _lifetime); } catch (_) {}
+    try { _ctx.globalState.update('roiLifetime', _lifetime); } catch (_) { /* save failed */ }
 }
 
 function getSessionROI() {

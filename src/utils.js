@@ -62,6 +62,8 @@ function elevatedWrite(fp, content) {
     fs.writeFileSync(tmp, content, 'utf8');
     try {
         if (process.platform === 'darwin') {
+            // Sanitize paths for AppleScript — reject double quotes to prevent injection
+            if (tmp.includes('"') || fp.includes('"')) throw new Error('Path contains invalid characters');
             // Use execFileSync with array args — no shell injection possible
             execFileSync('osascript', [
                 '-e', `do shell script "cp " & quoted form of "${tmp}" & " " & quoted form of "${fp}" & " && chmod 644 " & quoted form of "${fp}" with administrator privileges`,
@@ -73,7 +75,7 @@ function elevatedWrite(fp, content) {
             throw new Error('Permission denied — restart as admin');
         }
     } finally {
-        try { fs.unlinkSync(tmp); } catch (_) {}
+        try { fs.unlinkSync(tmp); } catch (_) { /* non-critical */ }
     }
 }
 
@@ -108,7 +110,7 @@ function deepFind(dir, name, depth) {
                 if (r) return r;
             }
         }
-    } catch (_) {}
+    } catch (_) { /* non-critical */ }
     return null;
 }
 
@@ -128,9 +130,18 @@ function cfg(key, fallback) {
  * @param {string} cmdLine
  * @returns {string[]}
  */
+// Tokens that are definitely not shell commands
+const CMD_REJECT = /^(?:\d+|[\-]{1,2}[\w\-]+|v?\d[\d.\-a-z]*|https?:\/\/\S+|\S+\.(?:js|ts|py|sh|json|yml|yaml|toml|md|txt|log|lock|env|cfg|ini|conf)|[./~]|\$[\w{]|[\[\]{}()<>"'`]|\w+=\S*)$/i;
+
 function extractCommands(cmdLine) {
     if (!cmdLine || typeof cmdLine !== 'string') return [];
-    const parts = cmdLine.split(/\s*(?:\|\||&&|[|;&])\s*/);
+    // Reject obviously non-command strings (numbers, flags, versions, paths, urls)
+    const trimmed = cmdLine.trim();
+    if (!trimmed || trimmed.length < 2) return [];
+    // Reject pure numbers at the top level immediately
+    if (/^\d+$/.test(trimmed)) return [];
+
+    const parts = trimmed.split(/\s*(?:\|\||&&|[|;&])\s*/);
     const cmds = [];
     for (const part of parts) {
         let p = part.trim();
@@ -140,8 +151,22 @@ function extractCommands(cmdLine) {
         p = p.replace(/^\$\(\s*/, '').replace(/^\(\s*/, '').replace(/\)\s*$/, '');
         const match = p.match(/^([^\s]+)/);
         if (match) {
-            let cmd = match[1].replace(/^.*[/\\]/, '');
-            if (cmd) cmds.push(cmd.toLowerCase());
+            const raw = match[1];
+            // Reject URLs before any stripping
+            if (/^https?:\/\//i.test(raw)) continue;
+            let cmd = raw.replace(/^.*[\/\\]/, '');  // strip path prefix
+            cmd = cmd.toLowerCase();
+            // Validate: must be a plausible command name
+            if (!cmd) continue;
+            if (cmd.length < 2) continue;                    // single char: skip
+            if (/^\d+$/.test(cmd)) continue;                 // pure number: skip
+            if (/^[\-]{1,2}[\w\-]+$/.test(cmd)) continue;   // flag: skip
+            if (/^v?\d[\d.\-a-z]*$/.test(cmd)) continue;    // version: skip
+            if (/\.[a-z]{2,4}$/.test(cmd)) continue;        // file/domain with extension: skip
+            if (CMD_REJECT.test(cmd)) continue;
+            // Must contain at least one letter (not just numbers/symbols)
+            if (!/[a-z]/.test(cmd)) continue;
+            cmds.push(cmd);
         }
     }
     return [...new Set(cmds)];
@@ -164,8 +189,13 @@ function matchesBlacklist(cmdLine, blacklist) {
         // Regex patterns: /pattern/
         if (p.startsWith('/') && p.endsWith('/')) {
             try {
-                if (new RegExp(p.slice(1, -1), 'i').test(cmdLine)) return pattern;
-            } catch (_) {}
+                const rawPattern = p.slice(1, -1);
+                // ReDoS protection: reject overly complex or long patterns
+                if (rawPattern.length > 200) continue;
+                if (cmdLine.length > 2000) continue;
+                const userRe = new RegExp(rawPattern, 'i');
+                if (userRe.test(cmdLine)) return pattern;
+            } catch (_) { /* non-critical */ }
             continue;
         }
 

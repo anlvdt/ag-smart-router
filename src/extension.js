@@ -18,11 +18,12 @@ const roi = require('./roi');
 const idle = require('./idle');
 
 let cdp = null;
-try { cdp = require('./cdp'); } catch (_) {}
+try { cdp = require('./cdp'); } catch (_) { /* optional CDP module */ }
 
 const CDP_PORT = 9333;
 let _ctx, _enabled = true, _scrollOn = true, _stats = {}, _log = [], _totalClicks = 0;
-let _acceptTimer, _lastQuotaMs = 0, _termLog = [], _acceptPaused = false, _dynamicAcceptCmds = [];
+let _acceptTimer, _lastQuotaMs = 0, _termLog = [], _acceptPaused = false, _dynamicAcceptCmds = [], _failedCmds = new Set();
+let _dryRun = false;  // Dry run: scan buttons but don't click
 let _sessionState = { startMs: 0, msgCount: 0, toolCalls: [], responseTimes: [], lastActivityMs: 0, aiTyping: false, approveCount: 0, rejectCount: 0, toolBreakdown: {} };
 let _sbMain, _sbScroll, _sbCdp, _isAntigravity = false;
 
@@ -61,7 +62,7 @@ const ensureCdpInArgv = (() => {
 })();
 
 // ── State & Handlers ─────────────────────────────────────────
-const getState = () => ({ enabled: _enabled, scrollOn: _scrollOn, stats: _stats, log: _log, totalClicks: _totalClicks, session: _sessionState, termLog: _termLog, cdpConnected: cdp ? cdp.isConnected() : false, cdpSessions: cdp ? cdp.getSessionCount() : 0 });
+const getState = () => ({ enabled: _enabled, scrollOn: _scrollOn, stats: _stats, log: _log, totalClicks: _totalClicks, session: _sessionState, termLog: _termLog, cdpConnected: cdp ? cdp.isConnected() : false, cdpSessions: cdp ? cdp.getSessionCount() : 0, dryRun: _dryRun, projectPatterns: _projectPatterns });
 const setState = (p) => { if (p.enabled !== undefined) _enabled = p.enabled; if (p.scrollOn !== undefined) _scrollOn = p.scrollOn; };
 const getSessionSafe = () => {
     const now = Date.now();
@@ -72,11 +73,47 @@ const getSessionSafe = () => {
 
 const refreshBar = () => {
     if (!_sbMain) return;
-    _sbMain.text = _enabled ? '$(rocket) Grav' : '$(circle-slash) Grav';
-    _sbMain.color = _enabled ? '#94e2d5' : '#f38ba8';
-    _sbMain.backgroundColor = _enabled ? undefined : new vscode.ThemeColor('statusBarItem.errorBackground');
-    if (_sbScroll) { _sbScroll.text = _scrollOn ? '$(fold-down) Scroll' : '$(circle-slash) Scroll'; _sbScroll.color = _scrollOn ? '#94e2d5' : '#f38ba8'; }
-    if (_sbCdp) { const connected = cdp && cdp.isConnected(); _sbCdp.text = connected ? '$(plug) CDP:' + cdp.getSessionCount() : '$(debug-disconnect) CDP'; _sbCdp.color = connected ? '#94e2d5' : '#f38ba8'; }
+
+    // Main — compact single indicator
+    if (_enabled) {
+        const clicks = _totalClicks > 0 ? ` ${_totalClicks}` : '';
+        _sbMain.text = _acceptPaused ? `$(debug-pause) Grav` : `$(rocket) Grav${clicks}`;
+        _sbMain.color = _acceptPaused ? '#fbbf24' : '#6ee7b7';
+        _sbMain.backgroundColor = undefined;
+    } else {
+        _sbMain.text = `$(circle-slash) Grav`;
+        _sbMain.color = '#f87171';
+        _sbMain.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    }
+    _sbMain.tooltip = `Grav ${_enabled ? (_acceptPaused ? '[Paused]' : _dryRun ? '[Dry Run]' : '[Active]') : '[Off]'} | ${_totalClicks} clicks\nClick to open Dashboard`;
+    if (_dryRun) { _sbMain.text = `$(eye) Grav DRY`; _sbMain.color = '#a78bfa'; }
+
+    // Scroll — minimal
+    if (_sbScroll) {
+        _sbScroll.text = _scrollOn ? '$(fold-down)' : '$(fold-up)';
+        _sbScroll.color = _scrollOn ? '#6ee7b7' : '#555';
+        _sbScroll.tooltip = `Auto-scroll: ${_scrollOn ? 'On' : 'Off'}`;
+    }
+
+    // CDP — only show when relevant
+    if (_sbCdp) {
+        const connected = cdp && cdp.isConnected();
+        const sessions = cdp ? cdp.getSessionCount() : 0;
+        if (connected && sessions > 0) {
+            _sbCdp.text = `$(plug) ${sessions}`;
+            _sbCdp.color = '#6ee7b7';
+            _sbCdp.tooltip = `CDP: ${sessions} session(s)`;
+        } else if (connected) {
+            _sbCdp.text = `$(plug) 0`;
+            _sbCdp.color = '#fbbf24';
+            _sbCdp.tooltip = 'CDP connected, no targets';
+        } else {
+            _sbCdp.text = `$(debug-disconnect)`;
+            _sbCdp.color = '#555';
+            const err = cdp && cdp.getLastError ? cdp.getLastError() : '';
+            _sbCdp.tooltip = err ? `CDP off: ${err}` : 'CDP disconnected';
+        }
+    }
 };
 
 const onStatsUpdated = () => { _totalClicks = Object.values(_stats).reduce((a, b) => a + b, 0); refreshBar(); if (_ctx) { _ctx.globalState.update('stats', _stats); _ctx.globalState.update('totalClicks', _totalClicks); }};
@@ -114,27 +151,89 @@ const onPatternsDiscovered = (patterns) => {
     }
 };
 const onSave = () => { injection.writeRuntimeConfig(_ctx); if (cdp) cdp.hotUpdate(); refreshBar(); };
+const onProjectConfigChange = () => { loadProjectConfig(); if (cdp) cdp.hotUpdate(); injection.writeRuntimeConfig(_ctx); };
+
+// ── Per-project patterns (.vscode/grav.json) ─────────────────
+let _projectPatterns = [];
+const PROJ_CONFIG_FILE = '.vscode/grav.json';
+
+const loadProjectConfig = () => {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) { _projectPatterns = []; return; }
+    const cfgPath = path.join(folders[0].uri.fsPath, PROJ_CONFIG_FILE);
+    try {
+        if (fs.existsSync(cfgPath)) {
+            const raw = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+            _projectPatterns = Array.isArray(raw.patterns) ? raw.patterns.filter(p => typeof p === 'string' && p.length > 0 && p.length <= 60) : [];
+            if (_projectPatterns.length > 0) console.log(`[Grav] Project patterns (${_projectPatterns.length}):`, _projectPatterns.slice(0, 5));
+        } else { _projectPatterns = []; }
+    } catch (e) { _projectPatterns = []; console.warn('[Grav] grav.json parse error:', e.message); }
+};
+
+const getEffectivePatterns = () => {
+    const global = cfg('approvePatterns', DEFAULT_PATTERNS);
+    if (_projectPatterns.length === 0) return global;
+    const merged = [...new Set([..._projectPatterns, ...global])];
+    return merged;
+};
 
 // ── Accept Loop ───────────────────────────────────────────────
 const discoverAcceptCommands = async () => {
     try {
         const allCmds = await vscode.commands.getCommands(true);
-        const SKIP = ['setting', 'config', 'preference', 'browser', 'permission', 'manage', 'open', 'show', 'toggle', 'enable', 'disable', 'edit', 'view', 'list', 'reset', 'clear'];
+        // Expanded SKIP list to catch commands requiring input
+        const SKIP = ['setting', 'config', 'preference', 'browser', 'permission', 'manage', 'open', 'show', 'toggle', 'enable', 'disable', 'edit', 'view', 'list', 'reset', 'clear', 'input', 'prompt', 'dialog', 'confirm', 'ask', 'select', 'pick', 'choose'];
+        
+        // Whitelist of known safe commands (specific to Antigravity/Windsurf)
+        const WHITELIST = [
+            'antigravity.accept',
+            'antigravity.acceptAll',
+            'windsurf.accept',
+            'windsurf.acceptAll',
+            'cascade.accept',
+            'cascade.acceptAll',
+            'codeium.accept',
+        ];
+        
         _dynamicAcceptCmds = allCmds.filter(c => {
             const l = c.toLowerCase();
+            
+            // First check whitelist (highest priority)
+            if (WHITELIST.some(w => l === w.toLowerCase())) return true;
+            
+            // Then apply filters for discovered commands
             const ns = l.includes('antigravity') || l.includes('windsurf') || l.includes('cascade') || l.includes('codeium') || l.includes('agent');
             const act = l.includes('accept') || l.includes('approve') || l.includes('allow') || l.includes('keep');
+            
             if (cfg('skipTerminalAccept', true) && l.includes('terminal')) return false;
-            return ns && act && !SKIP.some(s => l.includes(s));
+            if (SKIP.some(s => l.includes(s))) return false;
+            
+            return ns && act;
         });
-    } catch (_) {}
+        
+        console.log(`[Grav] Discovered ${_dynamicAcceptCmds.length} accept commands:`, _dynamicAcceptCmds.slice(0, 10));
+    } catch (_) { /* non-critical */ }
 };
 
 const startAcceptLoop = () => {
     if (_acceptTimer) clearInterval(_acceptTimer);
     // Minimum 3s interval to prevent "requires input" errors (was 2s default)
     const interval = Math.max(cfg('approveIntervalMs', 3000), 3000);
-    _acceptTimer = setInterval(() => { if (!_enabled || _acceptPaused || !idle.isIdle()) return; for (const cmd of _dynamicAcceptCmds) vscode.commands.executeCommand(cmd).catch(() => {}); }, interval);
+    _acceptTimer = setInterval(() => { 
+        if (!_enabled || _acceptPaused || !idle.isIdle()) return; 
+        for (const cmd of _dynamicAcceptCmds) {
+            // Skip commands known to fail or require input
+            if (_failedCmds.has(cmd)) continue;
+            vscode.commands.executeCommand(cmd).catch((err) => {
+                // Track commands that fail with "requires input" or similar errors
+                const errMsg = (err?.message || '').toLowerCase();
+                if (errMsg.includes('requires') || errMsg.includes('input') || errMsg.includes('argument') || errMsg.includes('parameter')) {
+                    _failedCmds.add(cmd);
+                    console.log(`[Grav] Excluded command due to error: ${cmd}`);
+                }
+            });
+        }
+    }, interval);
 };
 
 // ── Activate ─────────────────────────────────────────────────
@@ -169,8 +268,18 @@ async function activate(ctx) {
         if (changed) { await vscode.workspace.getConfiguration('grav').update('approvePatterns', merged, vscode.ConfigurationTarget.Global); await ctx.globalState.update('disabledPatterns', dp); }
     }
 
+    // Load project config
+    loadProjectConfig();
+    _dryRun = cfg('dryRun', false);
+
     wiki.init(ctx, () => learning.getData(), () => learning.getEpoch());
     learning.init(ctx, wiki);
+
+    // Auto-purge bad learning entries on startup (numbers, flags, versions learned incorrectly)
+    setTimeout(() => {
+        const purged = learning.purgeBadEntries();
+        if (purged > 0) console.log(`[Grav] Auto-purged ${purged} bad learning entries on startup`);
+    }, 3000);
     roi.init(ctx);
     quota.init({ onChange: (data) => dashboard.postMessage({ command: 'quotaUpdated', quota: quota.getSummary() }) });
     idle.init(ctx, { onIdleChange: (isIdle) => { console.log('[Grav] Idle:', isIdle); dashboard.postMessage({ command: 'idleChanged', idle: isIdle }); } });
@@ -204,7 +313,9 @@ async function activate(ctx) {
     _sbMain = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
     _sbScroll = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10002);
     _sbCdp = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10003);
-    _sbMain.command = _sbScroll.command = _sbCdp.command = 'grav.dashboard';
+    _sbMain.command = 'grav.dashboard';
+    _sbScroll.command = 'grav.toggleScroll';
+    _sbCdp.command = 'grav.forceReconnect';
     _ctx.subscriptions.push(_sbMain, _sbScroll, _sbCdp);
     refreshBar();
     _sbMain.show(); _sbScroll.show(); _sbCdp.show();
@@ -213,8 +324,20 @@ async function activate(ctx) {
     ctx.subscriptions.push({ dispose: () => clearInterval(cdpRefresh) });
 
     ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
-        if (e.affectsConfiguration('grav')) { _enabled = cfg('enabled', true); _scrollOn = cfg('autoScroll', true); refreshBar(); if (cdp) cdp.hotUpdate(); }
+        if (e.affectsConfiguration('grav')) { _enabled = cfg('enabled', true); _scrollOn = cfg('autoScroll', true); _dryRun = cfg('dryRun', false); refreshBar(); if (cdp) cdp.hotUpdate(); }
     }));
+
+    // Watch .vscode/grav.json for per-project pattern changes
+    const folders = vscode.workspace.workspaceFolders;
+    if (folders && folders.length > 0) {
+        const watcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(folders[0], PROJ_CONFIG_FILE)
+        );
+        watcher.onDidChange(onProjectConfigChange);
+        watcher.onDidCreate(onProjectConfigChange);
+        watcher.onDidDelete(() => { _projectPatterns = []; if (cdp) cdp.hotUpdate(); injection.writeRuntimeConfig(ctx); });
+        ctx.subscriptions.push(watcher);
+    }
 
     // Commands
     ctx.subscriptions.push(
@@ -222,8 +345,40 @@ async function activate(ctx) {
         vscode.commands.registerCommand('grav.diagnostics', async () => {
             const stats = learning.getStats();
             const lastTargets = cdp && cdp.getLastTargets ? cdp.getLastTargets() : [];
+            const sessions = cdp && cdp.getSessionSummaries ? cdp.getSessionSummaries() : [];
+            const debugLog = cdp && cdp.getDebugLog ? cdp.getDebugLog() : [];
             const webviewCount = lastTargets.filter(t => (t.url || '').includes('vscode-webview://')).length;
-            const lines = [`Grav v3.4.1`, `Platform: ${process.platform}`, ``, `── CDP Engine ──`, `Connected: ${cdp ? cdp.isConnected() : 'N/A'}`, `Sessions: ${cdp ? cdp.getSessionCount() : 0}`, `WEBVIEW: ${webviewCount}`, `Clicks: ${cdp ? cdp.getTotalClicks() : 0}`, `Error: ${cdp && cdp.getLastError ? cdp.getLastError() : 'none'}`, ``, `── Extension ──`, `Bridge: ${bridge.getPort() || 'not started'}`, `Enabled: ${_enabled}`, `Total clicks: ${_totalClicks}`, `Injected: ${injection.isInjected()}`, ``, `── Learning ──`, `Epoch: ${stats.epoch}`, `Tracking: ${stats.totalTracked}`, `Promoted: ${learning.getPromotedCommands().length}`];
+            const lines = [
+                `Grav v${ctx.extension?.packageJSON?.version || '3.4.2'}`,
+                `Platform: ${process.platform}`,
+                ``,
+                `── CDP Engine ──`,
+                `Connected: ${cdp ? cdp.isConnected() : 'N/A'}`,
+                `Sessions: ${cdp ? cdp.getSessionCount() : 0}`,
+                `WEBVIEW: ${webviewCount}`,
+                `Clicks: ${cdp ? cdp.getTotalClicks() : 0}`,
+                `Error: ${cdp && cdp.getLastError ? cdp.getLastError() : 'none'}`,
+                ``,
+                `── Active Sessions ──`,
+                ...(sessions.length ? sessions.map(s => `  [${s.alive ? 'alive' : 'DEAD'}] ${s.url.slice(0,90) || '(no url)'}  title=${s.title.slice(0,40) || '(none)'}`) : ['  (none)']),
+                ``,
+                `── All Discovered Targets (${lastTargets.length}) ──`,
+                ...lastTargets.slice(0, 30).map(t => `  [${t.type}] ${(t.url || '(blank)').slice(0,90)}  title=${(t.title || '').slice(0,40)}`),
+                ``,
+                `── Extension ──`,
+                `Bridge: ${bridge.getPort() || 'not started'}`,
+                `Enabled: ${_enabled}`,
+                `Total clicks: ${_totalClicks}`,
+                `Injected: ${injection.isInjected()}`,
+                ``,
+                `── Learning ──`,
+                `Epoch: ${stats.epoch}`,
+                `Tracking: ${stats.totalTracked}`,
+                `Promoted: ${learning.getPromotedCommands().length}`,
+                ``,
+                `── Observer Debug Log (last ${debugLog.length}) ──`,
+                ...(debugLog.length ? debugLog.slice(0,15).map(d => `  [${d.type}] ${JSON.stringify(d).slice(0,120)}`) : ['  (no debug events yet — run Grav: Refresh Observer to trigger)']),
+            ];
             const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
             await vscode.window.showTextDocument(doc);
         }),
@@ -254,6 +409,28 @@ async function activate(ctx) {
         }),
         vscode.commands.registerCommand('grav.pauseAccept', () => { _acceptPaused = true; vscode.window.showInformationMessage('[Grav] Auto-accept paused.'); refreshBar(); }),
         vscode.commands.registerCommand('grav.resumeAccept', () => { _acceptPaused = false; vscode.window.showInformationMessage('[Grav] Auto-accept resumed.'); refreshBar(); }),
+        vscode.commands.registerCommand('grav.purgeLearning', async () => {
+            const count = learning.purgeBadEntries();
+            const msg = count > 0
+                ? `[Grav] Purged ${count} invalid entries (numbers, flags, versions, filenames) from learning data.`
+                : '[Grav] No bad entries found — learning data is clean.';
+            vscode.window.showInformationMessage(msg);
+        }),
+        vscode.commands.registerCommand('grav.toggleDryRun', async () => { _dryRun = !_dryRun; await vscode.workspace.getConfiguration('grav').update('dryRun', _dryRun, vscode.ConfigurationTarget.Global); refreshBar(); vscode.window.showInformationMessage(`[Grav] Dry Run ${_dryRun ? 'ON — scanning buttons without clicking' : 'OFF — normal mode'}`); }),
+        vscode.commands.registerCommand('grav.initProjectConfig', async () => {
+            const folders = vscode.workspace.workspaceFolders;
+            if (!folders) { vscode.window.showWarningMessage('[Grav] No workspace folder open.'); return; }
+            const cfgPath = path.join(folders[0].uri.fsPath, PROJ_CONFIG_FILE);
+            if (fs.existsSync(cfgPath)) { const doc = await vscode.workspace.openTextDocument(cfgPath); await vscode.window.showTextDocument(doc); return; }
+            const vscodePath = path.join(folders[0].uri.fsPath, '.vscode');
+            if (!fs.existsSync(vscodePath)) fs.mkdirSync(vscodePath, { recursive: true });
+            const template = JSON.stringify({ patterns: [], blacklist: [], dryRun: false }, null, 2);
+            fs.writeFileSync(cfgPath, template, 'utf8');
+            const doc = await vscode.workspace.openTextDocument(cfgPath);
+            await vscode.window.showTextDocument(doc);
+            vscode.window.showInformationMessage('[Grav] Created .vscode/grav.json — add custom patterns here.');
+        }),
+        vscode.commands.registerCommand('grav.toggleScroll', async () => { _scrollOn = !_scrollOn; await vscode.workspace.getConfiguration('grav').update('autoScroll', _scrollOn, vscode.ConfigurationTarget.Global); onSave(); refreshBar(); }),
         vscode.commands.registerCommand('grav.stopAllTerminals', () => { let count = 0; for (const term of vscode.window.terminals) { try { term.sendText('\x03', false); count++; } catch (_) { } } vscode.window.showInformationMessage(`[Grav] Sent Ctrl+C to ${count} terminal(s).`); }),
         vscode.commands.registerCommand('grav.acceptAll', async () => { for (const cmd of _dynamicAcceptCmds) { try { await vscode.commands.executeCommand(cmd); } catch (_) { } } if (cdp && cdp.isConnected()) cdp.hotUpdate(); refreshBar(); }),
     );

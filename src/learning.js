@@ -29,7 +29,7 @@ const load = () => {
 
 const save = () => {
     if (!_ctx || _saveTimer) return;
-    _saveTimer = setTimeout(() => { _saveTimer = null; try { _ctx.globalState.update('learnData', _learnData); _ctx.globalState.update('learnEpoch', _learnEpoch); } catch (_) { } }, 2000);
+    _saveTimer = setTimeout(() => { _saveTimer = null; try { _ctx.globalState.update('learnData', _learnData); _ctx.globalState.update('learnEpoch', _learnEpoch); } catch (_) { /* save failed */ } }, 2000);
 };
 
 const flush = () => { if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; } if (!_ctx) return; try { _ctx.globalState.update('learnData', _learnData); _ctx.globalState.update('learnEpoch', _learnEpoch); } catch (_) { } };
@@ -107,7 +107,11 @@ const generalizePatterns = () => {
     for (const [cmd, d] of Object.entries(_learnData)) {
         if (d.conf < 0.2 || d.obs < 2) continue;
         const prefix = cmd.replace(/[-_].*$/, '').replace(/\d+$/, '');
-        if (prefix && prefix.length >= 2) { if (!groups[prefix]) groups[prefix] = []; groups[prefix].push(cmd); }
+        // Require meaningful prefix: ≥3 chars, must contain a letter, not a number/version
+        if (prefix && prefix.length >= 3 && /[a-z]/.test(prefix) && !/^\d/.test(prefix)) {
+            if (!groups[prefix]) groups[prefix] = [];
+            groups[prefix].push(cmd);
+        }
     }
     for (const [prefix, members] of Object.entries(groups)) {
         if (members.length >= LEARN.GENERALIZE_MIN && !SAFE_TERMINAL_CMDS.includes(prefix)) { _patternCache.push(prefix); }
@@ -181,4 +185,32 @@ const getWhitelist = () => _userWhitelist;
 const getBlacklist = () => _userBlacklist;
 const getPatternCache = () => _patternCache;
 
-module.exports = { init, flush, recordAction, evaluateCommand, getPromotedCommands, getStats, getData, getEpoch, getWhitelist, getBlacklist, getPatternCache };
+/**
+ * Purge badly-learned entries: numbers, flags, versions, filenames, 1-char tokens.
+ * Returns count of entries removed.
+ */
+const purgeBadEntries = () => {
+    const BAD = /^(?:\d+|[\-]{1,2}[\w\-]+|v?\d[\d.\-a-z]*|\S+\.[a-z]{2,4}|[./~$]|[\[\]{}()<>"'`]|\w+=\S*)$/i;
+    let count = 0;
+    for (const key of Object.keys(_learnData)) {
+        const isBad =
+            key.length < 2 ||              // single char
+            /^\d+$/.test(key) ||           // pure number
+            /^[\-]{1,2}[\w\-]+$/.test(key) || // flag
+            /^v?\d[\d.\-a-z]*$/.test(key) || // version
+            /\.[a-z]{2,4}$/.test(key) ||  // filename/domain
+            !/[a-z]/i.test(key) ||         // no letters at all
+            BAD.test(key);
+        if (isBad) {
+            delete _learnData[key];
+            count++;
+        }
+    }
+    if (count > 0) {
+        console.log(`[Grav] Purged ${count} bad learning entries`);
+        save();
+    }
+    return count;
+};
+
+module.exports = { init, flush, recordAction, evaluateCommand, getPromotedCommands, getStats, getData, getEpoch, getWhitelist, getBlacklist, getPatternCache, purgeBadEntries };

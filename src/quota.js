@@ -40,7 +40,7 @@ async function discover() {
                 processResponse(parsed);
                 return port;
             }
-        } catch (_) {}
+        } catch (_) { /* non-critical */ }
     }
     // Fallback: try to find port from process list via /json endpoint
     for (const port of LS_PORTS) {
@@ -52,7 +52,7 @@ async function discover() {
                 poll();
                 return port;
             }
-        } catch (_) {}
+        } catch (_) { /* non-critical */ }
     }
     _data.error = 'Language Server not found';
     return 0;
@@ -68,7 +68,7 @@ async function poll() {
             try {
                 res = await httpGet(`http://127.0.0.1:${_port}${ep}`, 2000);
                 if (res) { const p = JSON.parse(res); if (p && typeof p === 'object') { processResponse(p); return; } }
-            } catch (_) {}
+            } catch (_) { /* non-critical */ }
         }
         _data.error = 'No quota endpoint responded';
         _data.lastPoll = Date.now();

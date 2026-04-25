@@ -74,6 +74,26 @@ eq(extractCommands(null), [], 'null');
 eq(extractCommands(123), [], 'non-string');
 eq(extractCommands('nohup time nice npm start'), ['npm'], 'multiple prefixes stripped');
 
+// Regression: garbage inputs that were incorrectly learned as commands
+eq(extractCommands('1'), [], 'pure number 1 rejected');
+eq(extractCommands('42'), [], 'pure number 42 rejected');
+eq(extractCommands('404'), [], 'pure number 404 rejected');
+eq(extractCommands('-v'), [], 'flag -v rejected');
+eq(extractCommands('--help'), [], 'flag --help rejected');
+eq(extractCommands('v1.2.3'), [], 'version string rejected');
+eq(extractCommands('1.0.0'), [], 'version number rejected');
+eq(extractCommands('https://example.com'), [], 'URL rejected');
+eq(extractCommands('file.js'), [], 'js filename rejected');
+eq(extractCommands('config.json'), [], 'json filename rejected');
+eq(extractCommands('KEY=value'), [], 'env assignment rejected');
+// Real 2-char commands should still work
+eq(extractCommands('ls -la'), ['ls'], 'ls still works');
+eq(extractCommands('go build'), ['go'], 'go still works');
+eq(extractCommands('ps aux'), ['ps'], 'ps still works');
+// Numbers inside compound commands — extract the real command only
+eq(extractCommands('echo 1'), ['echo'], 'echo with number arg — only echo extracted');
+eq(extractCommands('sleep 5'), ['sleep'], 'sleep with number arg — only sleep extracted');
+
 // ── matchesBlacklist ─────────────────────────────────────────
 section('matchesBlacklist');
 eq(matchesBlacklist('rm -rf /', ['rm -rf /']), 'rm -rf /', 'exact multi-word match');

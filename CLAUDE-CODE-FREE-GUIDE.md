@@ -2,6 +2,8 @@
 
 Sử dụng Claude Code miễn phí thông qua NVIDIA NIM proxy (40 requests/phút).
 
+**Cập nhật: April 2026** - Sử dụng Llama 3.3 70B (ổn định nhất hiện tại)
+
 ## 📋 Yêu cầu
 
 - macOS / Linux / Windows
@@ -44,11 +46,11 @@ cat > ~/free-claude-code/.env << 'EOF'
 # Thay YOUR_API_KEY bằng key từ Bước 1
 NVIDIA_NIM_API_KEY="nvapi-YOUR_API_KEY_HERE"
 
-# Model mapping
-MODEL_OPUS="nvidia_nim/deepseek-ai/deepseek-r1"
-MODEL_SONNET="nvidia_nim/moonshotai/kimi-k2-thinking"
-MODEL_HAIKU="nvidia_nim/stepfun-ai/step-3.5-flash"
-MODEL="nvidia_nim/z-ai/glm4.7"
+# Llama 3.3 70B - stable and good for coding (April 2026)
+MODEL_OPUS="nvidia_nim/meta/llama-3.3-70b-instruct"
+MODEL_SONNET="nvidia_nim/meta/llama-3.3-70b-instruct"
+MODEL_HAIKU="nvidia_nim/meta/llama-3.3-70b-instruct"
+MODEL="nvidia_nim/meta/llama-3.3-70b-instruct"
 
 # Settings
 ENABLE_THINKING=true
@@ -57,15 +59,17 @@ PROVIDER_RATE_WINDOW=60
 EOF
 ```
 
-### Models có sẵn (miễn phí):
+### Models có sẵn (miễn phí - April 2026):
 
-| Model | Mô tả |
-|-------|-------|
-| `nvidia_nim/deepseek-ai/deepseek-r1` | Mạnh nhất, reasoning tốt |
-| `nvidia_nim/moonshotai/kimi-k2-thinking` | Coding tốt, có thinking |
-| `nvidia_nim/z-ai/glm4.7` | Nhanh, đa năng |
-| `nvidia_nim/stepfun-ai/step-3.5-flash` | Rất nhanh |
-| `nvidia_nim/minimaxai/minimax-m2.5` | Complex tasks |
+| Model | Mô tả | Status |
+|-------|-------|--------|
+| `nvidia_nim/meta/llama-3.3-70b-instruct` | Ổn định, coding tốt | ✅ Recommended |
+| `nvidia_nim/qwen/qwen3-next-80b-a3b-instruct` | MoE, 3B active | ✅ Available |
+| `nvidia_nim/qwen/qwen3.5-397b-a17b` | Multimodal VLM | ✅ Available |
+| `nvidia_nim/google/gemma-3-27b-it` | Nhanh, nhẹ | ✅ Available |
+| ~~`nvidia_nim/deepseek-ai/deepseek-r1`~~ | ~~Reasoning~~ | ❌ Retired |
+| ~~`nvidia_nim/moonshotai/kimi-k2-instruct`~~ | ~~Coding~~ | ⚠️ Unstable |
+| ~~`nvidia_nim/qwen/qwen3-coder-480b-a35b-instruct`~~ | ~~Coding~~ | ⚠️ Degraded |
 
 ---
 
@@ -106,6 +110,33 @@ source ~/.zshrc
 
 # Sau đó chỉ cần:
 claude-free
+```
+
+#### Auto-approve (không cần bấm yes):
+
+```bash
+# Cách 1: Dùng flag
+claude-free --dangerously-skip-permissions
+
+# Cách 2: Cấu hình allowlist
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "MultiEdit(*)",
+      "Grep(*)",
+      "Glob(*)",
+      "LS(*)"
+    ],
+    "deny": []
+  }
+}
+EOF
 ```
 
 ---
@@ -165,9 +196,10 @@ Double-click để chạy!
 
 1. **Proxy phải chạy trước** khi dùng Claude Code
 2. **Rate limit**: 40 requests/phút (miễn phí)
-3. **Model không phải Claude thật** - là Kimi K2, DeepSeek R1, GLM, etc.
+3. **Model không phải Claude thật** - là Llama 3.3, Qwen, etc.
 4. **Chất lượng có thể khác** so với Claude gốc
 5. **Không hoạt động với**: Claude Desktop app, Kiro IDE
+6. **Models thay đổi thường xuyên** - NVIDIA có thể retire/degrade models bất cứ lúc nào
 
 ---
 
@@ -179,15 +211,30 @@ Double-click để chạy!
 cd ~/free-claude-code && uv run uvicorn server:app --host 0.0.0.0 --port 8082
 ```
 
+### Lỗi "Address already in use"
+→ Proxy đã chạy rồi, chỉ cần dùng `claude-free`
+
 ### Lỗi "Error editing file"
-→ Model không hỗ trợ tool use tốt. Đổi sang DeepSeek R1:
+→ Model không hỗ trợ tool use tốt. Đổi sang Llama 3.3:
 ```
-MODEL_SONNET="nvidia_nim/deepseek-ai/deepseek-r1"
+MODEL="nvidia_nim/meta/llama-3.3-70b-instruct"
 ```
+
+### Lỗi "DEGRADED function cannot be invoked"
+→ Model đang bị lỗi trên NVIDIA. Đổi sang model khác trong danh sách Available.
+
+### Lỗi "model has reached its end of life"
+→ Model đã bị retire. Đổi sang model khác trong danh sách Available.
 
 ### Kiểm tra proxy hoạt động:
 ```bash
 curl http://localhost:8082/v1/models
+```
+
+### Restart proxy:
+```bash
+lsof -ti:8082 | xargs kill -9
+cd ~/free-claude-code && uv run uvicorn server:app --host 0.0.0.0 --port 8082
 ```
 
 ---

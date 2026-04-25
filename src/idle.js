@@ -55,7 +55,7 @@ function init(ctx, opts = {}) {
 function stop() {
     if (_timer) clearInterval(_timer);
     _timer = null;
-    for (const d of _disposables) try { d.dispose(); } catch (_) {}
+    for (const d of _disposables) try { d.dispose(); } catch (_) { /* cleanup */ }
     _disposables = [];
 }
 

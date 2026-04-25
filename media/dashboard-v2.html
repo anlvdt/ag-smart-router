@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Grav Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f111a;
+  --surface:#1a1d2e;
+  --surface-hover:#22263d;
+  --card:#1e2235;
+  --card-hover:#252a42;
+  --border:#2a2f4a;
+  --border-light:#3d4466;
+  --text-muted:#6b7299;
+  --text-secondary:#a0a8cc;
+  --text-primary:#e2e6f5;
+  --white:#f0f2ff;
+  --blue:#7aa2f7;
+  --blue-glow:rgba(122,162,247,0.15);
+  --green:#73daca;
+  --green-glow:rgba(115,218,202,0.15);
+  --yellow:#ffc777;
+  --yellow-glow:rgba(255,199,119,0.15);
+  --red:#ff757f;
+  --red-glow:rgba(255,117,127,0.15);
+  --purple:#c3a6ff;
+  --purple-glow:rgba(195,166,255,0.15);
+  --cyan:#86e1fc;
+  --cyan-glow:rgba(134,225,252,0.15);
+  --orange:#ff966c;
+  --radius-sm:6px;
+  --radius:10px;
+  --radius-lg:14px;
+  --shadow:0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg:0 4px 20px rgba(0,0,0,0.4);
+  --transition:all 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+html{font-size:14px}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+  background:var(--bg);color:var(--text-primary);
+  line-height:1.6;-webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
+
+/* ── Layout ── */
+.root{max-width:900px;margin:0 auto;padding:20px 24px 40px}
+.grid{display:grid;gap:16px}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:640px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+/* ── Header ── */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;margin-bottom:20px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow);
+}
+.hdr-brand{display:flex;align-items:center;gap:12px}
+.hdr-icon{
+  width:36px;height:36px;border-radius:var(--radius);
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;font-weight:800;color:var(--white);
+}
+.hdr-info{display:flex;flex-direction:column;gap:2px}
+.hdr-name{font-size:1.15rem;font-weight:800;color:var(--white);letter-spacing:.3px}
+.hdr-ver{font-size:.75rem;color:var(--text-muted);font-weight:500}
+.hdr-r{display:flex;align-items:center;gap:10px}
+
+/* ── Status Badge ── */
+.status-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:20px;
+  font-size:.8rem;font-weight:700;
+  border:1.5px solid var(--border);background:var(--card);
+  transition:var(--transition);
+}
+.status-badge.on{border-color:var(--green);color:var(--green);background:var(--green-glow)}
+.status-badge.off{border-color:var(--red);color:var(--red);background:var(--red-glow)}
+.status-badge.warn{border-color:var(--yellow);color:var(--yellow);background:var(--yellow-glow)}
+.status-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Card ── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  transition:var(--transition);box-shadow:var(--shadow);
+}
+.card:hover{border-color:var(--border-light);box-shadow:var(--shadow-lg)}
+.card-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.card-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:.85rem;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--text-secondary);
+}
+.card-title .icon{font-size:1rem}
+.card-body{padding:16px 18px}
+.card-body.compact{padding:12px 18px}
+
+/* ── Metric Row ── */
+.metric{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.metric:last-child{border-bottom:none;padding-bottom:0}
+.metric:first-child{padding-top:0}
+.metric-label{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--text-secondary)}
+.metric-label .icon{font-size:1rem;opacity:.7}
+.metric-value{
+  font-size:1.05rem;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--white);
+}
+.metric-value.blue{color:var(--blue)}
+.metric-value.green{color:var(--green)}
+.metric-value.yellow{color:var(--yellow)}
+.metric-value.red{color:var(--red)}
+.metric-value.purple{color:var(--purple)}
+.metric-value.cyan{color:var(--cyan)}
+
+/* ── Progress Bar ── */
+.progress-wrap{margin-top:6px}
+.progress-bar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
+.progress-fill.blue{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.progress-fill.green{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.progress-fill.yellow{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.progress-fill.red{background:linear-gradient(90deg,var(--red),var(--orange))}
+.progress-label{display:flex;justify-content:space-between;margin-top:4px;font-size:.75rem;color:var(--text-muted)}
+
+/* ── Toggle Row ── */
+.trow{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid var(--border);
+}
+.trow:last-child{border-bottom:none}
+.trow-info{flex:1;min-width:0}
+.trow-name{font-size:.95rem;font-weight:600;color:var(--white);display:flex;align-items:center;gap:8px}
+.trow-desc{font-size:.8rem;color:var(--text-muted);margin-top:3px}
+.trow-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);font-size:.85rem}
+.trow-icon.blue{background:var(--blue-glow);color:var(--blue)}
+.trow-icon.green{background:var(--green-glow);color:var(--green)}
+.trow-icon.yellow{background:var(--yellow-glow);color:var(--yellow)}
+
+/* ── Toggle Switch ── */
+.tog{position:relative;width:44px;height:24px;flex-shrink:0;cursor:pointer}
+.tog input{display:none}
+.tog-track{
+  position:absolute;inset:0;background:var(--border);border-radius:12px;transition:var(--transition);
+}
+.tog-thumb{
+  position:absolute;left:3px;top:3px;width:18px;height:18px;
+  background:var(--text-muted);border-radius:50%;transition:var(--transition);
+  box-shadow:0 1px 3px rgba(0,0,0,0.3);
+}
+.tog input:checked+.tog-track{background:var(--green)}
+.tog input:checked+.tog-track+.tog-thumb{transform:translateX(20px);background:var(--white)}
+
+/* ── Range Slider ── */
+.rng{display:flex;align-items:center;gap:12px;padding:10px 0}
+.rng-lbl{font-size:.85rem;color:var(--text-secondary);min-width:60px;font-weight:500}
+.rng input[type=range]{flex:1;height:5px;accent-color:var(--blue);border-radius:3px;cursor:pointer}
+.rng-val{font-size:.85rem;color:var(--blue);font-weight:700;min-width:60px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* ── Pattern Tags ── */
+.pgrid{display:flex;flex-wrap:wrap;gap:8px}
+.ptag{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:.85rem;font-weight:600;padding:7px 14px;
+  border:1.5px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text-secondary);cursor:pointer;user-select:none;
+  transition:var(--transition);background:transparent;font-family:inherit;
+}
+.ptag:hover{border-color:var(--border-light);color:var(--text-primary);background:var(--surface-hover)}
+.ptag.on{border-color:var(--green);color:var(--green);background:var(--green-glow)}
+.ptag.on::before{content:'✓';font-size:.7rem}
+.ptag.off{opacity:.35;border-style:dashed}
+.ptag.off:hover{opacity:.6}
+
+/* ── Quick Actions ── */
+.qactions{display:flex;gap:8px;flex-wrap:wrap}
+.qbtn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:.85rem;font-weight:600;padding:8px 16px;
+  border:1.5px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface);color:var(--text-secondary);cursor:pointer;
+  font-family:inherit;transition:var(--transition);
+}
+.qbtn:hover{border-color:var(--border-light);color:var(--text-primary);background:var(--surface-hover);transform:translateY(-1px)}
+.qbtn.primary{border-color:var(--blue);color:var(--blue);background:var(--blue-glow)}
+.qbtn.primary:hover{background:var(--blue);color:var(--bg)}
+.qbtn.danger{border-color:var(--red);color:var(--red);background:var(--red-glow)}
+.qbtn.danger:hover{background:var(--red);color:var(--bg)}
+.qbtn.success{border-color:var(--green);color:var(--green);background:var(--green-glow)}
+.qbtn.success:hover{background:var(--green);color:var(--bg)}
+
+/* ── Feed / Log ── */
+.feed{
+  max-height:200px;overflow-y:auto;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:4px 0;
+}
+.feed-row{
+  display:flex;align-items:center;gap:10px;
+  padding:6px 12px;font-size:.85rem;
+  border-bottom:1px solid rgba(42,47,74,0.5);
+  transition:background 0.15s;
+}
+.feed-row:hover{background:rgba(122,162,247,0.05)}
+.feed-row:last-child{border-bottom:none}
+.feed-ts{color:var(--text-muted);min-width:52px;font-size:.75rem;font-variant-numeric:tabular-nums;flex-shrink:0}
+.feed-badge{
+  font-size:.7rem;font-weight:700;text-transform:uppercase;
+  padding:2px 8px;border-radius:4px;flex-shrink:0;
+}
+.feed-badge.ingest{color:var(--green);background:var(--green-glow)}
+.feed-badge.lint{color:var(--yellow);background:var(--yellow-glow)}
+.feed-badge.approve{color:var(--green);background:var(--green-glow)}
+.feed-badge.reject{color:var(--red);background:var(--red-glow)}
+.feed-badge.block{color:var(--red);background:var(--red-glow)}
+.feed-cmd{color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.feed-conf{color:var(--text-muted);min-width:40px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
+.feed-empty{color:var(--text-muted);padding:16px;text-align:center;font-size:.85rem}
+
+/* ── Concept Cards ── */
+.cpt{padding:12px 0;border-bottom:1px solid var(--border)}
+.cpt:last-child{border-bottom:none;padding-bottom:0}
+.cpt:first-child{padding-top:0}
+.cpt-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.cpt-name{font-size:.9rem;font-weight:700;color:var(--cyan);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpt-risk{
+  font-size:.7rem;font-weight:700;text-transform:uppercase;
+  padding:3px 10px;border-radius:4px;flex-shrink:0;
+}
+.cpt-risk.safe{color:var(--green);background:var(--green-glow)}
+.cpt-risk.caution{color:var(--yellow);background:var(--yellow-glow)}
+.cpt-risk.danger{color:var(--red);background:var(--red-glow)}
+.cpt-risk.unknown{color:var(--text-muted);background:rgba(107,114,153,0.12)}
+.cpt-bar{height:4px;background:var(--bg);border-radius:2px;margin-top:8px;overflow:hidden}
+.cpt-fill{height:100%;border-radius:2px;transition:width .3s}
+.cpt-meta{font-size:.75rem;color:var(--text-muted);display:flex;justify-content:space-between;margin-top:5px}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:20px;left:50%;
+  transform:translateX(-50%) translateY(60px);
+  background:var(--surface);color:var(--white);
+  padding:10px 20px;font-size:.9rem;font-weight:600;
+  border:1px solid var(--border-light);border-radius:var(--radius);
+  opacity:0;transition:all .2s;pointer-events:none;z-index:99;
+  box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:8px;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast-icon{font-size:1.1rem}
+
+/* ── Typing indicator ── */
+.typing{display:none;align-items:center;gap:8px;padding:10px 0;font-size:.9rem;color:var(--blue)}
+.typing.on{display:flex}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:blink 1.2s infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+
+/* ── Animations ── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card{animation:fadeIn .3s ease}
+.card:nth-child(2){animation-delay:.05s}
+.card:nth-child(3){animation-delay:.1s}
+.card:nth-child(4){animation-delay:.15s}
+
+/* ── Section collapse ── */
+.sec-body{display:none}
+.sec-body.open{display:block;animation:fadeIn .2s ease}
+.sec-arrow{font-size:.65rem;color:var(--text-muted);transition:transform .2s;cursor:pointer}
+.sec-arrow.open{transform:rotate(90deg)}
+
+/* ── Footer ── */
+.foot{
+  display:flex;align-items:center;justify-content:flex-end;
+  gap:10px;margin-top:20px;padding-top:16px;
+  border-top:1px solid var(--border);
+}
+
+/* ── Stats Bars ── */
+.bar-r{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.85rem}
+.bar-k{min-width:80px;color:var(--text-muted);font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-bg{flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+.bar-fg{height:100%;border-radius:3px;transition:width .3s ease}
+.bar-n{min-width:30px;text-align:right;color:var(--white);font-weight:700;font-variant-numeric:tabular-nums;font-size:.8rem}
+
+/* ── Confirm Dialog ── */
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
+.confirm-overlay.show{opacity:1;pointer-events:auto}
+.confirm-box{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:20px 24px;max-width:320px;text-align:center;box-shadow:var(--shadow-lg)}
+.confirm-box p{margin-bottom:16px;color:var(--white);font-size:.95rem}
+.confirm-btns{display:flex;gap:8px;justify-content:center}
+.confirm-btns button{padding:6px 18px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);cursor:pointer;font-size:.85rem;font-family:inherit;transition:var(--transition)}
+.confirm-btns .confirm-yes{border-color:var(--red);color:var(--red);background:var(--red-glow)}
+.confirm-btns .confirm-yes:hover{background:var(--red);color:var(--bg)}
+.confirm-btns .confirm-no:hover{background:var(--surface-hover);color:var(--text-primary)}
+</style>
+</head>
+<body>
+<div class="root">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-brand">
+    <div class="hdr-icon">G</div>
+    <div class="hdr-info">
+      <div class="hdr-name">Grav Dashboard</div>
+      <div class="hdr-ver">v3.4.2 — Autopilot for Antigravity</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <span class="status-badge on" id="masterBadge"><span class="dot"></span>Active</span>
+    <span class="status-badge" id="cdpBadge" style="display:none"><span class="dot"></span>CDP</span>
+  </div>
+</div>
+
+<!-- TOP ROW: Controls + Session -->
+<div class="grid grid-2">
+
+  <!-- CONTROL CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">⚡</span> Controls</div>
+      <span class="status-badge on" id="ctrlBadge" style="padding:4px 10px;font-size:.75rem">ON</span>
+    </div>
+    <div class="card-body">
+      <div class="trow">
+        <div class="trow-info">
+          <div class="trow-name"><span class="trow-icon blue">🖱</span> Auto-Click</div>
+          <div class="trow-desc">Automatically click accept / run buttons</div>
+        </div>
+        <label class="tog" onclick="event.stopPropagation()">
+          <input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="instantToggle()">
+          <div class="tog-track"></div><div class="tog-thumb"></div>
+        </label>
+      </div>
+      <div class="trow">
+        <div class="trow-info">
+          <div class="trow-name"><span class="trow-icon green">⇣</span> Auto-Scroll</div>
+          <div class="trow-desc">Keep chat scrolled to bottom</div>
+        </div>
+        <label class="tog" onclick="event.stopPropagation()">
+          <input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="scrollToggle()">
+          <div class="tog-track"></div><div class="tog-thumb"></div>
+        </label>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div class="rng"><span class="rng-lbl">Click</span><input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'"><span class="rng-val" id="valApprove">{{APPROVE_MS}}ms</span></div>
+        <div class="rng"><span class="rng-lbl">Scroll</span><input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'"><span class="rng-val" id="valScroll">{{SCROLL_MS}}ms</span></div>
+        <div class="rng"><span class="rng-lbl">Pause</span><input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'"><span class="rng-val" id="valPause">{{PAUSE_MS}}ms</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SESSION CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">📊</span> Session</div>
+      <span class="status-badge" id="healthBadge" style="padding:4px 10px;font-size:.75rem">—</span>
+    </div>
+    <div class="card-body">
+      <div class="typing" id="aiTyping"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span><span style="margin-left:4px">AI is thinking...</span></div>
+      <div class="metric"><span class="metric-label"><span class="icon">⏱</span> Uptime</span><span class="metric-value blue" id="sessDuration">0m</span></div>
+      <div class="metric"><span class="metric-label"><span class="icon">💬</span> Messages</span><span class="metric-value" id="sessMsg">0</span></div>
+      <div class="metric"><span class="metric-label"><span class="icon">👆</span> Clicks</span><span class="metric-value green" id="sessApprove">0</span></div>
+      <div class="metric"><span class="metric-label"><span class="icon">⚡</span> Avg Response</span><span class="metric-value" id="sessAvgResp">—</span></div>
+      <div id="toolBreakdown" style="margin-top:8px"></div>
+      <div class="metric" style="margin-top:4px"><span class="metric-label"><span class="icon">😴</span> Idle</span><span class="metric-value" id="idleStatus">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECOND ROW: Targets + Stats -->
+<div class="grid grid-2" style="margin-top:16px">
+
+  <!-- TARGETS CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">🎯</span> Targets</div>
+      <span class="metric-value" id="statActive" style="font-size:.9rem">0 active</span>
+    </div>
+    <div class="card-body compact">
+      <div class="pgrid" id="patGrid"></div>
+    </div>
+  </div>
+
+  <!-- STATS CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">📈</span> Stats</div>
+      <span class="metric-value blue" id="statTotal" style="font-size:.9rem">{{TOTAL}}</span>
+    </div>
+    <div class="card-body compact">
+      <div id="statBars"></div>
+      <div class="progress-wrap" style="margin-top:12px">
+        <div class="progress-label"><span>Success Rate</span><span id="successRate">—</span></div>
+        <div class="progress-bar"><div class="progress-fill green" id="successBar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- THIRD ROW: Brain + Memory -->
+<div class="grid grid-2" style="margin-top:16px">
+
+  <!-- BRAIN CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">🧠</span> Brain</div>
+    </div>
+    <div class="card-body compact">
+      <div class="grid grid-2" style="gap:8px">
+        <div class="metric" style="padding:6px 0"><span class="metric-label">Epoch</span><span class="metric-value blue" id="brainEpoch">{{LEARN_EPOCH}}</span></div>
+        <div class="metric" style="padding:6px 0"><span class="metric-label">Tracking</span><span class="metric-value" id="brainTracking">{{LEARN_TRACKING}}</span></div>
+        <div class="metric" style="padding:6px 0"><span class="metric-label">Allowed</span><span class="metric-value green" id="brainWhite">{{WHITE_COUNT}}</span></div>
+        <div class="metric" style="padding:6px 0"><span class="metric-label">Blocked</span><span class="metric-value red" id="brainBlack">{{BLACK_COUNT}}</span></div>
+        <div class="metric" style="padding:6px 0"><span class="metric-label">Promoted</span><span class="metric-value purple" id="brainPromoted">{{LEARN_COUNT}}</span></div>
+        <div class="metric" style="padding:6px 0"><span class="metric-label">Patterns</span><span class="metric-value" id="brainPatterns">{{LEARN_PATTERNS}}</span></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="qbtn primary" onclick="vscode.postMessage({command:'manageTerminal'})" style="width:100%;justify-content:center">Manage Rules</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEMORY CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">💾</span> Memory</div>
+    </div>
+    <div class="card-body compact">
+      <div class="metric"><span class="metric-label">Pages</span><span class="metric-value blue" id="wikiPages">{{WIKI_PAGES}}</span></div>
+      <div class="metric"><span class="metric-label">Concepts</span><span class="metric-value cyan" id="wikiConcepts">{{WIKI_CONCEPTS}}</span></div>
+      <div class="metric"><span class="metric-label">Conflicts</span><span class="metric-value yellow" id="wikiContradictions">{{WIKI_CONTRADICTIONS}}</span></div>
+      <div id="conceptMap" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- QUOTA & ROI ROW -->
+<div class="grid grid-2" style="margin-top:16px">
+
+  <!-- QUOTA CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">📊</span> Quota</div>
+    </div>
+    <div class="card-body compact">
+      <div class="metric"><span class="metric-label">Overall</span><span class="metric-value" id="quotaPct">—</span></div>
+      <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill blue" id="quotaBar" style="width:0%"></div></div></div>
+      <div class="metric" style="margin-top:8px"><span class="metric-label">Usage Rate</span><span class="metric-value" id="quotaRate">—</span></div>
+      <div class="metric"><span class="metric-label">Runway</span><span class="metric-value" id="quotaRunway">—</span></div>
+      <div class="metric"><span class="metric-label">Next Reset</span><span class="metric-value" id="quotaReset">—</span></div>
+      <div id="quotaModels" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <!-- ROI CARD -->
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title"><span class="icon">💰</span> ROI</div>
+    </div>
+    <div class="card-body compact">
+      <div class="metric"><span class="metric-label">Time Saved</span><span class="metric-value green" id="roiSaved">0s</span></div>
+      <div class="metric"><span class="metric-label">Clicks</span><span class="metric-value blue" id="roiClicks">0</span></div>
+      <div class="metric"><span class="metric-label">Productivity</span><span class="metric-value" id="roiGain">0%</span></div>
+      <div class="metric"><span class="metric-label">Daily Estimate</span><span class="metric-value cyan" id="roiDaily">0m</span></div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">Lifetime</div>
+        <div class="metric" style="padding:4px 0"><span class="metric-label">Total Saved</span><span class="metric-value green" id="roiLifeSaved">0m</span></div>
+        <div class="metric" style="padding:4px 0"><span class="metric-label">Total Clicks</span><span class="metric-value" id="roiLifeClicks">0</span></div>
+        <div class="metric" style="padding:4px 0"><span class="metric-label">Sessions</span><span class="metric-value" id="roiLifeSessions">0</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGS CARD -->
+<div class="card" style="margin-top:16px">
+  <div class="card-hdr">
+    <div class="card-title"><span class="icon">📝</span> Activity Log</div>
+    <div class="qactions">
+      <button class="qbtn" onclick="getLog()" style="padding:4px 10px;font-size:.75rem">Refresh</button>
+      <button class="qbtn danger" onclick="clearLog()" style="padding:4px 10px;font-size:.75rem">Clear</button>
+    </div>
+  </div>
+  <div class="card-body compact">
+    <div class="feed" id="logFeed"><div class="feed-empty">No activity yet</div></div>
+  </div>
+</div>
+
+<!-- FOOTER ACTIONS -->
+<div class="foot">
+  <button class="qbtn" onclick="save()">Save Settings</button>
+  <button class="qbtn success" onclick="vscode.postMessage({command:'reload'})">Reload Window</button>
+  <button class="qbtn danger" onclick="resetStats()">Reset Stats</button>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span class="toast-icon" id="toastIcon">✓</span><span id="toastMsg">Saved</span></div>
+<div class="confirm-overlay" id="confirmOverlay"><div class="confirm-box"><p id="confirmMsg">Are you sure?</p><div class="confirm-btns"><button class="confirm-no" onclick="closeConfirm()">Cancel</button><button class="confirm-yes" id="confirmYes">Confirm</button></div></div></div>
+
+<script>
+const vscode = acquireVsCodeApi();
+const $ = id => document.getElementById(id);
+
+let _patterns = {{PATTERNS_JSON}};
+let _disabled = {{DISABLED_JSON}};
+let _stats = {{STATS_JSON}};
+let _allPatterns = {{ALL_PATTERNS_JSON}};
+let _patternGroups = {{PATTERN_GROUPS_JSON}};
+let _concepts = {{CONCEPTS_JSON}};
+let _wikiLog = {{WIKI_LOG_JSON}};
+let _totalClicks = {{TOTAL}};
+
+function showToast(msg, icon='✓', type='success') {
+    const t = $('toast');
+    $('toastMsg').textContent = msg;
+    $('toastIcon').textContent = icon;
+    t.className = 'toast show';
+    setTimeout(() => t.className = 'toast', 2200);
+}
+
+var _confirmCb = null;
+function confirmAction(msg, cb) { $('confirmMsg').textContent = msg; _confirmCb = cb; $('confirmOverlay').classList.add('show'); $('confirmYes').onclick = function() { closeConfirm(); if (_confirmCb) _confirmCb(); }; }
+function closeConfirm() { $('confirmOverlay').classList.remove('show'); _confirmCb = null; }
+
+function togSec(id) {
+    const body = $(id);
+    const arrow = $('arr' + id.slice(3));
+    if (!body || !arrow) return;
+    const isOpen = body.classList.toggle('open');
+    arrow.classList.toggle('open', isOpen);
+}
+
+function renderPatterns() {
+    const g = $('patGrid');
+    if (!g) return;
+    g.innerHTML = '';
+    for (const p of _allPatterns) {
+        const variants = _patternGroups[p] || [p];
+        const enabled = variants.some(v => _patterns.includes(v) && !_disabled.includes(v));
+        const btn = document.createElement('button');
+        btn.className = 'ptag ' + (enabled ? 'on' : 'off');
+        btn.textContent = p;
+        btn.onclick = () => {
+            const wasOn = btn.classList.contains('on');
+            if (wasOn) {
+                for (const v of variants) { if (!_disabled.includes(v)) _disabled.push(v); }
+            } else {
+                _disabled = _disabled.filter(d => !variants.includes(d));
+                for (const v of variants) { if (!_patterns.includes(v)) _patterns.push(v); }
+            }
+            renderPatterns();
+            showToast(wasOn ? 'Disabled: ' + p : 'Enabled: ' + p, wasOn ? '⊘' : '✓');
+        };
+        g.appendChild(btn);
+    }
+}
+
+function renderStats() {
+    const container = $('statBars');
+    if (!container) return;
+    container.innerHTML = '';
+    const entries = Object.entries(_stats || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    const max = entries.length > 0 ? entries[0][1] : 1;
+    let total = 0;
+    for (const [k, v] of entries) {
+        total += v;
+        const pct = Math.round((v / max) * 100);
+        const row = document.createElement('div');
+        row.className = 'bar-r';
+        row.innerHTML = '<span class="bar-k">' + k + '</span><div class="bar-bg"><div class="bar-fg" style="width:' + pct + '%;background:var(--blue)"></div></div><span class="bar-n">' + v + '</span>';
+        container.appendChild(row);
+    }
+    $('statTotal').textContent = String(_totalClicks || 0);
+    $('statActive').textContent = String(entries.length) + ' active';
+    const successRate = total > 0 ? Math.round((total / (_totalClicks || 1)) * 100) : 0;
+    $('successRate').textContent = successRate + '%';
+    $('successBar').style.width = successRate + '%';
+}
+
+function renderConcepts() {
+    const cm = $('conceptMap');
+    if (!cm) return;
+    cm.innerHTML = '';
+    const entries = Object.entries(_concepts || {}).slice(0, 8);
+    for (const [ck, cv] of entries) {
+        const el = document.createElement('div');
+        el.className = 'cpt';
+        const conf = Math.round((cv.avgConfidence || 0) * 100);
+        const risk = cv.riskLevel || 'unknown';
+        el.innerHTML = '<div class="cpt-top"><span class="cpt-name">' + ck + '</span><span class="cpt-risk ' + risk + '">' + risk + '</span></div><div class="cpt-bar"><div class="cpt-fill" style="width:' + conf + '%;background:var(--' + (risk === 'safe' ? 'green' : risk === 'danger' ? 'red' : 'yellow') + ')"></div></div><div class="cpt-meta"><span>' + (cv.commands || []).slice(0, 3).join(', ') + '</span><span>' + conf + '%</span></div>';
+        cm.appendChild(el);
+    }
+}
+
+function renderWikiLog() {
+    const feed = $('logFeed');
+    if (!feed) return;
+    if (!_wikiLog || _wikiLog.length === 0) {
+        feed.innerHTML = '<div class="feed-empty">No activity yet</div>';
+        return;
+    }
+    feed.innerHTML = '';
+    for (const l of _wikiLog.slice().reverse()) {
+        const row = document.createElement('div');
+        row.className = 'feed-row';
+        const op = (l.op || '').toLowerCase();
+        const badgeClass = op.includes('approve') ? 'approve' : op.includes('reject') ? 'reject' : op.includes('block') ? 'block' : op.includes('ingest') ? 'ingest' : 'lint';
+        row.innerHTML = '<span class="feed-ts">' + (l.time || '') + '</span><span class="feed-badge ' + badgeClass + '">' + (l.op || '') + '</span><span class="feed-cmd">' + (l.cmd || '') + '</span><span class="feed-conf">' + (l.conf !== undefined ? String(Math.round(l.conf * 100)) + '%' : '') + '</span>';
+        feed.appendChild(row);
+    }
+}
+
+function instantToggle() {
+    const enabled = $('chkEnabled').checked;
+    $('masterBadge').className = 'status-badge ' + (enabled ? 'on' : 'off');
+    $('masterBadge').innerHTML = '<span class="dot"></span>' + (enabled ? 'Active' : 'Paused');
+    $('ctrlBadge').className = 'status-badge ' + (enabled ? 'on' : 'off');
+    $('ctrlBadge').textContent = enabled ? 'ON' : 'OFF';
+    vscode.postMessage({ command: 'toggle', enabled });
+}
+
+function scrollToggle() {
+    vscode.postMessage({ command: 'scrollToggle', enabled: $('chkScroll').checked });
+}
+
+function toggleMaster() {
+    const chk = $('chkEnabled');
+    chk.checked = !chk.checked;
+    instantToggle();
+}
+
+function save() {
+    const d = {
+        enabled: $('chkEnabled').checked,
+        scrollOn: $('chkScroll').checked,
+        pauseMs: parseInt($('rngPause').value),
+        scrollMs: parseInt($('rngScroll').value),
+        approveMs: parseInt($('rngApprove').value),
+        patterns: _patterns,
+        disabledPatterns: _disabled,
+    };
+    vscode.postMessage({ command: 'save', data: d });
+    showToast('Settings saved', '✓');
+}
+
+function resetStats() {
+    confirmAction('Reset all stats? This cannot be undone.', function() {
+        vscode.postMessage({ command: 'resetStats' });
+        showToast('Stats reset', '🗑');
+    });
+}
+
+function clearLog() {
+    confirmAction('Clear activity log?', function() {
+        vscode.postMessage({ command: 'clearLog' });
+        showToast('Log cleared', '🗑');
+    });
+}
+
+function getLog() {
+    vscode.postMessage({ command: 'getLog' });
+}
+
+function formatDuration(ms) {
+    if (!ms || ms < 1000) return '0s';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    if (h > 0) return h + 'h ' + (m % 60) + 'm';
+    if (m > 0) return m + 'm ' + (s % 60) + 's';
+    return s + 's';
+}
+
+function formatNumber(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
+}
+
+window.addEventListener('message', e => {
+    const m = e.data;
+    switch (m.command) {
+        case 'statsUpdated':
+            _stats = m.stats || {};
+            _totalClicks = m.totalClicks || 0;
+            renderStats();
+            break;
+        case 'logUpdated':
+            _wikiLog = m.log || [];
+            renderWikiLog();
+            break;
+        case 'brainUpdated':
+            const b = m;
+            if ($('brainEpoch')) $('brainEpoch').textContent = String(b.epoch || 0);
+            if ($('brainTracking')) $('brainTracking').textContent = String(b.tracking || 0);
+            if ($('brainWhite')) $('brainWhite').textContent = String(b.whiteCount || 0);
+            if ($('brainBlack')) $('brainBlack').textContent = String(b.blackCount || 0);
+            if ($('brainPromoted')) $('brainPromoted').textContent = String(b.promoted || 0);
+            if ($('brainPatterns')) $('brainPatterns').textContent = String(b.patterns || 0);
+            if (b.concepts) { _concepts = b.concepts; renderConcepts(); }
+            if (b.wikiLog) { _wikiLog = b.wikiLog; renderWikiLog(); }
+            break;
+        case 'sessionUpdated': {
+            const s = m.session || {};
+            if ($('sessDuration')) $('sessDuration').textContent = formatDuration(s.sessionMs || 0);
+            if ($('sessMsg')) $('sessMsg').textContent = String(s.msgCount || 0);
+            if ($('sessApprove')) $('sessApprove').textContent = String(s.approveCount || 0);
+            if ($('sessAvgResp')) $('sessAvgResp').textContent = s.avgResponseMs ? String(s.avgResponseMs) + 'ms' : '—';
+            if ($('aiTyping')) $('aiTyping').classList.toggle('on', !!s.aiTyping);
+            if ($('idleStatus')) $('idleStatus').textContent = s.idle ? 'Idle' : 'Active';
+            const hb = $('healthBadge');
+            if (hb) {
+                const health = s.learningHealth || 'unknown';
+                hb.className = 'status-badge ' + (health === 'good' ? 'on' : health === 'poor' ? 'warn' : '');
+                hb.textContent = health === 'good' ? 'Healthy' : health === 'poor' ? 'Degraded' : '—';
+            }
+            const tb = $('toolBreakdown');
+            if (tb && s.toolBreakdown) {
+                tb.innerHTML = '';
+                for (const [tool, data] of Object.entries(s.toolBreakdown).slice(0, 5)) {
+                    const avg = data.count > 0 ? Math.round(data.totalMs / data.count) : 0;
+                    const div = document.createElement('div');
+                    div.className = 'metric';
+                    div.style.padding = '3px 0';
+                    div.innerHTML = '<span class="metric-label" style="font-size:.8rem">' + tool + '</span><span class="metric-value" style="font-size:.8rem">' + data.count + '× ~' + avg + 'ms</span>';
+                    tb.appendChild(div);
+                }
+            }
+            if (s.cdpConnected !== undefined) {
+                const cdpBadge = $('cdpBadge');
+                if (cdpBadge) {
+                    cdpBadge.style.display = 'inline-flex';
+                    cdpBadge.className = 'status-badge ' + (s.cdpConnected ? 'on' : 'off');
+                    cdpBadge.innerHTML = '<span class="dot"></span>CDP ' + (s.cdpConnected ? s.cdpSessions : 'off');
+                }
+            }
+            break;
+        }
+        case 'quotaUpdated': {
+            const q = m.quota || {};
+            if ($('quotaPct')) $('quotaPct').textContent = q.pct !== undefined ? q.pct + '%' : '—';
+            if ($('quotaRate')) $('quotaRate').textContent = q.rate !== undefined ? q.rate + '/h' : '—';
+            if ($('quotaRunway')) $('quotaRunway').textContent = q.runway !== undefined ? q.runway + 'h' : '—';
+            if ($('quotaReset')) $('quotaReset').textContent = q.resetIn || '—';
+            if ($('quotaBar')) $('quotaBar').style.width = (q.pct || 0) + '%';
+            const qm = $('quotaModels');
+            if (qm && q.models) {
+                qm.innerHTML = '';
+                for (const [model, data] of Object.entries(q.models).slice(0, 4)) {
+                    const div = document.createElement('div');
+                    div.className = 'progress-wrap';
+                    div.innerHTML = '<div class="progress-label"><span>' + model + '</span><span>' + data.pct + '%</span></div><div class="progress-bar"><div class="progress-fill ' + (data.pct > 80 ? 'red' : data.pct > 50 ? 'yellow' : 'green') + '" style="width:' + data.pct + '%"></div></div>';
+                    qm.appendChild(div);
+                }
+            }
+            break;
+        }
+        case 'roiUpdated': {
+            const r = m.roi || {};
+            if ($('roiSaved')) $('roiSaved').textContent = formatDuration((r.timeSavedSec || 0) * 1000);
+            if ($('roiClicks')) $('roiClicks').textContent = String(r.clicks || 0);
+            if ($('roiGain')) $('roiGain').textContent = (r.productivityGain || 0) + '%';
+            if ($('roiDaily')) $('roiDaily').textContent = formatDuration((r.dailyEstimateSec || 0) * 1000);
+            if ($('roiLifeSaved')) $('roiLifeSaved').textContent = formatDuration((r.lifetimeSavedSec || 0) * 1000);
+            if ($('roiLifeClicks')) $('roiLifeClicks').textContent = formatNumber(r.lifetimeClicks || 0);
+            if ($('roiLifeSessions')) $('roiLifeSessions').textContent = String(r.lifetimeSessions || 0);
+            break;
+        }
+        case 'commandBlocked':
+            showToast('Blocked: ' + (m.reason || ''), '⊘', 'warn');
+            break;
+        case 'termLogUpdated':
+            // Could render terminal log separately
+            break;
+    }
+});
+
+renderPatterns();
+renderStats();
+renderConcepts();
+renderWikiLog();
+</script>
+</body>
+</html>

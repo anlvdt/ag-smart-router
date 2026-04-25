@@ -84,10 +84,12 @@ function render() {
     _panel.webview.html = buildHtml({
         enabled: cfg('enabled', true),
         scrollOn: cfg('autoScroll', true),
+        dryRun: cfg('dryRun', false),
         pauseMs: cfg('scrollPauseMs', 7000),
         scrollMs: cfg('scrollIntervalMs', 500),
         patterns: cfg('approvePatterns', DEFAULT_PATTERNS),
         disabledPatterns: dp,
+        projectPatterns: state.projectPatterns || [],
         language: 'en',
         stats: state.stats,
         totalClicks: state.totalClicks,
@@ -138,6 +140,9 @@ function buildHtml(c) {
     h = replaceTag(h, 'CONCEPTS_JSON', JSON.stringify(c.concepts || {}));
     h = replaceTag(h, 'WIKI_LOG_JSON', JSON.stringify(c.wikiLog || []));
     h = replaceTag(h, 'ALL_PATTERNS_JSON', JSON.stringify(c.allPatterns || []));
+    h = replaceTag(h, 'PROJECT_PATTERNS_JSON', JSON.stringify(c.projectPatterns || []));
+    h = replaceTag(h, 'DRYRUN_CHK', c.dryRun ? 'checked' : '');
+    h = replaceTag(h, 'DRYRUN_VAL', c.dryRun ? 'true' : 'false');
     return h;
 }
 
@@ -155,6 +160,9 @@ function setupMessageHandler() {
             case 'scrollToggle':
                 _deps.setState({ scrollOn: msg.enabled });
                 await c.update('autoScroll', msg.enabled, vscode.ConfigurationTarget.Global);
+                _deps.onSave(); break;
+            case 'toggleDryRun':
+                await c.update('dryRun', msg.enabled, vscode.ConfigurationTarget.Global);
                 _deps.onSave(); break;
             case 'save': {
                 const d = msg.data;
