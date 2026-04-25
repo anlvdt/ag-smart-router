@@ -25,7 +25,7 @@ let _ctx, _enabled = true, _scrollOn = true, _stats = {}, _log = [], _totalClick
 let _acceptTimer, _lastQuotaMs = 0, _termLog = [], _acceptPaused = false, _dynamicAcceptCmds = [], _failedCmds = new Set();
 let _dryRun = false;  // Dry run: scan buttons but don't click
 let _sessionState = { startMs: 0, msgCount: 0, toolCalls: [], responseTimes: [], lastActivityMs: 0, aiTyping: false, approveCount: 0, rejectCount: 0, toolBreakdown: {} };
-let _sbMain, _isAntigravity = false;
+let _sbMain, _sbBridge, _isAntigravity = false;
 
 // ── Detection & Config ───────────────────────────────────────
 const isAntigravity = (() => {
@@ -87,6 +87,19 @@ const refreshBar = () => {
     }
     _sbMain.tooltip = `Grav ${_enabled ? (_acceptPaused ? '[Paused]' : _dryRun ? '[Dry Run]' : '[Active]') : '[Off]'} | ${_totalClicks} clicks\nClick to open Grav Menu`;
     if (_dryRun) { _sbMain.text = `$(eye) Grav DRY`; _sbMain.color = '#a78bfa'; }
+
+    if (_sbBridge) {
+        const port = bridge.getPort();
+        if (port) {
+            _sbBridge.text = `$(radio-tower) :${port}`;
+            _sbBridge.color = '#94e2d5';
+            _sbBridge.tooltip = `HTTP bridge on port ${port}`;
+        } else {
+            _sbBridge.text = `$(circle-slash) Bridge`;
+            _sbBridge.color = '#f38ba8';
+            _sbBridge.tooltip = 'Bridge disconnected';
+        }
+    }
 };
 
 const onStatsUpdated = () => { _totalClicks = Object.values(_stats).reduce((a, b) => a + b, 0); refreshBar(); if (_ctx) { _ctx.globalState.update('stats', _stats); _ctx.globalState.update('totalClicks', _totalClicks); } };
@@ -289,9 +302,11 @@ async function activate(ctx) {
     // Status bar
     _sbMain = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10000);
     _sbMain.command = 'grav.statusMenu';
-    _ctx.subscriptions.push(_sbMain);
+    _sbBridge = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, -10001);
+    _sbBridge.command = 'grav.diagnostics';
+    _ctx.subscriptions.push(_sbMain, _sbBridge);
     refreshBar();
-    _sbMain.show();
+    _sbMain.show(); _sbBridge.show();
 
     const cdpRefresh = setInterval(refreshBar, 5000);
     ctx.subscriptions.push({ dispose: () => clearInterval(cdpRefresh) });
@@ -367,13 +382,28 @@ async function activate(ctx) {
             await vscode.window.showTextDocument(doc);
         }),
         vscode.commands.registerCommand('grav.manageTerminal', async () => {
-            const actions = [{ label: '$(add) Add to Whitelist', action: 'addWhite' }, { label: '$(shield) Add to Blacklist', action: 'addBlack' }, { label: '$(search) Test Command', action: 'test' }, { label: '$(book) View Lists', action: 'viewAll' }];
+            const actions = [
+                { label: 'Whitelist', kind: vscode.QuickPickItemKind.Separator },
+                { label: '$(add) Add to Whitelist', description: 'Allow a command', action: 'addWhite' },
+                { label: 'Blacklist', kind: vscode.QuickPickItemKind.Separator },
+                { label: '$(shield) Add to Blacklist', description: 'Block a command', action: 'addBlack' },
+                { label: 'Tools', kind: vscode.QuickPickItemKind.Separator },
+                { label: '$(search) Test Command', description: 'Check if a command is allowed', action: 'test' },
+                { label: '$(book) View Lists', description: 'View all whitelist/blacklist entries', action: 'viewAll' },
+                { label: 'Learning & Wiki', kind: vscode.QuickPickItemKind.Separator },
+                { label: '$(graph) Learning Stats', description: 'View adaptive learning data', action: 'learnStats' },
+                { label: '$(notebook) Second Brain Wiki', description: 'View compiled knowledge wiki', action: 'viewWiki' },
+                { label: '$(checklist) Lint Wiki', description: 'Health-check the knowledge base', action: 'lintWiki' },
+            ];
             const pick = await vscode.window.showQuickPick(actions, { placeHolder: 'Manage Terminal Commands' });
             if (!pick) return;
             if (pick.action === 'addWhite') { const cmd = await vscode.window.showInputBox({ prompt: 'Enter safe command' }); if (cmd) { const wl = cfg('terminalWhitelist', []); wl.push(cmd); await vscode.workspace.getConfiguration('grav').update('terminalWhitelist', wl, vscode.ConfigurationTarget.Global); vscode.window.showInformationMessage(`[Grav] Added "${cmd}" to Whitelist.`); } }
             else if (pick.action === 'addBlack') { const cmd = await vscode.window.showInputBox({ prompt: 'Enter dangerous command' }); if (cmd) { const bl = cfg('terminalBlacklist', []); bl.push(cmd); await vscode.workspace.getConfiguration('grav').update('terminalBlacklist', bl, vscode.ConfigurationTarget.Global); vscode.window.showInformationMessage(`[Grav] Added "${cmd}" to Blacklist.`); } }
             else if (pick.action === 'test') { const cmd = await vscode.window.showInputBox({ prompt: 'Enter command to test' }); if (cmd) { const result = learning.evaluateCommand(cmd); const doc = await vscode.workspace.openTextDocument({ content: `${result.allowed ? 'ALLOWED' : 'BLOCKED'}\nReason: ${result.reason}\nCommands: ${result.commands.join(', ')}`, language: 'text' }); await vscode.window.showTextDocument(doc); } }
             else if (pick.action === 'viewAll') { const doc = await vscode.workspace.openTextDocument({ content: `── Whitelist ──\n${cfg('terminalWhitelist', []).join('\n')}\n\n── Blacklist ──\n${cfg('terminalBlacklist', []).join('\n')}`, language: 'text' }); await vscode.window.showTextDocument(doc); }
+            else if (pick.action === 'learnStats') { vscode.commands.executeCommand('grav.learnStats'); }
+            else if (pick.action === 'viewWiki') { vscode.commands.executeCommand('grav.viewWiki'); }
+            else if (pick.action === 'lintWiki') { vscode.commands.executeCommand('grav.lintWiki'); }
         }),
         vscode.commands.registerCommand('grav.learnStats', async () => {
             const stats = learning.getStats();
@@ -393,6 +423,22 @@ async function activate(ctx) {
         }),
         vscode.commands.registerCommand('grav.pauseAccept', () => { _acceptPaused = true; vscode.window.showInformationMessage('[Grav] Auto-accept paused.'); refreshBar(); }),
         vscode.commands.registerCommand('grav.resumeAccept', () => { _acceptPaused = false; vscode.window.showInformationMessage('[Grav] Auto-accept resumed.'); refreshBar(); }),
+        vscode.commands.registerCommand('grav.viewWiki', async () => {
+            const w = wiki.getWiki();
+            const pages = Object.entries(w.index).sort((a, b) => (b[1].totalEvents || 0) - (a[1].totalEvents || 0));
+            if (pages.length === 0) { vscode.window.showInformationMessage('[Grav] Wiki empty — no data yet'); return; }
+            const lines = ['SECOND BRAIN — KNOWLEDGE WIKI', `Pages: ${pages.length} | Concepts: ${Object.keys(w.concepts).length} | Contradictions: ${wiki.getContradictions().length}`, ''];
+            for (const [name, data] of pages) { lines.push(`[${name}] events: ${data.totalEvents || 0}`); }
+            const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+            await vscode.window.showTextDocument(doc);
+        }),
+        vscode.commands.registerCommand('grav.lintWiki', async () => {
+            const issues = wiki.lint();
+            if (!issues || issues.length === 0) { vscode.window.showInformationMessage('[Grav] Wiki clean — no issues found'); return; }
+            const lines = ['WIKI LINT RESULTS', `Found ${issues.length} issue(s):`, '', ...issues.map((i, idx) => `${idx + 1}. ${typeof i === 'string' ? i : JSON.stringify(i)}`)];
+            const doc = await vscode.workspace.openTextDocument({ content: lines.join('\n'), language: 'text' });
+            await vscode.window.showTextDocument(doc);
+        }),
         vscode.commands.registerCommand('grav.purgeLearning', async () => {
             const count = learning.purgeBadEntries();
             const msg = count > 0
@@ -422,6 +468,7 @@ async function activate(ctx) {
 
 function deactivate() {
     if (_sbMain) _sbMain.dispose();
+    if (_sbBridge) _sbBridge.dispose();
     if (_acceptTimer) clearInterval(_acceptTimer);
     bridge.stop();
     quota.stop();

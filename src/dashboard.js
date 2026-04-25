@@ -198,6 +198,10 @@ function setupMessageHandler() {
                 postMessage({ command: 'statsUpdated', stats: state.stats, totalClicks: state.totalClicks }); break;
             case 'manageTerminal':
                 vscode.commands.executeCommand('grav.manageTerminal'); break;
+            case 'viewWiki':
+                vscode.commands.executeCommand('grav.viewWiki'); break;
+            case 'lintWiki':
+                vscode.commands.executeCommand('grav.lintWiki'); break;
         }
     }, undefined, _ctx.subscriptions);
 }

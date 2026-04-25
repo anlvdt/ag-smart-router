@@ -9,7 +9,7 @@
 :root{
   --bg:#111;--surface:#191919;--surface2:#222;
   --border:#2a2a2a;--border2:#333;
-  --t3:#555;--t2:#888;--t1:#bbb;--t0:#e5e5e5;
+  --t3:#6a6a6a;--t2:#999;--t1:#bbb;--t0:#e5e5e5;
   --accent:#6ee7b7;--accent2:#34d399;--warn:#fbbf24;--danger:#f87171;--blue:#60a5fa;--purple:#a78bfa;
   --r:8px;--r2:12px;
 }
@@ -41,7 +41,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .tog-row+.tog-row{border-top:1px solid var(--border)}
 .tog-label{font-size:.85rem;color:var(--t1)}
 .tog{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
-.tog input{display:none}
+.tog input{position:absolute;opacity:0;width:0;height:0}
 .tog .track{position:absolute;inset:0;background:var(--border2);border-radius:10px;transition:background .2s}
 .tog .knob{position:absolute;left:2px;top:2px;width:16px;height:16px;background:var(--t3);border-radius:50%;transition:all .2s}
 .tog input:checked+.track{background:var(--accent2)}
@@ -59,7 +59,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mbox{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;text-align:center}
 .mbox .val{font-size:1.4rem;font-weight:700;color:var(--t0);font-variant-numeric:tabular-nums;line-height:1.2}
-.mbox .lbl{font-size:.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.mbox .lbl{font-size:.72rem;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 .mbox.accent .val{color:var(--accent)}
 .mbox.blue .val{color:var(--blue)}
 .mbox.purple .val{color:var(--purple)}
@@ -70,8 +70,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .tag{font-size:.75rem;font-weight:500;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);color:var(--t2);cursor:pointer;transition:all .15s;background:transparent;font-family:inherit;user-select:none}
 .tag:hover{border-color:var(--t3);color:var(--t1)}
 .tag.on{color:var(--accent);border-color:rgba(110,231,183,.3);background:rgba(110,231,183,.06)}
-.tag.off{opacity:.35;border-style:dashed}
-.tag.off:hover{opacity:.55}
+.tag.off{opacity:.45;border-style:dashed}
+.tag.off:hover{opacity:.6}
 .tag.project{border-color:rgba(167,139,250,.4);color:var(--purple)}
 .tag.dryrun{border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06);color:var(--purple)}
 .dryrun-banner{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);padding:8px 12px;font-size:.75rem;color:var(--purple);margin-bottom:10px;display:none}
@@ -88,7 +88,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .feed-row{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:.75rem;border-bottom:1px solid var(--border)}
 .feed-row:last-child{border-bottom:none}
 .feed-ts{color:var(--t3);min-width:44px;font-variant-numeric:tabular-nums;flex-shrink:0}
-.feed-op{font-size:.6rem;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:3px;flex-shrink:0}
+.feed-op{font-size:.65rem;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;flex-shrink:0}
 .feed-op.approve{color:var(--accent);background:rgba(110,231,183,.1)}
 .feed-op.reject{color:var(--danger);background:rgba(248,113,113,.1)}
 .feed-op.block{color:var(--danger);background:rgba(248,113,113,.1)}
@@ -115,6 +115,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 /* ── Toast ── */
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(40px);background:var(--surface2);color:var(--t0);padding:8px 16px;font-size:.8rem;font-weight:500;border:1px solid var(--border2);border-radius:var(--r);opacity:0;transition:all .2s;pointer-events:none;z-index:99}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ── Accessibility ── */
+.btn:focus-visible,.tag:focus-visible,.tog:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:active{transform:scale(0.97)}
+
+/* ── Reduced motion ── */
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* ── Unsaved indicator ── */
+.save-dot{display:none;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-left:5px}
+.unsaved .save-dot{display:inline-block}
+.unsaved .btn.primary{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(110,231,183,.4)}}
 
 /* ── Responsive ── */
 @media(max-width:480px){.mgrid{grid-template-columns:repeat(2,1fr)}}
@@ -155,17 +168,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
   <div class="card">
     <div class="slider-row">
       <span class="slider-lbl">Click</span>
-      <input type="range" id="rngApprove" aria-label="Click Interval" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'">
+      <input type="range" id="rngApprove" aria-label="Click Interval" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="sliderFmt('valApprove',this.value)">
       <span class="slider-val" id="valApprove">{{APPROVE_MS}}ms</span>
     </div>
     <div class="slider-row">
       <span class="slider-lbl">Scroll</span>
-      <input type="range" id="rngScroll" aria-label="Scroll Interval" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'">
+      <input type="range" id="rngScroll" aria-label="Scroll Interval" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="sliderFmt('valScroll',this.value)">
       <span class="slider-val" id="valScroll">{{SCROLL_MS}}ms</span>
     </div>
     <div class="slider-row">
       <span class="slider-lbl">Pause</span>
-      <input type="range" id="rngPause" aria-label="Pause Duration" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'">
+      <input type="range" id="rngPause" aria-label="Pause Duration" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="sliderFmt('valPause',this.value)">
       <span class="slider-val" id="valPause">{{PAUSE_MS}}ms</span>
     </div>
   </div>
@@ -175,12 +188,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 <div class="sec">
   <div class="sec-title">Session</div>
   <div class="mgrid">
-    <div class="mbox accent"><div class="val" id="statTotal">{{TOTAL}}</div><div class="lbl">Clicks</div></div>
-    <div class="mbox blue"><div class="val" id="sessDuration">0m</div><div class="lbl">Uptime</div></div>
-    <div class="mbox"><div class="val" id="sessMsg">0</div><div class="lbl">Messages</div></div>
-    <div class="mbox purple"><div class="val" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="lbl">Epoch</div></div>
-    <div class="mbox"><div class="val" id="brainTracking">{{LEARN_TRACKING}}</div><div class="lbl">Tracking</div></div>
-    <div class="mbox warn"><div class="val" id="brainPromoted">{{LEARN_COUNT}}</div><div class="lbl">Promoted</div></div>
+    <div class="mbox accent" aria-label="Total clicks"><div class="val" id="statTotal">{{TOTAL}}</div><div class="lbl">Clicks</div></div>
+    <div class="mbox blue" aria-label="Session uptime"><div class="val" id="sessDuration">0m</div><div class="lbl">Uptime</div></div>
+    <div class="mbox" aria-label="AI messages"><div class="val" id="sessMsg">0</div><div class="lbl">Messages</div></div>
+    <div class="mbox purple" aria-label="Learning epoch"><div class="val" id="brainEpoch">{{LEARN_EPOCH}}</div><div class="lbl">Epoch</div></div>
+    <div class="mbox" aria-label="Commands being tracked"><div class="val" id="brainTracking">{{LEARN_TRACKING}}</div><div class="lbl">Tracking</div></div>
+    <div class="mbox warn" aria-label="AI-promoted commands"><div class="val" id="brainPromoted">{{LEARN_COUNT}}</div><div class="lbl">Promoted</div></div>
   </div>
 </div>
 
@@ -208,7 +221,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
     <div class="mbox"><div class="val" id="wikiPages">{{WIKI_PAGES}}</div><div class="lbl">Pages</div></div>
     <div class="mbox"><div class="val" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="lbl">Concepts</div></div>
   </div>
-  <div style="margin-top:8px"><button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" tabindex="0" aria-label="Manage Terminal Rules" style="width:100%;text-align:center">Manage Rules</button></div>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" tabindex="0" aria-label="Manage Terminal Rules" style="flex:1;text-align:center">Manage Rules</button>
+    <button class="btn" onclick="vscode.postMessage({command:'viewWiki'})" tabindex="0" aria-label="View Knowledge Wiki" style="flex:1;text-align:center">Wiki</button>
+    <button class="btn" onclick="vscode.postMessage({command:'lintWiki'})" tabindex="0" aria-label="Lint Knowledge Wiki" style="flex:1;text-align:center">Lint</button>
+  </div>
 </div>
 
 <!-- Log -->
@@ -218,10 +235,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 </div>
 
 <!-- Actions -->
-<div class="btn-row">
-  <button class="btn" onclick="save()" tabindex="0">Save</button>
+<div class="btn-row" id="actionBar">
+  <button class="btn" onclick="save()" tabindex="0">Save<span class="save-dot"></span></button>
   <button class="btn primary" onclick="vscode.postMessage({command:'reload'})" tabindex="0">Reload</button>
-  <button class="btn danger" onclick="confirmAction('Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast('Reset')})" tabindex="0">Reset</button>
+  <button class="btn danger" onclick="confirmAction('Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast('Stats reset')})" tabindex="0">Reset</button>
 </div>
 
 </div>
@@ -249,7 +266,15 @@ let _dryRun={{DRYRUN_VAL}};
 
 // Toast
 let _tt;
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),1200)}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),1800)}
+
+// Slider dual labels
+function sliderFmt(id,v){v=parseInt(v);$(id).textContent=v>=1000?(v/1000)+'s':v+'ms';markUnsaved()}
+
+// Unsaved indicator
+let _dirty=false;
+function markUnsaved(){if(_dirty)return;_dirty=true;const a=$('actionBar');if(a)a.classList.add('unsaved')}
+function clearUnsaved(){_dirty=false;const a=$('actionBar');if(a)a.classList.remove('unsaved')}
 
 // Confirm
 let _cfn=null;
@@ -270,10 +295,11 @@ function renderPatterns(){
   const g=$('patGrid');g.innerHTML='';
   // Project-specific patterns first (purple)
   for(const p of _projectPatterns){
-    if(_allPatterns.includes(p))continue; // avoid duplicate
+    if(_allPatterns.includes(p))continue;
     const b=document.createElement('button');
     b.className='tag project on';b.textContent=p;
     b.title='Project pattern from .vscode/grav.json';
+    b.setAttribute('role','checkbox');b.setAttribute('aria-checked','true');
     b.onclick=()=>toast('Edit .vscode/grav.json to change project patterns');
     g.appendChild(b);
   }
@@ -284,10 +310,11 @@ function renderPatterns(){
     const on=vars.some(v=>_patterns.includes(v)&&!_disabled.includes(v));
     const b=document.createElement('button');
     b.className='tag '+(on?'on':'off');b.textContent=p;
+    b.setAttribute('role','checkbox');b.setAttribute('aria-checked',String(on));
     b.onclick=()=>{
       if(on){for(const v of vars)if(!_disabled.includes(v))_disabled.push(v)}
       else{_disabled=_disabled.filter(d=>!vars.includes(d));for(const v of vars)if(!_patterns.includes(v))_patterns.push(v)}
-      renderPatterns()
+      markUnsaved();renderPatterns()
     };
     g.appendChild(b)
   }
@@ -328,7 +355,7 @@ function save(){
     enabled:$('chkEnabled').checked,scrollOn:$('chkScroll').checked,
     pauseMs:parseInt($('rngPause').value),scrollMs:parseInt($('rngScroll').value),approveMs:parseInt($('rngApprove').value),
     patterns:_patterns,disabledPatterns:_disabled
-  }});toast('Saved')
+  }});clearUnsaved();toast('Saved')
 }
 
 // Duration format
