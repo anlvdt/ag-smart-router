@@ -51,7 +51,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 .slider-row{display:flex;align-items:center;gap:10px;padding:8px 0}
 .slider-row+.slider-row{border-top:1px solid var(--border)}
 .slider-lbl{font-size:.75rem;color:var(--t2);min-width:48px}
-.slider-row input[type=range]{flex:1;height:3px;accent-color:var(--accent);cursor:pointer;border-radius:2px}
+.slider-row input[type=range]{flex:1;height:6px;accent-color:var(--accent);cursor:pointer;border-radius:3px;-webkit-appearance:none;background:var(--border2)}
+.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 4px rgba(0,0,0,0.5)}
 .slider-val{font-size:.75rem;color:var(--t2);min-width:48px;text-align:right;font-variant-numeric:tabular-nums}
 
 /* ── Metrics Grid ── */
@@ -126,7 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 <div class="hdr">
   <div class="hdr-l">
     <h1>Grav</h1>
-    <span>v3.5</span>
+    <span>v{{VERSION}}</span>
   </div>
   <div style="display:flex;gap:6px">
     <span class="pill on" id="masterPill"><span class="dot"></span>Active</span>
@@ -140,31 +141,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
   <div class="card">
     <div class="tog-row">
       <span class="tog-label">Auto-Click</span>
-      <label class="tog"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="toggleEnabled()"><div class="track"></div><div class="knob"></div></label>
+      <label class="tog" tabindex="0" aria-label="Toggle Auto-Click" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('chkEnabled').click()}"><input type="checkbox" id="chkEnabled" {{ENABLED_CHK}} onchange="toggleEnabled()" tabindex="-1"><div class="track"></div><div class="knob"></div></label>
     </div>
     <div class="tog-row">
       <span class="tog-label">Auto-Scroll</span>
-      <label class="tog"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="toggleScroll()"><div class="track"></div><div class="knob"></div></label>
+      <label class="tog" tabindex="0" aria-label="Toggle Auto-Scroll" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('chkScroll').click()}"><input type="checkbox" id="chkScroll" {{SCROLL_CHK}} onchange="toggleScroll()" tabindex="-1"><div class="track"></div><div class="knob"></div></label>
     </div>
     <div class="tog-row">
       <span class="tog-label" title="Scan buttons but don't click — safe for debugging">Dry Run</span>
-      <label class="tog"><input type="checkbox" id="chkDryRun" {{DRYRUN_CHK}} onchange="toggleDryRun()"><div class="track"></div><div class="knob"></div></label>
+      <label class="tog" tabindex="0" aria-label="Toggle Dry Run" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('chkDryRun').click()}"><input type="checkbox" id="chkDryRun" {{DRYRUN_CHK}} onchange="toggleDryRun()" tabindex="-1"><div class="track"></div><div class="knob"></div></label>
     </div>
   </div>
   <div class="card">
     <div class="slider-row">
       <span class="slider-lbl">Click</span>
-      <input type="range" id="rngApprove" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'">
+      <input type="range" id="rngApprove" aria-label="Click Interval" min="200" max="5000" step="100" value="{{APPROVE_MS}}" oninput="$('valApprove').textContent=this.value+'ms'">
       <span class="slider-val" id="valApprove">{{APPROVE_MS}}ms</span>
     </div>
     <div class="slider-row">
       <span class="slider-lbl">Scroll</span>
-      <input type="range" id="rngScroll" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'">
+      <input type="range" id="rngScroll" aria-label="Scroll Interval" min="100" max="5000" step="100" value="{{SCROLL_MS}}" oninput="$('valScroll').textContent=this.value+'ms'">
       <span class="slider-val" id="valScroll">{{SCROLL_MS}}ms</span>
     </div>
     <div class="slider-row">
       <span class="slider-lbl">Pause</span>
-      <input type="range" id="rngPause" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'">
+      <input type="range" id="rngPause" aria-label="Pause Duration" min="1000" max="60000" step="500" value="{{PAUSE_MS}}" oninput="$('valPause').textContent=this.value+'ms'">
       <span class="slider-val" id="valPause">{{PAUSE_MS}}ms</span>
     </div>
   </div>
@@ -207,7 +208,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
     <div class="mbox"><div class="val" id="wikiPages">{{WIKI_PAGES}}</div><div class="lbl">Pages</div></div>
     <div class="mbox"><div class="val" id="wikiConcepts">{{WIKI_CONCEPTS}}</div><div class="lbl">Concepts</div></div>
   </div>
-  <div style="margin-top:8px"><button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" style="width:100%;text-align:center">Manage Rules</button></div>
+  <div style="margin-top:8px"><button class="btn primary" onclick="vscode.postMessage({command:'manageTerminal'})" tabindex="0" aria-label="Manage Terminal Rules" style="width:100%;text-align:center">Manage Rules</button></div>
 </div>
 
 <!-- Log -->
@@ -218,9 +219,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,s
 
 <!-- Actions -->
 <div class="btn-row">
-  <button class="btn" onclick="save()">Save</button>
-  <button class="btn primary" onclick="vscode.postMessage({command:'reload'})">Reload</button>
-  <button class="btn danger" onclick="confirmAction('Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast('Reset')})">Reset</button>
+  <button class="btn" onclick="save()" tabindex="0">Save</button>
+  <button class="btn primary" onclick="vscode.postMessage({command:'reload'})" tabindex="0">Reload</button>
+  <button class="btn danger" onclick="confirmAction('Reset all stats?',function(){vscode.postMessage({command:'resetStats'});toast('Reset')})" tabindex="0">Reset</button>
 </div>
 
 </div>

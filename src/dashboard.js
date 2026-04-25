@@ -82,6 +82,7 @@ function render() {
     const w = wiki.getWiki();
 
     _panel.webview.html = buildHtml({
+        version: _ctx?.extension?.packageJSON?.version || '3.5',
         enabled: cfg('enabled', true),
         scrollOn: cfg('autoScroll', true),
         dryRun: cfg('dryRun', false),
@@ -117,6 +118,7 @@ function buildHtml(c) {
     }
 
     h = replaceTag(h, 'LANG', lang);
+    h = replaceTag(h, 'VERSION', c.version || '3.5');
     h = replaceTag(h, 'TOTAL', String(c.totalClicks || 0));
     h = replaceTag(h, 'ENABLED_CHK', c.enabled ? 'checked' : '');
     h = replaceTag(h, 'SCROLL_CHK', c.scrollOn !== false ? 'checked' : '');
