@@ -11,21 +11,49 @@
     "engines": {
         "vscode": "^1.60.0"
     },
-    "extensionKind": ["ui"],
-    "categories": ["Other"],
-    "activationEvents": ["onStartupFinished"],
+    "extensionKind": [
+        "ui"
+    ],
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
     "main": "./src/extension.js",
     "contributes": {
         "commands": [
-            { "command": "grav.inject", "title": "Grav: Inject Runtime" },
-            { "command": "grav.eject", "title": "Grav: Eject Runtime" },
-            { "command": "grav.dashboard", "title": "Grav: Dashboard" },
-            { "command": "grav.diagnostics", "title": "Grav: Diagnostics" },
-            { "command": "grav.manageTerminal", "title": "Grav: Manage Terminal Commands (Whitelist/Blacklist)" },
-            { "command": "grav.learnStats", "title": "Grav: View Learning Stats" }
+            {
+                "command": "grav.inject",
+                "title": "Grav: Inject Runtime"
+            },
+            {
+                "command": "grav.eject",
+                "title": "Grav: Eject Runtime"
+            },
+            {
+                "command": "grav.dashboard",
+                "title": "Grav: Dashboard"
+            },
+            {
+                "command": "grav.diagnostics",
+                "title": "Grav: Diagnostics"
+            },
+            {
+                "command": "grav.manageTerminal",
+                "title": "Grav: Manage Terminal Commands (Whitelist/Blacklist)"
+            },
+            {
+                "command": "grav.learnStats",
+                "title": "Grav: View Learning Stats"
+            }
         ],
         "keybindings": [
-            { "command": "grav.dashboard", "key": "ctrl+shift+d", "mac": "cmd+shift+d" }
+            {
+                "command": "grav.dashboard",
+                "key": "ctrl+shift+d",
+                "mac": "cmd+shift+d"
+            }
         ],
         "configuration": {
             "title": "Grav",
@@ -42,8 +70,17 @@
                 },
                 "grav.approvePatterns": {
                     "type": "array",
-                    "items": { "type": "string" },
-                    "default": ["Run", "Allow", "Always Allow", "Keep Waiting", "Continue", "Retry"],
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "Run",
+                        "Allow",
+                        "Always Allow",
+                        "Keep Waiting",
+                        "Continue",
+                        "Retry"
+                    ],
                     "description": "Danh sách nút tự bấm | Button labels to auto-approve"
                 },
                 "grav.scrollPauseMs": {
@@ -63,19 +100,27 @@
                 },
                 "grav.language": {
                     "type": "string",
-                    "enum": ["vi", "en", "zh"],
+                    "enum": [
+                        "vi",
+                        "en",
+                        "zh"
+                    ],
                     "default": "vi",
                     "description": "Ngôn ngữ | Language"
                 },
                 "grav.terminalWhitelist": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                        "type": "string"
+                    },
                     "default": [],
                     "description": "Lệnh terminal thêm vào whitelist | Additional whitelisted terminal commands"
                 },
                 "grav.terminalBlacklist": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                        "type": "string"
+                    },
                     "default": [],
                     "description": "Lệnh terminal bị chặn | Blocked terminal commands (supports substring & /regex/)"
                 },
@@ -95,6 +140,11 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "echo ok"
+        "vscode:prepublish": "echo ok",
+        "test": "jest --verbose",
+        "lint": "echo 'lint ok'"
+    },
+    "devDependencies": {
+        "jest": "^30.3.0"
     }
 }

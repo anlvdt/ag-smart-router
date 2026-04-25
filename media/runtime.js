@@ -27,6 +27,7 @@
     var SCROLL_MS  = /*{{SCROLL_MS}}*/500;
     var PATTERNS   = /*{{PATTERNS}}*/["Run", "Allow", "Always Allow", "Keep Waiting", "Continue"];
     var ENABLED    = /*{{ENABLED}}*/true;
+    var BRIDGE_TOKEN = /*{{BRIDGE_TOKEN}}*/"";
 
     window.__gravEnabled       = ENABLED;
     window.__gravScrollEnabled = true;
@@ -88,6 +89,7 @@
                     pending++;
                     var x = new XMLHttpRequest();
                     x.open('GET', 'http://127.0.0.1:' + port + '/grav-status?t=' + Date.now(), true);
+                    if (BRIDGE_TOKEN) x.setRequestHeader('X-Grav-Token', BRIDGE_TOKEN);
                     x.timeout = 800;
                     x.onload = function () {
                         if (found) return;
@@ -115,6 +117,7 @@
         if (typeof c.scrollEnabled === 'boolean') window.__gravScrollEnabled = c.scrollEnabled;
         if (Array.isArray(c.patterns))            PATTERNS = c.patterns.filter(function (p) { return p !== 'Accept'; });
         if (typeof c.acceptInChatOnly === 'boolean') window.__gravAcceptChat = c.acceptInChatOnly;
+        if (c.bridgeToken) BRIDGE_TOKEN = c.bridgeToken;
         if (c.pauseMs)   PAUSE_MS = c.pauseMs;
         if (c.scrollMs)  SCROLL_MS = c.scrollMs;
         if (c.approveMs) APPROVE_MS = c.approveMs;
@@ -138,6 +141,7 @@
                 _sessionStats = {}; _sessionTotal = 0;
             }
             x.open('GET', 'http://127.0.0.1:' + BRIDGE_PORT + '/grav-status?t=' + Date.now() + qs, true);
+            if (BRIDGE_TOKEN) x.setRequestHeader('X-Grav-Token', BRIDGE_TOKEN);
             x.timeout = 1500;
             x.onload = function () { if (x.status === 200) { _pollErrors = 0; applyConfig(JSON.parse(x.responseText)); } };
             x.onerror = x.ontimeout = function () { _pollErrors++; };
@@ -207,6 +211,7 @@
                 var x = new XMLHttpRequest();
                 x.open('POST', 'http://127.0.0.1:' + BRIDGE_PORT + '/api/quota-detected', true);
                 x.setRequestHeader('Content-Type', 'application/json');
+                if (BRIDGE_TOKEN) x.setRequestHeader('X-Grav-Token', BRIDGE_TOKEN);
                 x.timeout = 3000;
                 x.send(JSON.stringify({ phrase: phrase }));
             } catch (_) {}
@@ -304,6 +309,7 @@
                     var x = new XMLHttpRequest();
                     x.open('POST', 'http://127.0.0.1:' + BRIDGE_PORT + '/api/click-log', true);
                     x.setRequestHeader('Content-Type', 'application/json');
+                    if (BRIDGE_TOKEN) x.setRequestHeader('X-Grav-Token', BRIDGE_TOKEN);
                     x.timeout = 2000;
                     x.send(JSON.stringify({ button: text, pattern: matched }));
                 } catch (_) {}
