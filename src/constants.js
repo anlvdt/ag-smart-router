@@ -26,21 +26,29 @@ const DEFAULT_PATTERNS = Object.freeze([
     // Source: YazanBaker priority matching + cotamatcotam iframe scan + Antigravity UI decompile
     //
     // Priority order (higher = matched first when multiple buttons visible):
-    //   Run > Accept > Always Allow > Allow > Retry
+    //   Run > Accept > Always Allow > Allow > Proceed
     //
     // === SAFE: File edits — accept code changes, revertible ===
-    'Accept all', 'Accept All', 'Accept',
+    'Accept', 'Accept All', 'Accept all',
     // === SAFE: Agent flow — continue/retry execution ===
     'Retry', 'Proceed',
     // === CAUTION: Per-request permissions (Safety Guard protects Run) ===
-    // "Run" button appears above terminal code blocks in Antigravity agent panel
-    // Safety Guard reads the command text from the <code> block before clicking
-    'Run',
+    'Run Task', 'Run',
     // === Antigravity-specific: Agent Manager / Cortex step buttons ===
-    'Approve', 'Expand',
-    // === Connection Recovery — auto-click when connection fails ===
-    'Resume', 'Try Again', 'Reconnect',
+    'Approve', 'Expand', 'Allow in Workspace',
 ]);
+
+const PRESET_PATTERNS = Object.freeze({
+    '1.19.6': [
+        'Accept all', 'Accept All', 'Accept', 'Retry', 'Proceed', 'Run', 'Approve', 'Expand', 'Allow in Workspace',
+    ],
+    '1.23.2': [
+        'Accept All', 'Accept', 'Retry', 'Run', 'Approve', 'Allow This Workspace', 'Allow in Workspace',
+    ],
+    '1.24+': [
+        'Accept', 'Accept All', 'Retry', 'Run Task', 'Run', 'Approve', 'Allow in Workspace',
+    ],
+});
 
 // Patterns disabled by default — irreversible, billing, or permanent permissions
 const RISKY_PATTERNS = Object.freeze([
@@ -48,7 +56,8 @@ const RISKY_PATTERNS = Object.freeze([
     'Resume Conversation',              // can loop when AG needs user input
     'Always Allow',                     // permanent — never asks again
     'Allow in this Workspace',          // permanent for workspace
-    'Allow This Conversation',          // session-scoped — safer than Always Allow
+    'Allow for this Workspace',         // Cursor variant
+    'Allow This Conversation',          // session-scoped
     'Allow this Conversation',          // lowercase variant
     'Allow Once',                       // one-time permission
     'Allow once',                       // lowercase variant
@@ -56,7 +65,7 @@ const RISKY_PATTERNS = Object.freeze([
     'Allow and Skip Reviewing Result',  // skips tool output review
     'Trust',                            // trusts workspace — security risk
     'OK',                               // too generic
-    'Confirm',                          // too generic — could confirm billing/delete
+    'Confirm',                          // too generic
     'Enable Overages',                  // BILLING: auto-agrees to pay AI credits
 ]);
 
@@ -129,6 +138,10 @@ const DEFAULT_BLACKLIST = Object.freeze([
     // Windows registry
     'reg delete hk',
     'vssadmin delete shadows',
+    // Privileged / Blocking execution (deadlocks agent)
+    'sudo ', 'su -', 'su root',
+    // Destructive Git resets
+    'git reset --hard',
 ]);
 
 const LEARN = Object.freeze({
@@ -156,7 +169,6 @@ const HIGH_CONF = Object.freeze({
     'Approve': 1, 'Approved': 1, 'Expand': 1,
     'Run': 1, 'Run Task': 1, 'Execute': 1,
     'Retry': 1, 'Proceed': 1, 'Go': 1,
-    'Resume': 1, 'Resumed': 1, 'Try Again': 1, 'Reconnect': 1,
 });
 
 // Cooldown durations (ms) — time to wait before clicking same pattern again
@@ -176,22 +188,24 @@ const COOLDOWN = Object.freeze({
 
 // Reject button labels — if found nearby, confirms this is an approval dialog
 const REJECT_WORDS = Object.freeze([
-    'Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow",
+    'Reject', 'Deny', 'Cancel', 'Dismiss', "Don't Allow", 'Always Deny',
     'Decline', 'Reject all', 'Reject All', 'No', 'Disallow',
     'Stop', 'Abort', 'Skip',
 ]);
 
-// Editor-specific patterns to skip (merge conflict buttons, etc.)
+// Editor-specific patterns to skip (merge conflict buttons, diff review, etc.)
 const EDITOR_SKIP = Object.freeze([
     'Accept Changes', 'Accept Incoming', 'Accept Current',
     'Accept Both', 'Accept Combination', 'Accept Line',
     'Accept Word', 'Accept Suggestion',
+    'Review Changes', 'Review All', 'View Changes', 'View Diff',
 ]);
 
 // Notification keywords to suppress
 const SUPPRESS_KEYWORDS = Object.freeze([
     'corrupt', 'reinstall', 'requires your input',
-    'step requires', 'requires input',
+    'step requires', 'requires input', 'waiting for user input',
+    'waiting for input',
 ]);
 
 // Numeric limits — replaces magic numbers
@@ -229,7 +243,7 @@ const COMMAND_CATEGORIES = Object.freeze({
 
 module.exports = {
     TAG, LEGACY_TAGS, LEGACY_SCRIPTS, RUNTIME_FILE, CONFIG_FILE,
-    PORT_START, PORT_END, DEFAULT_PATTERNS, RISKY_PATTERNS,
+    PORT_START, PORT_END, DEFAULT_PATTERNS, RISKY_PATTERNS, PRESET_PATTERNS,
     SAFE_TERMINAL_CMDS, DEFAULT_BLACKLIST, LEARN, COMMAND_CATEGORIES,
     PATTERN_GROUPS, PATTERN_DISPLAY,
     // Shared observer constants

@@ -20,7 +20,7 @@
 const vscode = require('vscode');
 const http = require('http');
 
-const { DEFAULT_BLACKLIST, DEFAULT_PATTERNS } = require('./constants');
+const { DEFAULT_BLACKLIST, DEFAULT_PATTERNS, PRESET_PATTERNS } = require('./constants');
 const { cfg } = require('./utils');
 const { buildObserverScript } = require('./cdp-observer');
 
@@ -430,6 +430,12 @@ function handleConsoleEvent(params) {
         }
     }
 
+    if (type === 'KILL_TERMINAL') {
+        try {
+            vscode.commands.executeCommand('grav.stopAllTerminals');
+        } catch (_) {}
+    }
+
     // RETRY: Observer click failed — escalate to CDP Input.dispatchMouseEvent
     // This sends TRUSTED mouse events at the browser level, bypassing all JS interception
     if (type === 'RETRY') {
@@ -659,8 +665,10 @@ function isAgentTarget(info) {
     if (url.includes('windsurf') && url.includes('agent')) return true;
     if (url.includes('windsurf') && url.includes('chat')) return true;
     if (url.includes('windsurf') && url.includes('cascade')) return true;
+    if (url.includes('windsurf') && url.includes('cortex')) return true;
     if (url.includes('codeium') && url.includes('agent')) return true;
     if (url.includes('codeium') && url.includes('chat')) return true;
+    if (url.includes('codeium') && url.includes('copilot')) return true;
 
     // ── SKIP: everything else ──
     if (url.startsWith('chrome-extension://')) return false;
@@ -806,7 +814,8 @@ async function attachToTarget(targetId, url, title = '') {
 
 // ── Observer Injection ───────────────────────────────────────
 async function injectObserver(sessionId) {
-    const patterns = cfg('approvePatterns', DEFAULT_PATTERNS);
+    const presetMode = cfg('presetMode', '1.19.6');
+    const patterns = presetMode === 'custom' ? cfg('approvePatterns', DEFAULT_PATTERNS) : (PRESET_PATTERNS[presetMode] || DEFAULT_PATTERNS);
     const userBlacklist = cfg('terminalBlacklist', []);
     const allBlacklist = [...DEFAULT_BLACKLIST, ...userBlacklist];
     const scrollEnabled = cfg('autoScroll', true);

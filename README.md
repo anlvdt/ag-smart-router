@@ -2,7 +2,7 @@
 
 **Stop babysitting your AI agent.** Grav auto-clicks approval buttons, keeps your chat pinned to the latest response, and blocks dangerous terminal commands — completely hands-free.
 
-[![Version](https://img.shields.io/badge/version-3.6.1-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Version](https://img.shields.io/badge/version-3.6.3-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
@@ -26,6 +26,7 @@ Reads every terminal command **before** clicking `Run`. Blocks 30+ destructive p
 - `DROP DATABASE`, `TRUNCATE TABLE`
 - `git push --force`, `git clean -fdx`
 - `curl | bash`, `wget | sh`
+- `sudo`, `su -`, `git reset --hard` (added in v3.6.3)
 - Docker prune, Windows registry deletes, and more
 
 ### 📜 Auto-Scroll
@@ -58,7 +59,7 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 
 ## Installation
 
-1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-3.6.1.vsix`
+1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-3.6.3.vsix`
 2. Fully quit Windsurf/Antigravity (`Cmd+Q` on macOS, `Alt+F4` on Windows)
 3. Reopen the IDE — Grav auto-patches `argv.json` with the debug port
 4. Status bar shows `🚀 Grav` — you're done
@@ -101,7 +102,7 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 | `Grav: Init Project Config` | — | Create `.vscode/grav.json` template |
 | `Grav: Purge Bad Learning Data` | — | Clean up incorrectly learned entries |
 | `Grav: Manage Terminal Commands` | — | Interactively manage whitelist/blacklist |
-| `Grav: Stop All Terminals` | `Cmd+Shift+Q` | Send Ctrl+C to all terminals |
+| `Grav: Stop All Terminals` | `Cmd+Shift+Q` | Send Ctrl+C to Agent terminals (Auto-Kill) |
 
 ---
 
@@ -139,6 +140,16 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 
 ## Changelog
 
+### v3.6.3
+- **Dev Server Protection:** `grav.stopAllTerminals` (Auto-Kill) now safely filters out user dev servers (e.g., `npm run dev`, `serve`) to avoid collateral damage during deadlock resolution.
+- **Enhanced Blacklist:** Added `sudo`, `su -`, and `git reset --hard` to strictly prevent unrecoverable states and password deadlocks.
+- **Optimized Matching:** Refactored exact word-boundary matching in `matchesBlacklist` to prevent false positives for single-word destructive commands.
+
+### v3.6.2
+- **Updated Auto-Click Patterns:** Sync with Windsurf 1.24+ native UI (`Run Task`, `Allow in Workspace`).
+- **Enhanced Security:** Removed sensitive one-time permissions (`Allow Once`, `Trust`) from auto-click defaults.
+- **Deep Coverage:** Added missing variants to `RISKY_PATTERNS` and `REJECT_WORDS` for 100% native detection.
+
 ### v3.6.1
 - Fixed adaptive learning ingesting invalid tokens (numbers, flags, version strings, filenames)
 - Added `Grav: Purge Bad Learning Data` command + auto-purge on startup
@@ -165,9 +176,9 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 
 **Author:** An Le · [GitHub](https://github.com/anlvdt/grav) · [Issues](https://github.com/anlvdt/grav/issues) · dev@anlvdt.com
 
----
-
 ☕️ **Support the Developer**
-If Grav saves you time, consider buying me a coffee:
-- 💳 [Buy Me a Coffee](https://www.buymeacoffee.com/anlvdt) (Visa/Mastercard)
-- 📱 **Momo / VietQR**: Scan code or send to anlvdt via standard VietQR platforms.
+If Grav saves you time, consider supporting:
+- 💳 **MB Bank**: `0360126996868` (LE VAN AN)
+- 📱 **Momo**: `0976896621` (LE VAN AN)
+- ☕️ **Buy Me a Coffee**: [buymeacoffee.com/anlvdt](https://www.buymeacoffee.com/anlvdt)
+- 💖 **GitHub Sponsors**: [github.com/sponsors/anlvdt](https://github.com/sponsors/anlvdt)

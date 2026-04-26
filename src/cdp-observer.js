@@ -619,6 +619,11 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             // Skip editor-specific accept patterns
             if (isEditorAccept(text)) continue;
 
+            // Secondary check: if visible text differs from resolved label (e.g. aria-label="Run"
+            // but innerText="Review Changes"), block on visible text too
+            var visibleText = ((b.innerText || b.textContent || '').trim().split('\\n')[0] || '').trim();
+            if (visibleText && visibleText !== text && visibleText.length <= 60 && isEditorAccept(visibleText)) continue;
+
             var matched = findMatch(text);
             if (!matched) continue;
 
@@ -753,18 +758,19 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         }, true);
 
         setInterval(function() {
-            var scrollables = Array.from(document.querySelectorAll('*')).filter(function (el) {
-                if (el.tagName === 'TEXTAREA' || el.tagName === 'CODE' || el.tagName === 'PRE' || el.tagName === 'INPUT') return false;
+            var candidates = document.querySelectorAll(
+                '.antigravity-agent-side-panel, [class*=chat], [class*=agent], [class*=cascade], [class*=cortex]'
+            );
+            var scrollables = [];
+            for (var _s = 0; _s < candidates.length; _s++) {
+                var el = candidates[_s];
+                var tag = el.tagName;
+                if (tag === 'TEXTAREA' || tag === 'CODE' || tag === 'PRE' || tag === 'INPUT') continue;
                 var style = window.getComputedStyle(el);
-                var hasScrollbar = el.scrollHeight > el.clientHeight &&
-                    (style.overflowY === 'auto' || style.overflowY === 'scroll');
-                if (!hasScrollbar) return false;
-                var cls = (el.className || '').toString().toLowerCase();
-                if (/editor|monaco|diff|tree|explorer|outline|sidebar/.test(cls)) return false;
-                
-                var inChatPanel = el.closest('.antigravity-agent-side-panel,[class*=chat],[class*=agent],[class*=cascade],[class*=cortex]');
-                return !!inChatPanel;
-            });
+                if (el.scrollHeight > el.clientHeight && (style.overflowY === 'auto' || style.overflowY === 'scroll')) {
+                    scrollables.push(el);
+                }
+            }
 
             if (scrollables.length > 0) {
                 _isAutoScrolling = true;
@@ -823,6 +829,12 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
                     var t = (el.textContent || '').toLowerCase();
                     var shouldDismiss = SUPPRESS_KEYWORDS.some(function(kw) { return t.indexOf(kw) !== -1; });
                     if (!shouldDismiss) return;
+
+                    // If it's a blocking input prompt, aggressively kill the terminal
+                    if (t.indexOf('waiting for user input') !== -1 || t.indexOf('requires input') !== -1 || t.indexOf('requires your input') !== -1) {
+                        console.log('[GRAV:KILL_TERMINAL]');
+                    }
+
                     // Try close button first (graceful)
                     var closeBtn = el.querySelector('.codicon-notifications-clear, .codicon-close, [class*=close], [aria-label*=close], [aria-label*=Clear]');
                     if (closeBtn && closeBtn.offsetWidth > 0) {

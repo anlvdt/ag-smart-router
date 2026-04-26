@@ -1,8 +1,8 @@
 {
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
-    "description": "AI Autopilot for Windsurf / Antigravity IDE. Auto-click approvals, auto-scroll chat, and guard terminal commands automatically. Boost your workflow with adaptive learning and CDP-first reliability.",
-    "version": "3.6.1",
+    "description": "AI Autopilot for Windsurf / Antigravity IDE (v1.19 to 1.24+). Auto-click approvals, auto-scroll chat, and guard terminal commands. Boost your workflow with adaptive learning and CDP-first reliability.",
+    "version": "3.6.3",
     "icon": "icons/icon.png",
     "publisher": "anlvdt",
     "author": {
@@ -97,6 +97,10 @@
             {
                 "command": "grav.purgeLearning",
                 "title": "Grav: Purge Bad Learning Data"
+            },
+            {
+                "command": "grav.resetLearningData",
+                "title": "Grav: Factory Reset Learning Data"
             }
         ],
         "keybindings": [
@@ -130,20 +134,30 @@
                     "default": true,
                     "description": "Keep chat panel scrolled to the bottom while the AI is responding. Pauses automatically when the user scrolls up."
                 },
+                "grav.presetMode": {
+                    "type": "string",
+                    "enum": [
+                        "1.19.6",
+                        "1.23.2",
+                        "1.24+",
+                        "custom"
+                    ],
+                    "default": "1.24+",
+                    "description": "Select preset button patterns based on Antigravity/Windsurf version. 1.19.6 = v1.19–v1.22; 1.23.2 = v1.23; 1.24+ = latest (Run Task, Continue); custom = use grav.approvePatterns."
+                },
                 "grav.approvePatterns": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
                     "default": [
-                        "Accept all",
-                        "Accept All",
                         "Accept",
+                        "Accept All",
                         "Retry",
-                        "Proceed",
+                        "Run Task",
                         "Run",
                         "Approve",
-                        "Expand"
+                        "Allow in Workspace"
                     ],
                     "description": "List of button labels to auto-click in the agent panel. Case-sensitive. Add custom labels for per-project buttons."
                 },

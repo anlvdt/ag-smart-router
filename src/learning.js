@@ -195,10 +195,12 @@ const purgeBadEntries = () => {
     for (const key of Object.keys(_learnData)) {
         const isBad =
             key.length < 2 ||              // single char
+            key.length > 20 ||             // too long
             /^\d+$/.test(key) ||           // pure number
             /^[\-]{1,2}[\w\-]+$/.test(key) || // flag
             /^v?\d[\d.\-a-z]*$/.test(key) || // version
             /\.[a-z]{2,4}$/.test(key) ||  // filename/domain
+            /^(?:error|warning|info|debug|success|failed|running|building|started|finished|done|some|the|this|that|an?|is|are|was|were)$/i.test(key) ||
             !/[a-z]/i.test(key) ||         // no letters at all
             BAD.test(key);
         if (isBad) {

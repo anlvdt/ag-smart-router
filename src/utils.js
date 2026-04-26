@@ -164,6 +164,10 @@ function extractCommands(cmdLine) {
             if (/^v?\d[\d.\-a-z]*$/.test(cmd)) continue;    // version: skip
             if (/\.[a-z]{2,4}$/.test(cmd)) continue;        // file/domain with extension: skip
             if (CMD_REJECT.test(cmd)) continue;
+            // Reject common log prefixes/words that leak from terminal output
+            if (/^(?:error|warning|info|debug|success|failed|running|building|started|finished|done|some|the|this|that|an?|is|are|was|were)$/i.test(cmd)) continue;
+            // Reject insanely long "commands" (likely hashes, base64, or garbage)
+            if (cmd.length > 20) continue;
             // Must contain at least one letter (not just numbers/symbols)
             if (!/[a-z]/.test(cmd)) continue;
             cmds.push(cmd);

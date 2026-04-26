@@ -415,8 +415,31 @@ async function activate(ctx) {
             vscode.window.showInformationMessage('[Grav] Created .vscode/grav.json — add custom patterns here.');
         }),
         vscode.commands.registerCommand('grav.toggleScroll', async () => { _scrollOn = !_scrollOn; await vscode.workspace.getConfiguration('grav').update('autoScroll', _scrollOn, vscode.ConfigurationTarget.Global); onSave(); refreshBar(); }),
-        vscode.commands.registerCommand('grav.stopAllTerminals', () => { let count = 0; for (const term of vscode.window.terminals) { try { term.sendText('\x03', false); count++; } catch (_) { } } vscode.window.showInformationMessage(`[Grav] Sent Ctrl+C to ${count} terminal(s).`); }),
+        vscode.commands.registerCommand('grav.stopAllTerminals', () => { 
+            let count = 0; 
+            for (const term of vscode.window.terminals) { 
+                const name = term.name.toLowerCase();
+                // Protect common dev server names unless explicitly marked as agent
+                const isAgent = name.includes('agent') || name.includes('task') || name.includes('cascade') || name.includes('windsurf') || name.includes('antigravity');
+                const isDev = name.includes('dev') || name.includes('serve') || name.includes('watch') || name.includes('start') || name.includes('npm');
+                const isSystem = name === 'extension' || name === 'output';
+                
+                if (isSystem || (isDev && !isAgent)) continue;
+
+                try { term.sendText('\x03', false); count++; } catch (_) { } 
+            } 
+            if (count > 0) vscode.window.setStatusBarMessage(`[Grav] Auto-Killed ${count} terminal(s) to prevent deadlock`, 3000); 
+        }),
         vscode.commands.registerCommand('grav.acceptAll', async () => { for (const cmd of _dynamicAcceptCmds) { try { await vscode.commands.executeCommand(cmd); } catch (_) { } } if (cdp && cdp.isConnected()) cdp.hotUpdate(); refreshBar(); }),
+        vscode.commands.registerCommand('grav.resetLearningData', async () => {
+            const confirm = await vscode.window.showWarningMessage('[Grav] Bạn có chắc chắn muốn xóa TOÀN BỘ dữ liệu học máy không?', 'Có, Xóa', 'Hủy');
+            if (confirm === 'Có, Xóa') {
+                await ctx.globalState.update('learnData', {});
+                await ctx.globalState.update('learnEpoch', 0);
+                if (learning) learning.init(ctx, wiki);
+                vscode.window.showInformationMessage('[Grav] Đã reset toàn bộ dữ liệu học máy về 0.');
+            }
+        })
     );
 }
 
