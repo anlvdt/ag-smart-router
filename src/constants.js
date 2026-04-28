@@ -35,7 +35,7 @@ const DEFAULT_PATTERNS = Object.freeze([
     // === CAUTION: Per-request permissions (Safety Guard protects Run) ===
     'Run Task', 'Run',
     // === Antigravity-specific: Agent Manager / Cortex step buttons ===
-    'Approve', 'Expand', 'Allow in Workspace',
+    'Approve', 'Expand', 'Allow in Workspace', 'Allow', 'Allow Once', 'Always Allow',
 ]);
 
 const PRESET_PATTERNS = Object.freeze({
@@ -46,7 +46,7 @@ const PRESET_PATTERNS = Object.freeze({
         'Accept All', 'Accept', 'Retry', 'Run', 'Approve', 'Allow This Workspace', 'Allow in Workspace',
     ],
     '1.24+': [
-        'Accept', 'Accept All', 'Retry', 'Run Task', 'Run', 'Approve', 'Allow in Workspace',
+        'Accept', 'Accept All', 'Accept all', 'ACCEPT ALL', 'Retry', 'Run Task', 'Run', 'Approve', 'Allow in Workspace', 'Allow', 'Allow Once', 'Always Allow',
     ],
 });
 
@@ -72,7 +72,7 @@ const RISKY_PATTERNS = Object.freeze([
 // UI Display Names — maps variants to a single display name
 // Key = display name shown in UI, Value = array of all variants (including display name)
 const PATTERN_GROUPS = Object.freeze({
-    'Accept all': ['Accept all', 'Accept All'],
+    'Accept all': ['Accept all', 'Accept All', 'ACCEPT ALL'],
     'Allow This Conversation': ['Allow This Conversation', 'Allow this Conversation'],
     'Allow Once': ['Allow Once', 'Allow once'],
 });
@@ -104,7 +104,7 @@ const SAFE_TERMINAL_CMDS = Object.freeze([
     'brew', 'apt', 'apt-get', 'yum', 'dnf', 'pacman', 'snap',
     'sqlite3', 'psql', 'mysql', 'mongosh', 'redis-cli',
     'tsc', 'eslint', 'prettier', 'jest', 'vitest', 'mocha', 'playwright',
-    'sass', 'postcss', 'webpack', 'vite', 'esbuild', 'rollup', 'turbo',
+    'sass', 'postcss', 'webpack', 'vite', 'esbuild', 'rollup', 'turbo', 'vsce',
     'uvx', 'uv', 'pipx', 'poetry', 'pdm', 'ruff', 'black', 'mypy',
     'code', 'antigravity',
 ]);
@@ -138,8 +138,9 @@ const DEFAULT_BLACKLIST = Object.freeze([
     // Windows registry
     'reg delete hk',
     'vssadmin delete shadows',
-    // Privileged / Blocking execution (deadlocks agent)
-    'sudo ', 'su -', 'su root',
+    // Privileged escalation to another user (interactive shell — deadlocks agent)
+    // NOTE: 'sudo ' removed — Antigravity agent legitimately runs sudo commands
+    'su -', 'su root',
     // Destructive Git resets
     'git reset --hard',
 ]);
@@ -165,10 +166,11 @@ const LEARN = Object.freeze({
 // HIGH_CONF: Patterns auto-clicked WITHOUT requiring reject-sibling validation
 // These only appear in agent approval contexts
 const HIGH_CONF = Object.freeze({
-    'Accept All': 1, 'Accept all': 1, 'Accept': 1,
+    'Accept All': 1, 'Accept all': 1, 'ACCEPT ALL': 1, 'Accept': 1,
     'Approve': 1, 'Approved': 1, 'Expand': 1,
     'Run': 1, 'Run Task': 1, 'Execute': 1,
     'Retry': 1, 'Proceed': 1, 'Go': 1,
+    'Allow': 1, 'Allow Once': 1, 'Always Allow': 1, 'Allow in Workspace': 1,
 });
 
 // Cooldown durations (ms) — time to wait before clicking same pattern again
@@ -202,10 +204,10 @@ const EDITOR_SKIP = Object.freeze([
 ]);
 
 // Notification keywords to suppress
+// NOTE: Do NOT add 'requires input' / 'waiting for user input' here —
+// those are Antigravity tool approval prompts that Grav needs to click.
 const SUPPRESS_KEYWORDS = Object.freeze([
-    'corrupt', 'reinstall', 'requires your input',
-    'step requires', 'requires input', 'waiting for user input',
-    'waiting for input',
+    'corrupt', 'reinstall',
 ]);
 
 // Numeric limits — replaces magic numbers

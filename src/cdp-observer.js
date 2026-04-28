@@ -607,11 +607,18 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
                 if (!b.closest || !b.closest('[class*=overlay],[class*=popup],[class*=dialog],[class*=notification]')) continue;
             }
 
-            // Skip editor context
-            if (inEditorContext(b)) continue;
-
+            // Extract text first
             var text = labelOf(b);
             if (!text || text.length > 60) continue;
+
+            // Find match early
+            var matched = findMatch(text);
+            if (!matched) continue;
+
+            var isHighConf = !!HIGH_CONF[matched];
+
+            // Skip editor context (unless it's a high-confidence button like Accept all)
+            if (!isHighConf && inEditorContext(b)) continue;
 
             // Skip already clicked (multi-layer check)
             if (isAlreadyClicked(b, text)) continue;
@@ -623,9 +630,6 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             // but innerText="Review Changes"), block on visible text too
             var visibleText = ((b.innerText || b.textContent || '').trim().split('\\n')[0] || '').trim();
             if (visibleText && visibleText !== text && visibleText.length <= 60 && isEditorAccept(visibleText)) continue;
-
-            var matched = findMatch(text);
-            if (!matched) continue;
 
             // Expand: one-shot per element, but allow re-expand after 5s
             // (React may reuse DOM nodes for new steps)
@@ -830,10 +834,9 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
                     var shouldDismiss = SUPPRESS_KEYWORDS.some(function(kw) { return t.indexOf(kw) !== -1; });
                     if (!shouldDismiss) return;
 
-                    // If it's a blocking input prompt, aggressively kill the terminal
-                    if (t.indexOf('waiting for user input') !== -1 || t.indexOf('requires input') !== -1 || t.indexOf('requires your input') !== -1) {
-                        console.log('[GRAV:KILL_TERMINAL]');
-                    }
+                    // NOTE: Do NOT kill terminal for "requires input" — that is Antigravity's
+                    // normal tool approval prompt (run_command etc.). Killing the terminal
+                    // would break the agentic workflow. Just dismiss the toast below.
 
                     // Try close button first (graceful)
                     var closeBtn = el.querySelector('.codicon-notifications-clear, .codicon-close, [class*=close], [aria-label*=close], [aria-label*=Clear]');
