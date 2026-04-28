@@ -834,9 +834,21 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
                     var shouldDismiss = SUPPRESS_KEYWORDS.some(function(kw) { return t.indexOf(kw) !== -1; });
                     if (!shouldDismiss) return;
 
-                    // NOTE: Do NOT kill terminal for "requires input" — that is Antigravity's
-                    // normal tool approval prompt (run_command etc.). Killing the terminal
-                    // would break the agentic workflow. Just dismiss the toast below.
+                    // KILL_TERMINAL guard: only fire if a real blocking <input>/<textarea>
+                    // is visible in the notification DOM (genuine interactive shell prompt).
+                    // Antigravity approval toasts do NOT contain input elements — safe to skip.
+                    var hasBlockingInput = (function() {
+                        try {
+                            var inputs = el.querySelectorAll('input:not([type=hidden]), textarea');
+                            for (var i = 0; i < inputs.length; i++) {
+                                if (inputs[i].offsetWidth > 0 && inputs[i].offsetHeight > 0) return true;
+                            }
+                        } catch(_) {}
+                        return false;
+                    })();
+                    if (hasBlockingInput) {
+                        console.log('[GRAV:KILL_TERMINAL] Blocking input detected in notification');
+                    }
 
                     // Try close button first (graceful)
                     var closeBtn = el.querySelector('.codicon-notifications-clear, .codicon-close, [class*=close], [aria-label*=close], [aria-label*=Clear]');

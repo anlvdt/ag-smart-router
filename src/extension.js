@@ -13,7 +13,7 @@ const wiki = require('./wiki');
 const bridge = require('./bridge');
 const terminal = require('./terminal');
 const dashboard = require('./dashboard');
-const quota = require('./quota');
+
 const roi = require('./roi');
 const idle = require('./idle');
 
@@ -68,7 +68,7 @@ const getSessionSafe = () => {
     const now = Date.now();
     const sessionMs = _sessionState.startMs ? now - _sessionState.startMs : 0;
     const avgResponseMs = _sessionState.responseTimes.length > 0 ? Math.round(_sessionState.responseTimes.reduce((a, b) => a + b, 0) / _sessionState.responseTimes.length) : 0;
-    return { sessionMs, msgCount: _sessionState.msgCount, approveCount: _sessionState.approveCount, aiTyping: _sessionState.aiTyping, avgResponseMs, toolBreakdown: _sessionState.toolBreakdown, recentTools: _sessionState.toolCalls.slice(-20), learningHealth: wiki.learningHealth(), cdpConnected: cdp ? cdp.isConnected() : false, cdpSessions: cdp ? cdp.getSessionCount() : 0, quota: quota.getSummary(), roi: roi.getSummary(), idle: idle.isIdle() };
+    return { sessionMs, msgCount: _sessionState.msgCount, approveCount: _sessionState.approveCount, aiTyping: _sessionState.aiTyping, avgResponseMs, toolBreakdown: _sessionState.toolBreakdown, recentTools: _sessionState.toolCalls.slice(-20), learningHealth: wiki.learningHealth(), cdpConnected: cdp ? cdp.isConnected() : false, cdpSessions: cdp ? cdp.getSessionCount() : 0, roi: roi.getSummary(), idle: idle.isIdle() };
 };
 
 const refreshBar = () => {
@@ -91,13 +91,19 @@ const refreshBar = () => {
 
 const onStatsUpdated = () => { _totalClicks = Object.values(_stats).reduce((a, b) => a + b, 0); refreshBar(); if (_ctx) { _ctx.globalState.update('stats', _stats); _ctx.globalState.update('totalClicks', _totalClicks); } };
 const onClickLogged = (d) => { if (_ctx) _ctx.globalState.update('clickLog', _log); dashboard.postMessage({ command: 'logUpdated', log: _log }); if (d.pattern) roi.recordClick(d.pattern); if (cfg('learnEnabled', true) && d.button) { const btn = d.button.trim(); const cmdMatch = btn.match(/[`']([^`']+)[`']/) || btn.match(/^(?:Run|Allow|Execute)\s+(.+)/i); if (cmdMatch) learning.recordAction(cmdMatch[1].trim(), 'approve', { project: vscode.workspace.workspaceFolders?.[0]?.name }); } };
-const onQuotaDetected = () => { if (Date.now() - _lastQuotaMs > 60000) { _lastQuotaMs = Date.now(); console.log('[Grav] Quota'); dashboard.postMessage({ command: 'quotaDetected', ts: Date.now() }); } };
+const onQuotaDetected = () => {};
 const onChatEvent = (d) => {
     const now = Date.now();
     _sessionState.lastActivityMs = now;
     if (d.type === 'message-start') _sessionState.aiTyping = true;
     else if (d.type === 'message-end') { _sessionState.aiTyping = false; _sessionState.msgCount++; if (d.responseMs > 0) { _sessionState.responseTimes.push(d.responseMs); if (_sessionState.responseTimes.length > 50) _sessionState.responseTimes.shift(); } }
-    else if (d.type === 'tool-call') { const tool = d.tool || 'tool-call'; _sessionState.toolCalls.push({ tool, startMs: now, endMs: 0, durationMs: 0 }); if (_sessionState.toolCalls.length > 100) _sessionState.toolCalls.shift(); }
+    else if (d.type === 'tool-call') {
+        const tool = d.tool || 'tool-call';
+        _sessionState.toolCalls.push({ tool, startMs: now, endMs: 0, durationMs: 0 });
+        if (_sessionState.toolCalls.length > 100) _sessionState.toolCalls.shift();
+        // Adaptive boost: run_command approval dialog may appear in next few seconds
+        if (tool === 'run_command' || tool === 'tool-call') boostAcceptLoop();
+    }
     else if (d.type === 'tool-result') { const tool = d.tool || 'tool-call'; for (let i = _sessionState.toolCalls.length - 1; i >= 0; i--) { const tc = _sessionState.toolCalls[i]; if (tc.tool === tool && tc.endMs === 0) { tc.endMs = now; tc.durationMs = d.durationMs || (now - tc.startMs); break; } } if (!_sessionState.toolBreakdown[tool]) _sessionState.toolBreakdown[tool] = { count: 0, totalMs: 0 }; _sessionState.toolBreakdown[tool].count++; _sessionState.toolBreakdown[tool].totalMs += d.durationMs || 0; }
     dashboard.postMessage({ command: 'sessionUpdated', session: getSessionSafe() });
 };
@@ -178,36 +184,74 @@ const discoverAcceptCommands = async () => {
             const ns = l.includes('antigravity') || l.includes('windsurf') || l.includes('cascade') || l.includes('codeium') || l.includes('agent');
             const act = l.includes('accept') || l.includes('approve') || l.includes('allow') || l.includes('keep');
 
-            if (cfg('skipTerminalAccept', true) && l.includes('terminal')) return false;
             if (SKIP.some(s => l.includes(s))) return false;
 
             return ns && act;
         });
 
+        // Force include all whitelist commands even if hidden from getCommands
+        for (const w of WHITELIST) {
+            if (!_dynamicAcceptCmds.some(c => c.toLowerCase() === w.toLowerCase())) {
+                _dynamicAcceptCmds.push(w);
+            }
+        }
+
         console.log(`[Grav] Discovered ${_dynamicAcceptCmds.length} accept commands:`, _dynamicAcceptCmds.slice(0, 10));
     } catch (_) { /* non-critical */ }
 };
 
+let _adaptiveBoostUntil = 0; // ms timestamp until which to use fast interval
+
+const boostAcceptLoop = () => {
+    _adaptiveBoostUntil = Date.now() + 10000; // boost for 10s
+};
+
 const startAcceptLoop = () => {
     if (_acceptTimer) clearInterval(_acceptTimer);
-    // Minimum 3s interval to prevent "requires input" errors (was 2s default)
-    const interval = Math.max(cfg('approveIntervalMs', 3000), 3000);
+    const BASE_INTERVAL = Math.max(cfg('approveIntervalMs', 3000), 3000);
+    const FAST_INTERVAL = 800;
     _acceptTimer = setInterval(() => {
         if (!_enabled || _acceptPaused || !idle.isIdle()) return;
+        const now = Date.now();
+        // Adaptive: if a run_command/tool event just fired, skip slow cycles
+        if (now < _adaptiveBoostUntil) {
+            // Running fast — do the accept work
+        } else {
+            // Slow cycle: only run every BASE_INTERVAL effectively
+            // We run the timer at FAST_INTERVAL but skip if not due
+            if (!_nextAcceptDue) _nextAcceptDue = now + BASE_INTERVAL;
+            if (now < _nextAcceptDue) return;
+            _nextAcceptDue = now + BASE_INTERVAL;
+        }
         for (const cmd of _dynamicAcceptCmds) {
-            // Skip commands known to fail or require input
             if (_failedCmds.has(cmd)) continue;
             vscode.commands.executeCommand(cmd).catch((err) => {
-                // Track commands that fail with "requires input" or similar errors
                 const errMsg = (err?.message || '').toLowerCase();
-                if (errMsg.includes('requires') || errMsg.includes('input') || errMsg.includes('argument') || errMsg.includes('parameter')) {
+
+                // Silently ignore permission / interaction errors — Antigravity throws these
+                // intermittently even for valid accept commands. Do not blacklist.
+                const isNoise = errMsg.includes('not permission') ||
+                    errMsg.includes('unexpected user interaction') ||
+                    errMsg.includes('permission');
+
+                if (isNoise) return; // suppress without logging
+
+                // Only blacklist commands that explicitly need user input arguments
+                const needsInput = errMsg.includes('requires') || errMsg.includes('argument') ||
+                    errMsg.includes('parameter') || errMsg.includes('input');
+
+                const isCore = cmd.includes('acceptall') || cmd.includes('antigravity.accept') ||
+                    cmd.includes('windsurf.accept') || cmd.includes('cascade.accept');
+
+                if (!isCore && needsInput) {
                     _failedCmds.add(cmd);
-                    console.log(`[Grav] Excluded command due to error: ${cmd}`);
+                    console.log(`[Grav] Excluded command (needs input): ${cmd}`);
                 }
             });
         }
-    }, interval);
+    }, FAST_INTERVAL);
 };
+let _nextAcceptDue = 0;
 
 // ── Activate ─────────────────────────────────────────────────
 async function activate(ctx) {
@@ -258,7 +302,7 @@ async function activate(ctx) {
         if (purged > 0) console.log(`[Grav] Auto-purged ${purged} bad learning entries on startup`);
     }, 3000);
     roi.init(ctx);
-    quota.init({ onChange: (data) => dashboard.postMessage({ command: 'quotaUpdated', quota: quota.getSummary() }) });
+
     idle.init(ctx, { onIdleChange: (isIdle) => { console.log('[Grav] Idle:', isIdle); dashboard.postMessage({ command: 'idleChanged', idle: isIdle }); } });
 
     // CDP + Injection
@@ -325,13 +369,19 @@ async function activate(ctx) {
             const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Grav Menu' });
             if (pick) vscode.commands.executeCommand(pick.command);
         }),
-        vscode.commands.registerCommand('grav.dashboard', () => dashboard.toggle(ctx, { learning, wiki, injection, quota, roi, idle, getState, setState, getSessionSafe, onSave, refreshBar })),
+        vscode.commands.registerCommand('grav.dashboard', () => dashboard.toggle(ctx, { learning, wiki, injection, roi, idle, getState, setState, getSessionSafe, onSave, refreshBar })),
         vscode.commands.registerCommand('grav.diagnostics', async () => {
             const stats = learning.getStats();
             const lastTargets = cdp && cdp.getLastTargets ? cdp.getLastTargets() : [];
             const sessions = cdp && cdp.getSessionSummaries ? cdp.getSessionSummaries() : [];
             const debugLog = cdp && cdp.getDebugLog ? cdp.getDebugLog() : [];
             const webviewCount = lastTargets.filter(t => (t.url || '').includes('vscode-webview://')).length;
+
+            // Conflict detection: commands in both SAFE_TERMINAL_CMDS and terminalBlacklist
+            const { SAFE_TERMINAL_CMDS } = require('./constants');
+            const userBlacklist = cfg('terminalBlacklist', []);
+            const conflicts = SAFE_TERMINAL_CMDS.filter(c => userBlacklist.some(b => b === c || c.startsWith(b)));
+
             const lines = [
                 `Grav v${ctx.extension?.packageJSON?.version || '3.4.2'}`,
                 `Platform: ${process.platform}`,
@@ -359,6 +409,11 @@ async function activate(ctx) {
                 `Epoch: ${stats.epoch}`,
                 `Tracking: ${stats.totalTracked}`,
                 `Promoted: ${learning.getPromotedCommands().length}`,
+                ``,
+                `── ⚠️  Conflict Report ──`,
+                conflicts.length > 0
+                    ? `SAFE cmds blocked by terminalBlacklist: ${conflicts.join(', ')}`
+                    : `No conflicts detected ✓`,
                 ``,
                 `── Observer Debug Log (last ${debugLog.length}) ──`,
                 ...(debugLog.length ? debugLog.slice(0, 15).map(d => `  [${d.type}] ${JSON.stringify(d).slice(0, 120)}`) : ['  (no debug events yet — run Grav: Refresh Observer to trigger)']),
@@ -447,7 +502,7 @@ function deactivate() {
     if (_sbMain) _sbMain.dispose();
     if (_acceptTimer) clearInterval(_acceptTimer);
     bridge.stop();
-    quota.stop();
+
     idle.stop();
     if (cdp) try { cdp.disconnect(); } catch (_) { }
     learning.flush();
