@@ -23,7 +23,7 @@ const autofix = require('./autofix');
 function setup(ctx, learning) {
     const _pendingExecs = new Map();
     const _seenCmds = new Set();
-    const _termOutputs = new Map();
+
     const _autoFixedCmds = new Map();
 
     function getProject() {
@@ -82,19 +82,16 @@ function setup(ctx, learning) {
                         }
                     }
 
-                    // Auto-Fixer logic
+                    // Auto-Fixer logic (safe mode: no buffer output to prevent IDE crash)
                     if (cmdLine && exitCode !== 0) {
-                        const output = _termOutputs.get(tid) || '';
-                        const fixedCmd = autofix.evaluate(cmdLine, output);
-                        
+                        const fixedCmd = autofix.evaluate(cmdLine, '');
                         if (fixedCmd) {
-                            // Infinite loop guard: do not fix the same command twice within 10 seconds
                             const fixKey = tid + ':' + cmdLine;
                             const lastFix = _autoFixedCmds.get(fixKey) || 0;
                             if (Date.now() - lastFix > 10000) {
                                 _autoFixedCmds.set(fixKey, Date.now());
                                 console.log(`[Grav] Auto-Fixing: ${cmdLine} -> ${fixedCmd}`);
-                                // Send feedback and the corrected command
+
                                 e.terminal.sendText(`echo "🛠️ [Grav Auto-Fix] Running: ${fixedCmd}"`);
                                 e.terminal.sendText(fixedCmd);
                             }
@@ -113,10 +110,7 @@ function setup(ctx, learning) {
                 try {
                     const tid = e.terminal?.name || 'default';
                     const cleanData = e.data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-                    
-                    // Buffer for Auto-Fixer (keep last 5000 chars)
-                    const curOut = (_termOutputs.get(tid) || '') + cleanData;
-                    _termOutputs.set(tid, curOut.slice(-5000));
+
 
                     if (!cfg('learnEnabled', true)) return;
                     const buf = (_termBuffers.get(tid) || '') + e.data;
