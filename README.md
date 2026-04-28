@@ -2,7 +2,7 @@
 
 **Stop babysitting your AI agent.** Grav auto-clicks approval buttons, keeps your chat pinned to the latest response, and blocks dangerous terminal commands — completely hands-free.
 
-[![Version](https://img.shields.io/badge/version-3.6.3-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Version](https://img.shields.io/badge/version-3.7.0-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
@@ -46,6 +46,19 @@ Define custom button patterns and blacklists per workspace via `.vscode/grav.jso
 }
 ```
 
+### ⚡ Adaptive Accept Loop *(unique)*
+Most auto-clickers poll at a fixed slow interval and miss approval dialogs. Grav detects when the AI agent fires a `run_command` tool call and **instantly drops its scan interval to 800ms for 10 seconds** — then returns to normal. This eliminates the race condition where an approval dialog appears and disappears before the next poll cycle.
+
+> No other Windsurf/Antigravity extension implements event-driven adaptive polling.
+
+### 🧩 Smart Terminal Kill Guard *(unique)*
+When a notification containing input-related keywords appears, Grav now **inspects the actual DOM** before sending any kill signal. If the element contains a visible `<input>` or `<textarea>` (a real blocking shell prompt), it fires. If it's just Antigravity's approval toast — it's silently dismissed, leaving your terminal untouched.
+
+> Prevents the #1 cause of "terminal killed for no reason" reports across all Windsurf extensions.
+
+### 🔍 Diagnostics Conflict Report
+`Grav: Diagnostics` now includes an automatic conflict scan: any command in `SAFE_TERMINAL_CMDS` that is also present in `grav.terminalBlacklist` is flagged with a warning. Previously these conflicts were silent and impossible to debug.
+
 ### 🔍 Dry Run Mode
 Scan and match buttons without clicking. See exactly what Grav would click before enabling auto-approval on a new project.
 
@@ -59,7 +72,7 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 
 ## Installation
 
-1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-3.6.3.vsix`
+1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-3.6.7.vsix`
 2. Fully quit Windsurf/Antigravity (`Cmd+Q` on macOS, `Alt+F4` on Windows)
 3. Reopen the IDE — Grav auto-patches `argv.json` with the debug port
 4. Status bar shows `🚀 Grav` — you're done
@@ -127,7 +140,7 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 
 **Learning store has garbage:** Run `Grav: Purge Bad Learning Data` (also runs automatically on startup).
 
-**"1 step requires input" notification persists:** Grav auto-excludes failed commands via `_failedCmds`. Use `Grav: Manage Terminal Commands` to blacklist manually if it keeps appearing.
+**Terminal being killed unexpectedly:** Upgrade to v3.7.0. The Smart Terminal Kill Guard now verifies DOM input presence before firing — approval toasts will never trigger a kill.
 
 ---
 
@@ -139,6 +152,16 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 ---
 
 ## Changelog
+
+### v3.7.0
+- **Adaptive Accept Loop:** scan interval dynamically drops to 800ms for 10s when `run_command` tool-call fires — eliminates race condition where approval dialog expires before next poll cycle
+- **Smart Terminal Kill Guard:** DOM-verified `KILL_TERMINAL` — only fires when an actual `<input>`/`<textarea>` is visible in the notification element; Antigravity approval toasts never trigger it
+- **Diagnostics Conflict Report:** `Grav: Diagnostics` now surfaces conflicts between `SAFE_TERMINAL_CMDS` and user `terminalBlacklist` — no more silent misconfigurations
+- **Fixed `SUPPRESS_KEYWORDS`:** removed `'requires input'` / `'waiting for user input'` — these are Antigravity's normal approval prompts, not errors
+- **Fixed `DEFAULT_BLACKLIST`:** removed `'sudo '` — agent legitimately uses sudo; only `su -` / `su root` remain blocked
+
+### v3.6.7
+- Update UI layouts.
 
 ### v3.6.3
 - **Dev Server Protection:** `grav.stopAllTerminals` (Auto-Kill) now safely filters out user dev servers (e.g., `npm run dev`, `serve`) to avoid collateral damage during deadlock resolution.
@@ -174,11 +197,11 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 
 ---
 
-**Author:** An Le · [GitHub](https://github.com/anlvdt/grav) · [Issues](https://github.com/anlvdt/grav/issues) · dev@anlvdt.com
+**Author:** An Le · [GitHub](https://github.com/anlvdt/grav) · [Issues](https://github.com/anlvdt/grav/issues) · anlvdt@gmail.com
 
 ☕️ **Support the Developer**
 If Grav saves you time, consider supporting:
 - 💳 **MB Bank**: `0360126996868` (LE VAN AN)
-- 📱 **Momo**: `0976896621` (LE VAN AN)
-- ☕️ **Buy Me a Coffee**: [buymeacoffee.com/anlvdt](https://www.buymeacoffee.com/anlvdt)
-- 💖 **GitHub Sponsors**: [github.com/sponsors/anlvdt](https://github.com/sponsors/anlvdt)
+<p align="left">
+  <img src="https://img.vietqr.io/image/970422-0360126996868-compact2.png" width="250" alt="MB Bank QR">
+</p>
