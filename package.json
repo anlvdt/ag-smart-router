@@ -2,7 +2,7 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "AI Autopilot for Windsurf / Antigravity IDE (v1.19 to 1.24+). Auto-click approvals, auto-scroll chat, and guard terminal commands. Boost your workflow with adaptive learning and CDP-first reliability.",
-    "version": "3.7.0",
+    "version": "4.0.0",
     "icon": "icons/icon.png",
     "publisher": "anlvdt",
     "author": {

@@ -13,6 +13,7 @@
 const vscode = require('vscode');
 const { cfg, extractCommands, matchesBlacklist } = require('./utils');
 const { DEFAULT_BLACKLIST } = require('./constants');
+const autofix = require('./autofix');
 
 /**
  * Setup all terminal listeners.
@@ -22,6 +23,8 @@ const { DEFAULT_BLACKLIST } = require('./constants');
 function setup(ctx, learning) {
     const _pendingExecs = new Map();
     const _seenCmds = new Set();
+    const _termOutputs = new Map();
+    const _autoFixedCmds = new Map();
 
     function getProject() {
         return vscode.workspace.workspaceFolders?.[0]?.name;
@@ -61,19 +64,40 @@ function setup(ctx, learning) {
                     const id = e.execution?.id || '';
                     const exitCode = e.exitCode;
                     const pending = _pendingExecs.get(id);
+                    const cmdLine = pending ? pending.command : (e.execution?.commandLine?.value || e.execution?.commandLine || '');
+                    const tid = e.terminal?.name || 'default';
+
                     if (pending) {
                         _pendingExecs.delete(id);
                         if (cfg('learnEnabled', true) && typeof exitCode === 'number') {
-                            safeRecord(pending.command, exitCode === 0 ? 'approve' : 'reject', {
+                            safeRecord(cmdLine, exitCode === 0 ? 'approve' : 'reject', {
                                 exitCode, project: getProject(), duration: Date.now() - pending.startTime,
                             });
                         }
                     } else {
-                        const cmdLine = e.execution?.commandLine?.value || e.execution?.commandLine || '';
                         if (cmdLine && cfg('learnEnabled', true) && typeof exitCode === 'number') {
                             safeRecord(cmdLine, exitCode === 0 ? 'approve' : 'reject', {
                                 exitCode, project: getProject(),
                             });
+                        }
+                    }
+
+                    // Auto-Fixer logic
+                    if (cmdLine && exitCode !== 0) {
+                        const output = _termOutputs.get(tid) || '';
+                        const fixedCmd = autofix.evaluate(cmdLine, output);
+                        
+                        if (fixedCmd) {
+                            // Infinite loop guard: do not fix the same command twice within 10 seconds
+                            const fixKey = tid + ':' + cmdLine;
+                            const lastFix = _autoFixedCmds.get(fixKey) || 0;
+                            if (Date.now() - lastFix > 10000) {
+                                _autoFixedCmds.set(fixKey, Date.now());
+                                console.log(`[Grav] Auto-Fixing: ${cmdLine} -> ${fixedCmd}`);
+                                // Send feedback and the corrected command
+                                e.terminal.sendText(`echo "🛠️ [Grav Auto-Fix] Running: ${fixedCmd}"`);
+                                e.terminal.sendText(fixedCmd);
+                            }
                         }
                     }
                 } catch (_) { /* non-critical */ }
@@ -81,14 +105,20 @@ function setup(ctx, learning) {
         );
     }
 
-    // ── Method 2: Terminal data write (fallback) ──
-    if (!vscode.window.onDidStartTerminalShellExecution && vscode.window.onDidWriteTerminalData) {
+    // ── Method 2: Terminal data write (fallback & output buffer) ──
+    if (vscode.window.onDidWriteTerminalData) {
         const _termBuffers = new Map();
         ctx.subscriptions.push(
             vscode.window.onDidWriteTerminalData(e => {
                 try {
-                    if (!cfg('learnEnabled', true)) return;
                     const tid = e.terminal?.name || 'default';
+                    const cleanData = e.data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+                    
+                    // Buffer for Auto-Fixer (keep last 5000 chars)
+                    const curOut = (_termOutputs.get(tid) || '') + cleanData;
+                    _termOutputs.set(tid, curOut.slice(-5000));
+
+                    if (!cfg('learnEnabled', true)) return;
                     const buf = (_termBuffers.get(tid) || '') + e.data;
                     const lines = buf.split(/\r?\n/);
                     if (lines.length > 1) {

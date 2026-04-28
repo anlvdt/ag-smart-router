@@ -163,7 +163,7 @@ const discoverAcceptCommands = async () => {
         // Expanded SKIP list to catch commands requiring input
         const SKIP = ['setting', 'config', 'preference', 'browser', 'permission', 'manage', 'open', 'show', 'toggle', 'enable', 'disable', 'edit', 'view', 'list', 'reset', 'clear', 'input', 'prompt', 'dialog', 'confirm', 'ask', 'select', 'pick', 'choose'];
 
-        // Whitelist of known safe commands (specific to Antigravity/Windsurf)
+        // Whitelist of known safe commands (specific to Antigravity/Windsurf/Copilot/Native Chat)
         const WHITELIST = [
             'antigravity.accept',
             'antigravity.acceptAll',
@@ -172,6 +172,11 @@ const discoverAcceptCommands = async () => {
             'cascade.accept',
             'cascade.acceptAll',
             'codeium.accept',
+            'workbench.action.chat.applyAll',
+            'workbench.action.chat.accept',
+            'inlineChat.accept',
+            'chatEditor.action.accept',
+            'github.copilot.acceptWorkspaceEdit'
         ];
 
         _dynamicAcceptCmds = allCmds.filter(c => {
@@ -181,8 +186,8 @@ const discoverAcceptCommands = async () => {
             if (WHITELIST.some(w => l === w.toLowerCase())) return true;
 
             // Then apply filters for discovered commands
-            const ns = l.includes('antigravity') || l.includes('windsurf') || l.includes('cascade') || l.includes('codeium') || l.includes('agent');
-            const act = l.includes('accept') || l.includes('approve') || l.includes('allow') || l.includes('keep');
+            const ns = l.includes('antigravity') || l.includes('windsurf') || l.includes('cascade') || l.includes('codeium') || l.includes('agent') || l.includes('copilot') || l.includes('chat') || l.includes('inlinechat');
+            const act = l.includes('accept') || l.includes('approve') || l.includes('allow') || l.includes('keep') || l.includes('apply');
 
             if (SKIP.some(s => l.includes(s))) return false;
 

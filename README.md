@@ -2,7 +2,7 @@
 
 **Stop babysitting your AI agent.** Grav auto-clicks approval buttons, keeps your chat pinned to the latest response, and blocks dangerous terminal commands — completely hands-free.
 
-[![Version](https://img.shields.io/badge/version-3.7.0-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue)](https://github.com/anlvdt/grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
@@ -10,7 +10,7 @@
 
 Windsurf / Antigravity runs its agent panel inside an Out-of-Process IFrame (OOPIF) — standard VS Code extensions can't reach it. Grav connects directly via **Chrome DevTools Protocol (CDP)**, injecting an observer into the webview to reliably interact with every button regardless of Shadow DOM or iframe boundaries.
 
-> **Works with:** Windsurf IDE, Antigravity IDE, any VS Code fork that exposes a CDP debug port.
+> **Works with:** Windsurf IDE, Antigravity IDE, VS Code Native Chat (Copilot Edits), and any VS Code fork that exposes a CDP debug port.
 
 ---
 
@@ -34,6 +34,16 @@ Keeps the chat panel pinned to the bottom while AI responds. Automatically pause
 
 ### 🧠 Adaptive Learning
 Observes which terminal commands you approve or reject. Builds a confidence model and suggests promoting safe commands to the whitelist — fewer interruptions over time.
+
+### 🛠️ Auto-Fixer *(Agent Runtime Optimizer)*
+If the AI Agent (or you) makes a typo in the terminal and the command fails, Grav instantly evaluates the error and **automatically injects the corrected command**. No wasted turns thinking or asking for permission.
+- `gti status` → auto-runs `git status`
+- `npm instal` → auto-runs `npm install`
+- `python script.py` (when python is missing on macOS) → auto-runs `python3 script.py`
+- Parses Git suggestions: `"The most similar command is..."`
+
+### 💬 VS Code Native Chat & Copilot Edits
+Fully supports Microsoft's native **Copilot Edits** and Chat tools. Automatically detects native VS Code permission boundaries and auto-clicks `workbench.action.chat.applyAll`, `github.copilot.acceptWorkspaceEdit`, and inline chat accept buttons.
 
 ### 🗂️ Per-Project Patterns
 Define custom button patterns and blacklists per workspace via `.vscode/grav.json`. Changes reload live without restarting the extension.
@@ -152,6 +162,10 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 ---
 
 ## Changelog
+
+### v4.0.0
+- **Auto-Fixer Engine:** New heuristic module that evaluates failed terminal commands (exit code > 0) and automatically injects corrections for common typos (`gti`, `npm instal`), missing aliases (`python` -> `python3`), and Git's "most similar command" suggestions.
+- **VS Code Native Chat Support:** Expanded dynamic command detection to fully support Microsoft Copilot Edits (`workbench.action.chat.applyAll`, `github.copilot.acceptWorkspaceEdit`) and Inline Chat.
 
 ### v3.7.0
 - **Adaptive Accept Loop:** scan interval dynamically drops to 800ms for 10s when `run_command` tool-call fires — eliminates race condition where approval dialog expires before next poll cycle
