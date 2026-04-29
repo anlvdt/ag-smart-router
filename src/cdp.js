@@ -821,8 +821,9 @@ async function injectObserver(sessionId) {
     const scrollEnabled = cfg('autoScroll', true);
     const scrollPauseMs = cfg('scrollPauseMs', 7000);
     const dryRun = cfg('dryRun', false);
+    const skipBrowserAgent = cfg('skipBrowserAgent', false);
 
-    const script = buildObserverScript(patterns, allBlacklist, scrollEnabled, scrollPauseMs, dryRun);
+    const script = buildObserverScript(patterns, allBlacklist, scrollEnabled, scrollPauseMs, dryRun, skipBrowserAgent);
 
     try {
         await send('Runtime.evaluate', {

@@ -2,7 +2,7 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "AI Autopilot for Windsurf / Antigravity IDE (v1.19 to 1.24+). Auto-click approvals, auto-scroll chat, and guard terminal commands. Boost your workflow with adaptive learning and CDP-first reliability.",
-    "version": "4.0.1",
+    "version": "4.0.3",
     "icon": "icons/icon.png",
     "publisher": "anlvdt",
     "author": {
@@ -101,6 +101,10 @@
             {
                 "command": "grav.resetLearningData",
                 "title": "Grav: Factory Reset Learning Data"
+            },
+            {
+                "command": "grav.toggleSkipBrowserAgent",
+                "title": "Grav: Toggle Skip Browser Agent"
             }
         ],
         "keybindings": [
@@ -233,6 +237,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Dry Run mode: scan and match buttons but do not click. Use for debugging. Activity log shows what would be clicked."
+                },
+                "grav.skipBrowserAgent": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip auto-click when Browser Agent is active. Pauses Grav when Antigravity triggers a browser/computer-use agent."
                 }
             }
         }

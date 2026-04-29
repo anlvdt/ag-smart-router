@@ -103,7 +103,7 @@ function setup(ctx, learning) {
     }
 
     // ── Method 2: Terminal data write (fallback & output buffer) ──
-    if (vscode.window.onDidWriteTerminalData) {
+    try { if (vscode.window.onDidWriteTerminalData) {
         const _termBuffers = new Map();
         ctx.subscriptions.push(
             vscode.window.onDidWriteTerminalData(e => {
@@ -131,7 +131,7 @@ function setup(ctx, learning) {
                 } catch (_) { /* non-critical */ }
             })
         );
-    }
+    } } catch (_) { /* terminalDataWriteEvent API not available in this IDE version */ }
 
     // ── Method 3: Terminal open tracking ──
     ctx.subscriptions.push(

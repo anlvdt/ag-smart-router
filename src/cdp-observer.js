@@ -8,9 +8,9 @@ const {
     HIGH_CONF, COOLDOWN, REJECT_WORDS, EDITOR_SKIP, SUPPRESS_KEYWORDS, LIMITS,
 } = require('./constants');
 
-function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, dryRun) {
+function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, dryRun, skipBrowserAgent) {
     // Version tag - increment this when observer logic changes
-    const OBSERVER_VERSION = 'v3.5.2';
+    const OBSERVER_VERSION = 'v3.5.3';
     return `(function() {
     'use strict';
     // Version-based guard: allows new observer to replace old one
@@ -22,6 +22,7 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
     var SCROLL_ON = ${scrollEnabled};
     var SCROLL_PAUSE = ${scrollPauseMs};
     var DRY_RUN = ${dryRun ? 'true' : 'false'};
+    var SKIP_BROWSER_AGENT = ${skipBrowserAgent ? 'true' : 'false'};
     var _clickId = 0;
 
     // ── Shared Constants (from constants.js) ────────────────
@@ -581,9 +582,43 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         return btns;
     }
 
+    // ── Browser Agent Detection ────────────────────────────
+    var _browserAgentActive = false;
+    var _lastBrowserCheck = 0;
+
+    function isBrowserAgentActive() {
+        if (!SKIP_BROWSER_AGENT) return false;
+        var now = Date.now();
+        if (now - _lastBrowserCheck < 2000) return _browserAgentActive;
+        _lastBrowserCheck = now;
+        try {
+            // Check recent messages for browser agent signals
+            var els = document.querySelectorAll('[class*=message], [class*=chat], [class*=response], [class*=step], [class*=tool]');
+            var SIGNALS = ['browser agent', 'browser_action', 'computer_use', 'use_browser', 'browsing', 'navigating to', 'screenshot'];
+            for (var j = els.length - 1; j >= Math.max(0, els.length - 5); j--) {
+                var t = (els[j].innerText || '').toLowerCase().slice(0, 500);
+                for (var k = 0; k < SIGNALS.length; k++) {
+                    if (t.indexOf(SIGNALS[k]) !== -1) { _browserAgentActive = true; return true; }
+                }
+            }
+            // Check for visible browser iframe
+            var frames = document.querySelectorAll('iframe[src*="http"], [class*=browser-view], [class*=simple-browser]');
+            for (var f = 0; f < frames.length; f++) {
+                if (frames[f].offsetWidth > 0 && frames[f].offsetHeight > 0) { _browserAgentActive = true; return true; }
+            }
+        } catch(_) {}
+        _browserAgentActive = false;
+        return false;
+    }
+
     // ── Core: Scan & Click (enhanced) ───────────────────────
     var _scanCount = 0;
     function scanAndClick() {
+        if (isBrowserAgentActive()) {
+            _scanCount++;
+            if (_scanCount % 20 === 0) report('DEBUG', { skip: 'browser-agent-active', scan: _scanCount });
+            return;
+        }
         collectShadowRoots(document.body);
         var btns = collectAllButtons();
         _scanCount++;
