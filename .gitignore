@@ -2,6 +2,7 @@
 *.vsix
 node_modules/
 .DS_Store
+.claude/
 
 # Repomix
 repomix-output.md
