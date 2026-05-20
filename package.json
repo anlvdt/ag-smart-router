@@ -2,9 +2,9 @@
     "name": "grav",
     "displayName": "Grav — Autopilot for Antigravity",
     "description": "AI Autopilot for Windsurf / Antigravity IDE (v1.19 to 1.24+). Auto-click approvals, auto-scroll chat, and guard terminal commands. Boost your workflow with adaptive learning and CDP-first reliability.",
-    "version": "4.0.12",
+    "version": "4.0.18",
     "icon": "icons/icon.png",
-    "publisher": "anlvdt",
+    "publisher": "ANLE",
     "author": {
         "name": "An Le",
         "email": "anlvdt@gmail.com",
@@ -105,6 +105,18 @@
             {
                 "command": "grav.toggleSkipBrowserAgent",
                 "title": "Grav: Toggle Skip Browser Agent"
+            },
+            {
+                "command": "grav.applyOperationPreset",
+                "title": "Grav: Apply Operation Preset"
+            },
+            {
+                "command": "grav.recordFalsePositive",
+                "title": "Grav: Record False Positive"
+            },
+            {
+                "command": "grav.recordMissedAction",
+                "title": "Grav: Record Missed Click"
             }
         ],
         "keybindings": [
@@ -137,6 +149,17 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Keep chat panel scrolled to the bottom while the AI is responding. Pauses automatically when the user scrolls up."
+                },
+                "grav.operationMode": {
+                    "type": "string",
+                    "enum": [
+                        "safe",
+                        "balanced",
+                        "fast",
+                        "custom"
+                    ],
+                    "default": "custom",
+                    "description": "High-level operating mode for Grav. Safe = conservative approvals, Balanced = recommended default, Fast = quickest routine flow, custom = manual settings."
                 },
                 "grav.presetMode": {
                     "type": "string",
@@ -248,8 +271,12 @@
     },
     "scripts": {
         "vscode:prepublish": "echo ok",
+        "smoke": "node test/smoke-flows.test.js",
         "test": "node test/run-all.js",
-        "build": "npm install && npx -y @vscode/vsce package"
+        "package:vsix": "npx -y @vscode/vsce package",
+        "release:check": "npx -y @vscode/vsce ls --tree",
+        "release": "node scripts/release.js",
+        "build": "npm run package:vsix"
     },
     "dependencies": {
         "ws": "^8.20.0"

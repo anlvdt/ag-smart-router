@@ -109,12 +109,18 @@ function setup(ctx, learning) {
             vscode.window.onDidWriteTerminalData(e => {
                 try {
                     const tid = e.terminal?.name || 'default';
-                    const cleanData = e.data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 
-
-                    if (!cfg('learnEnabled', true)) return;
+                    // Always maintain buffer regardless of learnEnabled — avoids data loss
+                    // when learning is re-enabled mid-stream (buffer was previously dropped).
                     const buf = (_termBuffers.get(tid) || '') + e.data;
                     const lines = buf.split(/\r?\n/);
+                    const tail = lines.length > 1 ? lines[lines.length - 1] : buf.slice(-1000);
+
+                    if (!cfg('learnEnabled', true)) {
+                        _termBuffers.set(tid, tail);
+                        return;
+                    }
+
                     if (lines.length > 1) {
                         for (let i = 0; i < lines.length - 1; i++) {
                             const line = lines[i].replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
@@ -124,9 +130,9 @@ function setup(ctx, learning) {
                                 safeRecord(cmdMatch[1].trim(), 'approve', { project: getProject() });
                             }
                         }
-                        _termBuffers.set(tid, lines[lines.length - 1]);
+                        _termBuffers.set(tid, tail);
                     } else {
-                        _termBuffers.set(tid, buf.slice(-1000));
+                        _termBuffers.set(tid, tail);
                     }
                 } catch (_) { /* non-critical */ }
             })

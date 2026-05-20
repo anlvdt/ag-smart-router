@@ -46,7 +46,8 @@ function elevatedWrite(fp, content) {
     const allowedRoots = [
         vscode.env.appRoot,                    // IDE installation
         os.tmpdir(),                           // temp files
-        path.join(os.homedir(), '.antigravity'), // Antigravity config
+        path.join(os.homedir(), '.antigravity-ide'), // Antigravity IDE config
+        path.join(os.homedir(), '.antigravity'), // Legacy Antigravity config
     ];
     const inAllowed = allowedRoots.some(root => resolved.startsWith(path.resolve(root)));
     if (!inAllowed) throw new Error(`Path outside allowed directories: ${fp}`);
@@ -62,8 +63,10 @@ function elevatedWrite(fp, content) {
     fs.writeFileSync(tmp, content, 'utf8');
     try {
         if (process.platform === 'darwin') {
-            // Sanitize paths for AppleScript — reject double quotes to prevent injection
-            if (tmp.includes('"') || fp.includes('"')) throw new Error('Path contains invalid characters');
+            // Sanitize paths for AppleScript — reject quotes and newlines to prevent injection
+            if (tmp.includes('"') || fp.includes('"') ||
+                tmp.includes('\n') || fp.includes('\n') ||
+                tmp.includes('\r') || fp.includes('\r')) throw new Error('Path contains invalid characters');
             // Use execFileSync with array args — no shell injection possible
             execFileSync('osascript', [
                 '-e', `do shell script "cp " & quoted form of "${tmp}" & " " & quoted form of "${fp}" & " && chmod 644 " & quoted form of "${fp}" with administrator privileges`,
@@ -197,17 +200,42 @@ function matchesBlacklist(cmdLine, blacklist) {
                 // ReDoS protection: reject overly complex or long patterns
                 if (rawPattern.length > 200) continue;
                 if (cmdLine.length > 2000) continue;
+                // Reject catastrophic backtracking patterns: nested quantifiers like (a+)+, (a*)+, (.+)*
+                if (/\([^)]*[+*][^)]*\)[+*?]/.test(rawPattern)) continue;
+                // Reject alternation inside quantified group: (a|ab)+
+                if (/\([^)]*\|[^)]*\)[+*?]/.test(rawPattern)) continue;
                 const userRe = new RegExp(rawPattern, 'i');
                 if (userRe.test(cmdLine)) return pattern;
             } catch (_) { /* non-critical */ }
             continue;
         }
 
-        // Multi-word patterns → match at start of command or after separator
+        // Multi-word / pipe patterns
         if (p.includes(' ') || p.includes('|')) {
-            // Must match at: start of string, or after a command separator (;|&)
+            // Pipe-to-shell: pattern starts with '|' (e.g., '| bash', '| sh')
+            // Use substring match — these appear mid-command: curl url | bash
+            if (p.startsWith('|')) {
+                if (lower.includes(p)) return pattern;
+                continue;
+            }
+
+            // Pipe-chain: no spaces, has '|' (e.g., 'wget|sh', 'curl|bash')
+            // Detects: wget <url> | sh  OR  curl <url>|bash
+            if (!p.includes(' ') && p.includes('|')) {
+                const [pcmd, pshell] = p.split('|');
+                // Word-boundary check: 'curl' must not match 'curling' or 'mycurl'
+                const pcmdRe = new RegExp(`^${pcmd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$|[|;&])`, 'i');
+                if (pcmdRe.test(lower)) {
+                    const shellRe = new RegExp(`[|]\\s*${pshell.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$|;)`, 'i');
+                    if (shellRe.test(lower)) return pattern;
+                }
+                continue;
+            }
+
+            // Standard multi-word: match at start or after separator + trailing boundary
+            // The lookahead (?=\s|$|[;|&]) prevents 'git push --force' matching '--force-with-lease'
             const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const re = new RegExp(`(?:^|[;|&]\\s*|\\b(?:sudo|nohup|time|env)\\s+)${escaped}`, 'i');
+            const re = new RegExp(`(?:^|[;|&]\\s*|\\b(?:sudo|nohup|time|env)\\s+)${escaped}(?=\\s|$|[;|&])`, 'i');
             if (re.test(lower)) return pattern;
             continue;
         }

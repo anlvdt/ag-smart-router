@@ -10,7 +10,7 @@ const {
 
 function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, dryRun, skipBrowserAgent) {
     // Version tag - increment this when observer logic changes
-    const OBSERVER_VERSION = 'v4.0.15';
+    const OBSERVER_VERSION = 'v4.0.17';
     return `(function() {
     'use strict';
     // Version-based guard: allows new observer to replace old one
@@ -31,6 +31,16 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
     var SUPPRESS_KEYWORDS = ${JSON.stringify(SUPPRESS_KEYWORDS)};
     var LIM = ${JSON.stringify(LIMITS)};
 
+    // ── Label Normalization & Shortcut Stripping ────────────
+    function cleanLabel(text) {
+        if (!text) return '';
+        // Strip keyboard shortcuts like (Cmd+Shift+A) or [Enter] or (Ctrl+Enter) at the end
+        var cleaned = text.replace(/\\s*[\\(\\[][^\\]\\)]*[\\)\\]]\\s*$/, '');
+        // Strip enter symbols ↵, arrow icons, and other non-alphanumeric control marks
+        cleaned = cleaned.replace(/[\\u21B5\\u23CE\\u21A9\\u2192\\u2190]/g, '');
+        return cleaned.trim();
+    }
+
     // ── Communication (CSP-safe: no XHR needed) ─────────────
     function report(type, data) {
         try {
@@ -38,11 +48,13 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         } catch(e) { console.error('[GRAV] report error:', e.message); }
     }
     function matchPattern(text, pattern) {
-        if (text === pattern) return true;
-        if (text.length <= pattern.length) return false;
-        if (text.indexOf(pattern) !== 0) return false;
-        var c = text.charAt(pattern.length);
-        return /[\\s\\u00a0.,;:!?\\-\\u2013\\u2014()\\[\\]{}|/\\\\<>'"@#\$%^&*+=~\`]/.test(c);
+        var t = cleanLabel(text).toLowerCase();
+        var p = cleanLabel(pattern).toLowerCase();
+        if (t === p) return true;
+        if (t.indexOf(p) !== 0) return false;
+        if (t.length === p.length) return true;
+        var c = t.charAt(p.length);
+        return /[\\s\\u00a0.,;:!?\\-\\u2013\\u2014()\\[\\]{}|/\\\\<>'"@#\\$%^&*+=~\\x60]/.test(c);
     }
 
     function findMatch(text) {
@@ -76,14 +88,15 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         // 4. innerText first line
         var raw = (btn.innerText || btn.textContent || '').trim();
         var first = raw.split('\\n')[0].trim();
+        first = cleanLabel(first);
         if (first.length >= 2 && first.length <= 60) return first;
 
         // 5. title attribute
-        var title = (btn.getAttribute('title') || '').trim();
+        var title = cleanLabel((btn.getAttribute('title') || '').trim());
         if (title.length >= 2 && title.length <= 60) return title;
 
         // 6. value attribute (input[type=button])
-        var value = (btn.getAttribute('value') || '').trim();
+        var value = cleanLabel((btn.getAttribute('value') || '').trim());
         if (value.length >= 2 && value.length <= 60) return value;
 
         // 7. Nested spans (React wraps text in layers)
@@ -97,11 +110,36 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             t = t.trim();
             if (t) st += (st ? ' ' : '') + t;
         }
+        st = cleanLabel(st);
         if (st.length >= 2 && st.length <= 60) return st;
 
         // 8. alt attribute (image buttons)
-        var alt = (btn.getAttribute('alt') || '').trim();
+        var alt = cleanLabel((btn.getAttribute('alt') || '').trim());
         if (alt.length >= 2 && alt.length <= 60) return alt;
+
+        // 9. data-testid / id / class mapping for icon-only buttons
+        var testId = (btn.getAttribute('data-testid') || '').toLowerCase();
+        if (testId) {
+            if (testId.indexOf('submit') !== -1) return 'Submit';
+            if (testId.indexOf('send') !== -1) return 'Submit';
+            if (testId.indexOf('accept-all') !== -1 || testId.indexOf('acceptall') !== -1) return 'Accept all';
+            if (testId.indexOf('accept') !== -1) return 'Accept';
+            if (testId.indexOf('approve') !== -1) return 'Approve';
+            if (testId.indexOf('run') !== -1) return 'Run';
+            if (testId.indexOf('allow') !== -1) return 'Allow';
+        }
+        var id = (btn.id || '').toLowerCase();
+        if (id) {
+            if (id.indexOf('submit') !== -1) return 'Submit';
+            if (id.indexOf('send') !== -1) return 'Submit';
+            if (id.indexOf('acceptall') !== -1 || id.indexOf('accept-all') !== -1) return 'Accept all';
+        }
+        var cls = (btn.className || '').toString().toLowerCase();
+        if (cls) {
+            if (cls.indexOf('submit') !== -1) return 'Submit';
+            if (cls.indexOf('send') !== -1) return 'Submit';
+            if (cls.indexOf('acceptall') !== -1 || cls.indexOf('accept-all') !== -1) return 'Accept all';
+        }
 
         return '';
     }
@@ -148,8 +186,9 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
     // ── Reject Sibling Detection ────────────────────────────
     function hasRejectNearby(btn) {
         var p = btn.parentElement;
+        var SEL = 'button, [role="button"], a.action-label, vscode-button, span.cursor-pointer, [class*="cursor-pointer"], [class*="flux-button"], [class*="flux-action"], [data-testid*="accept"], [data-testid*="approve"], [data-testid*="allow"], [data-testid*="run"], div.clickable, [class*="clickable"], .monaco-button, [class*="monaco-button"]';
         for (var lv = 0; lv < 5 && p; lv++) {
-            var sibs = p.querySelectorAll('button, [role="button"], vscode-button');
+            var sibs = p.querySelectorAll(SEL);
             for (var i = 0; i < sibs.length; i++) {
                 if (sibs[i] === btn) continue;
                 var t = labelOf(sibs[i]);
@@ -221,7 +260,6 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             // lives inside the sidebar on Antigravity 1.19.6+
             btn.closest('.context-view') ||
             btn.closest('.monaco-menu') ||
-            btn.closest('.quick-input-widget') ||
             btn.closest('.terminal-tab') ||
             // ── Accounts / Auth panels ──
             btn.closest('[class*=accounts]') ||
@@ -311,12 +349,7 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         
         _lastClickedPattern = text;
         
-        // Cleanup old entries every 50 clicks
-        if (++_clickId % 50 === 0) {
-            for (var k in _clickedIds) {
-                if (now - _clickedIds[k] > 30000) delete _clickedIds[k];
-            }
-        }
+        ++_clickId;
     }
 
     // Check if we're in Run cooldown period
@@ -374,6 +407,12 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             // Generic agent/chat containers
             btn.closest('[class*=agent]') ||
             btn.closest('[class*=chat]') ||
+            // Interactive modal / dialog / quick-input containers
+            btn.closest('.quick-input-widget') ||
+            btn.closest('.quick-input-container') ||
+            btn.closest('.monaco-dialog-box') ||
+            btn.closest('.dialog-buttons') ||
+            btn.closest('.context-view') ||
             // Approval dialogs and notifications
             btn.closest('[class*=dialog]') ||
             btn.closest('[class*=notification]') ||
@@ -439,14 +478,44 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
     }
 
     // ══════════════════════════════════════════════════════════
-    //  SOLUTION 3: Shadow DOM Piercing
+    //  SOLUTION 3: Shadow DOM Piercing & MutationObserver (Layer 1)
     //  Learned from chrome-accept-cookies extension:
     //  Override Element.attachShadow to track all shadow roots,
-    //  then scan inside them for buttons.
+    //  and immediately attach MutationObservers to them.
     // ══════════════════════════════════════════════════════════
     var _shadowRoots = [];
     var MAX_SHADOW_ROOTS = 200; // Cap to prevent memory leak
     var _origAttachShadow = Element.prototype.attachShadow;
+    var _observedShadowRoots = new WeakSet();
+    var _scanTimer = null;
+
+    function triggerScan() {
+        if (_scanTimer) clearTimeout(_scanTimer);
+        _scanTimer = setTimeout(function() {
+            try { safeScanner(); } catch(_) {}
+        }, 100);
+    }
+
+    function onMutation(mutations) {
+        var shouldScan = false;
+        for (var i = 0; i < mutations.length; i++) {
+            var m = mutations[i];
+            if (m.addedNodes && m.addedNodes.length > 0) {
+                shouldScan = true;
+                for (var j = 0; j < m.addedNodes.length; j++) {
+                    var node = m.addedNodes[j];
+                    if (node.nodeType === 1) { // ELEMENT_NODE
+                        collectShadowRoots(node);
+                    }
+                }
+            } else if (m.type === 'attributes') {
+                shouldScan = true;
+            }
+        }
+        if (shouldScan) {
+            triggerScan();
+        }
+    }
 
     try {
         Element.prototype.attachShadow = function(init) {
@@ -464,16 +533,19 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
                 }
             }
             _shadowRoots.push(shadow);
-            try {
-                var obs = new MutationObserver(onMutation);
-                obs.observe(shadow, { childList: true, subtree: true, attributes: true,
-                    attributeFilter: ['class','style','disabled','aria-hidden','aria-label','data-state'] });
-            } catch(_) { /* DOM op */ }
+            if (!_observedShadowRoots.has(shadow)) {
+                _observedShadowRoots.add(shadow);
+                try {
+                    var obs = new MutationObserver(onMutation);
+                    obs.observe(shadow, { childList: true, subtree: true, attributes: true,
+                        attributeFilter: ['class','style','disabled','aria-hidden','aria-label','data-state'] });
+                } catch(_) { /* DOM op */ }
+            }
             return shadow;
         };
     } catch(_) { /* DOM op */ }
 
-    // Collect existing open shadow roots
+    // Collect existing open shadow roots and attach MutationObservers to them
     function collectShadowRoots(root) {
         if (!root) return;
         try {
@@ -483,6 +555,16 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
                 if (sr) {
                     if (_shadowRoots.indexOf(sr) === -1) {
                         _shadowRoots.push(sr);
+                    }
+                    if (!_observedShadowRoots.has(sr)) {
+                        _observedShadowRoots.add(sr);
+                        try {
+                            var obs = new MutationObserver(onMutation);
+                            obs.observe(sr, { childList: true, subtree: true, attributes: true,
+                                attributeFilter: ['class','style','disabled','aria-hidden','aria-label','data-state'] });
+                        } catch(_) {}
+                        // Trigger immediate scan when new shadow root is detected
+                        triggerScan();
                     }
                     collectShadowRoots(sr);
                 }
@@ -515,7 +597,7 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
     //  Also covers: flux-* components, data-testid buttons, clickable divs
     // ══════════════════════════════════════════════════════════
     function collectAllButtons() {
-        var SEL = 'button, [role="button"], a.action-label, vscode-button, span.cursor-pointer, [class*="cursor-pointer"], [class*="flux-button"], [class*="flux-action"], [data-testid*="accept"], [data-testid*="approve"], [data-testid*="allow"], [data-testid*="run"], div.clickable, [class*="clickable"]';
+        var SEL = 'button, [role="button"], a.action-label, vscode-button, span.cursor-pointer, [class*="cursor-pointer"], [class*="flux-button"], [class*="flux-action"], [data-testid*="accept"], [data-testid*="approve"], [data-testid*="allow"], [data-testid*="run"], div.clickable, [class*="clickable"], .monaco-button, [class*="monaco-button"]';
         var btns = [];
 
         // Main document
@@ -591,10 +673,26 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             if (SKIP_BROWSER_AGENT) {
                 // Use only tight, per-step containers — NOT [class*=message] or [class*=container]
                 // which wrap multiple tool calls and cause false positives on terminal Run buttons
-                var tc = b.closest('[class*=tool], [class*=step]');
+                var tc = b.closest('[class*=tool], [class*=step], [class*=preview], [class*=action], [class*=block]');
+                if (!tc && isSkipBtn) {
+                    // For Skip buttons, search wider (parent hierarchy) since browser agent
+                    // UI may not have standard class names
+                    tc = b.parentElement;
+                    for (var _up = 0; _up < 6 && tc; _up++) { tc = tc.parentElement; }
+                    if (!tc) tc = b.parentElement && b.parentElement.parentElement;
+                }
                 if (tc) {
-                    var tcTxt = (tc.innerText || '').toLowerCase().slice(0, 300);
-                    browserContext = tcTxt.indexOf('browser_subagent') !== -1 || tcTxt.indexOf('computer_use') !== -1 || tcTxt.indexOf('use_browser') !== -1;
+                    var tcTxt = (tc.innerText || '').toLowerCase().slice(0, 500);
+                    var tcClass = (tc.className || '').toLowerCase();
+                    browserContext = tcTxt.indexOf('browser_subagent') !== -1 || tcTxt.indexOf('computer_use') !== -1 || tcTxt.indexOf('use_browser') !== -1 ||
+                        // Antigravity-specific browser subagent labels
+                        tcTxt.indexOf('browser agent') !== -1 || tcTxt.indexOf('open browser') !== -1 || tcTxt.indexOf('web browser') !== -1 ||
+                        (tcTxt.indexOf('browser') !== -1 && tcTxt.indexOf('agent') !== -1) ||
+                        // Class-based detection: container element has 'browser' in its class name
+                        tcClass.indexOf('browser') !== -1 ||
+                        // Existing compound checks
+                        (tcTxt.indexOf('exploring') !== -1 && tcTxt.indexOf('browser') !== -1) ||
+                        (tcTxt.indexOf('navigate') !== -1 && tcTxt.indexOf('browser') !== -1);
                 }
 
                 if (isSkipBtn) {
@@ -617,12 +715,18 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             if (isAlreadyClicked(b, text)) continue;
 
             // Skip editor-specific accept patterns
-            if (isEditorAccept(text)) continue;
+            if (isEditorAccept(text)) {
+                var isReviewInAgent = (text === 'Review Changes' || text === 'Review all' || text === 'Review All') && inAgentContext(b);
+                if (!isReviewInAgent) continue;
+            }
 
             // Secondary check: if visible text differs from resolved label (e.g. aria-label="Run"
             // but innerText="Review Changes"), block on visible text too
             var visibleText = ((b.innerText || b.textContent || '').trim().split('\\n')[0] || '').trim();
-            if (visibleText && visibleText !== text && visibleText.length <= 60 && isEditorAccept(visibleText)) continue;
+            if (visibleText && visibleText !== text && visibleText.length <= 60 && isEditorAccept(visibleText)) {
+                var isReviewInAgent = (visibleText === 'Review Changes' || visibleText === 'Review all' || visibleText === 'Review All') && inAgentContext(b);
+                if (!isReviewInAgent) continue;
+            }
 
             // Expand: one-shot per element, but allow re-expand after 5s
             // (React may reuse DOM nodes for new steps)
@@ -708,20 +812,50 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         } catch(_) { /* DOM op */ }
     }, 1000);
 
-    // Standard poll — 1.5s interval
+    // Time-based cleanup for _clickedIds — runs every 30s regardless of click count.
+    // Also enforces a hard size cap of 2000 entries to guard against high-click-rate sessions
+    // (e.g. busy dashboards with many tool steps) accumulating unbounded memory between ticks.
+    var CLICKED_IDS_MAX = 2000;
     setInterval(function() {
-        scanAndClick();
-    }, 1500);
+        var cutoff = Date.now() - 30000;
+        for (var k in _clickedIds) {
+            if (_clickedIds[k] < cutoff) delete _clickedIds[k];
+        }
+        // Hard size cap: if still over limit, evict oldest entries first
+        var keys = Object.keys(_clickedIds);
+        if (keys.length > CLICKED_IDS_MAX) {
+            keys.sort(function(a, b) { return _clickedIds[a] - _clickedIds[b]; });
+            for (var i = 0; i < keys.length - CLICKED_IDS_MAX; i++) {
+                delete _clickedIds[keys[i]];
+            }
+        }
+    }, 30000);
 
-    // Slow poll — 5s safety net (was 3s)
-    setInterval(function() {
-        scanAndClick();
-    }, 5000);
+    // Guard: prevent concurrent scans — if a scan is still running (e.g. slow shadow root
+    // collection across many nested webviews), skip the next tick rather than overlap.
+    var _scanning = false;
+    function safeScanner() {
+        if (_scanning) return;
+        _scanning = true;
+        try { scanAndClick(); } catch(_) { /* non-critical */ } finally { _scanning = false; }
+    }
+
+    // Event-driven MutationObserver initialization on the main document
+    try {
+        var docObs = new MutationObserver(onMutation);
+        docObs.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'style', 'disabled', 'aria-hidden', 'aria-label', 'data-state']
+        });
+    } catch(_) {}
+
+    // Enhanced safety net poll — 4s interval (almost 0% CPU overhead, highly responsive)
+    setInterval(safeScanner, 4000);
 
     // Initial scan with delay (let page settle)
-    setTimeout(function() {
-        scanAndClick();
-    }, 1000);
+    setTimeout(safeScanner, 1000);
 
     // ── Auto-Scroll (stick-to-bottom) ───────────────────────
     // Tracks per-element "was at bottom" state. If user scrolls up, we let them read.

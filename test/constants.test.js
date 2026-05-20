@@ -31,6 +31,7 @@ assert(C.DEFAULT_PATTERNS.includes('Retry'), 'has Retry');
 assert(C.DEFAULT_PATTERNS.includes('Proceed'), 'has Proceed');
 assert(C.DEFAULT_PATTERNS.includes('Approve'), 'has Approve');
 assert(C.DEFAULT_PATTERNS.includes('Expand'), 'has Expand');
+assert(C.DEFAULT_PATTERNS.includes('Submit'), 'has Submit');
 
 // No duplicates
 const uniquePatterns = new Set(C.DEFAULT_PATTERNS);
@@ -76,6 +77,7 @@ assert(Object.isFrozen(C.LIMITS), 'LIMITS is frozen');
 section('HIGH_CONF patterns');
 assert(C.HIGH_CONF['Accept All'] === 1, 'Accept All in HIGH_CONF');
 assert(C.HIGH_CONF['Run'] === 1, 'Run in HIGH_CONF');
+assert(C.HIGH_CONF['Submit'] === 1, 'Submit in HIGH_CONF');
 assert(!C.HIGH_CONF['Continue'], 'Continue NOT in HIGH_CONF');
 assert(!C.HIGH_CONF['Resume Conversation'], 'Resume Conversation NOT in HIGH_CONF');
 

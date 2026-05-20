@@ -9,6 +9,7 @@ const path = require('path');
 
 const { DEFAULT_PATTERNS, SAFE_TERMINAL_CMDS, DEFAULT_BLACKLIST, PATTERN_GROUPS, PATTERN_DISPLAY, RISKY_PATTERNS } = require('./constants');
 const { cfg } = require('./utils');
+const { buildOperationPreset, getOperationPresets, normalizeOperationMode } = require('./operation-presets');
 
 let _panel = null;
 let _ctx = null;
@@ -82,11 +83,12 @@ function render() {
     const w = wiki.getWiki();
 
     _panel.webview.html = buildHtml({
-        version: _ctx?.extension?.packageJSON?.version || '3.5',
+        version: _ctx?.extension?.packageJSON?.version || '0',
         enabled: cfg('enabled', true),
         scrollOn: cfg('autoScroll', true),
         dryRun: cfg('dryRun', false),
         skipBrowser: cfg('skipBrowserAgent', false),
+        skipTerminalAccept: cfg('skipTerminalAccept', true),
         pauseMs: cfg('scrollPauseMs', 7000),
         scrollMs: cfg('scrollIntervalMs', 500),
         patterns: cfg('approvePatterns', DEFAULT_PATTERNS),
@@ -110,6 +112,10 @@ function render() {
         wikiLog: (w.log || []).slice(-30),
         allPatterns: getDisplayPatterns([...DEFAULT_PATTERNS, ...RISKY_PATTERNS]),
         patternGroups: PATTERN_GROUPS,
+        operationMode: normalizeOperationMode(cfg('operationMode', 'custom')),
+        operationPresets: getOperationPresets(),
+        operationPresetConfigs: ['safe', 'balanced', 'fast'].map((mode) => buildOperationPreset(mode)).filter(Boolean),
+        trace: _deps.getTraceSnapshot ? _deps.getTraceSnapshot() : {},
     });
 }
 
@@ -121,10 +127,11 @@ function buildHtml(c) {
     }
 
     h = replaceTag(h, 'LANG', lang);
-    h = replaceTag(h, 'VERSION', c.version || '3.5');
+    h = replaceTag(h, 'VERSION', c.version || '0');
     h = replaceTag(h, 'TOTAL', String(c.totalClicks || 0));
     h = replaceTag(h, 'ENABLED_CHK', c.enabled ? 'checked' : '');
     h = replaceTag(h, 'SCROLL_CHK', c.scrollOn !== false ? 'checked' : '');
+    h = replaceTag(h, 'SKIP_TERMINAL_CHK', c.skipTerminalAccept !== false ? 'checked' : '');
     h = replaceTag(h, 'APPROVE_MS', String(c.approveMs || 1000));
     h = replaceTag(h, 'SCROLL_MS', String(c.scrollMs || 500));
     h = replaceTag(h, 'PAUSE_MS', String(c.pauseMs || 7000));
@@ -148,6 +155,10 @@ function buildHtml(c) {
     h = replaceTag(h, 'WIKI_LOG_JSON', JSON.stringify(c.wikiLog || []));
     h = replaceTag(h, 'ALL_PATTERNS_JSON', JSON.stringify(c.allPatterns || []));
     h = replaceTag(h, 'PROJECT_PATTERNS_JSON', JSON.stringify(c.projectPatterns || []));
+    h = replaceTag(h, 'TRACE_JSON', JSON.stringify(c.trace || {}));
+    h = replaceTag(h, 'OPERATION_PRESETS_JSON', JSON.stringify(c.operationPresets || []));
+    h = replaceTag(h, 'OPERATION_PRESET_CONFIGS_JSON', JSON.stringify(c.operationPresetConfigs || []));
+    h = replaceTag(h, 'OPERATION_MODE_JSON', JSON.stringify(c.operationMode || 'custom'));
     h = replaceTag(h, 'DRYRUN_CHK', c.dryRun ? 'checked' : '');
     h = replaceTag(h, 'DRYRUN_VAL', c.dryRun ? 'true' : 'false');
     h = replaceTag(h, 'SKIP_BROWSER_CHK', c.skipBrowser ? 'checked' : '');
@@ -181,10 +192,12 @@ function setupMessageHandler() {
                 await c.update('enabled', d.enabled, vscode.ConfigurationTarget.Global);
                 await c.update('autoScroll', d.scrollOn, vscode.ConfigurationTarget.Global);
                 await c.update('skipBrowserAgent', d.skipBrowser, vscode.ConfigurationTarget.Global);
+                await c.update('skipTerminalAccept', d.skipTerminalAccept !== false, vscode.ConfigurationTarget.Global);
                 await c.update('scrollPauseMs', d.pauseMs, vscode.ConfigurationTarget.Global);
                 await c.update('scrollIntervalMs', d.scrollMs, vscode.ConfigurationTarget.Global);
                 await c.update('approveIntervalMs', d.approveMs, vscode.ConfigurationTarget.Global);
                 await c.update('approvePatterns', d.patterns, vscode.ConfigurationTarget.Global);
+                await c.update('operationMode', d.operationMode || 'custom', vscode.ConfigurationTarget.Global);
                 await _ctx.globalState.update('disabledPatterns', d.disabledPatterns);
                 _deps.setState({ enabled: d.enabled, scrollOn: d.scrollOn !== false });
                 _deps.onSave(); break;
@@ -209,6 +222,17 @@ function setupMessageHandler() {
                 postMessage({ command: 'statsUpdated', stats: state.stats, totalClicks: state.totalClicks }); break;
             case 'manageTerminal':
                 vscode.commands.executeCommand('grav.manageTerminal'); break;
+            case 'feedback':
+                if (_deps.recordFeedback) _deps.recordFeedback(msg.kind, { reason: msg.reason || 'dashboard' });
+                if (_deps.getTraceSnapshot) postMessage({ command: 'traceUpdated', trace: _deps.getTraceSnapshot() });
+                break;
+            case 'getTrace':
+                if (_deps.getTraceSnapshot) postMessage({ command: 'traceUpdated', trace: _deps.getTraceSnapshot() });
+                break;
+            case 'refreshObserver':
+                vscode.commands.executeCommand('grav.refreshObserver'); break;
+            case 'openDiagnostics':
+                vscode.commands.executeCommand('grav.diagnostics'); break;
         }
     }, undefined, _ctx.subscriptions);
 }
@@ -218,10 +242,10 @@ function startTickers() {
     const learning = _deps.learning;
     const wiki = _deps.wiki;
 
-    // Tier 1: Stats — 1s
+    // Tier 1: Stats — 2.5s (reduced from 1s to avoid VSCode webview postMessage lag)
     _statsTicker = setInterval(() => {
         postMessage({ command: 'statsUpdated', stats: state.stats, totalClicks: state.totalClicks });
-    }, 1000);
+    }, 2500);
 
     // Tier 2: Brain/Wiki — 5s
     _brainTicker = setInterval(() => {
@@ -257,10 +281,9 @@ function startTickers() {
                 action: l.action || '', conf: l.conf, detail: l.detail || '',
             }));
             msg.session = _deps.getSessionSafe();
-            // Quota + ROI data
-            if (_deps.quota) msg.quota = _deps.quota.getSummary();
             if (_deps.roi) msg.roi = _deps.roi.getSummary();
             if (_deps.idle) msg.idle = _deps.idle.isIdle();
+            if (_deps.getTraceSnapshot) msg.trace = _deps.getTraceSnapshot();
             msg.termLog = (state.termLog || []).slice(0, 30).map(t => ({
                 time: t.time || '', cmd: t.cmd || '', source: t.source || 'ui',
             }));
@@ -274,4 +297,4 @@ function startTickers() {
     }, 5000);
 }
 
-module.exports = { toggle, getPanel, postMessage, render };
+module.exports = { toggle, getPanel, postMessage, render, buildHtml };

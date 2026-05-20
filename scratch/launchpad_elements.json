@@ -1,0 +1,629 @@
+[
+  {
+    "tagName": "HTML",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "lang": "en",
+      "style": "--vscode-foreground: #cccccc; --vscode-editor-background: #1f1f1f; --vscode-sideBar-background: #181818; --vscode-titleBar-activeBackground: #181818; font-size: 16px; --vscode-checkbox-border: #3c3c3c; --vscode-editor-foreground: #cccccc; --vscode-editor-inactiveSelectionBackground: #3a3d41; --vscode-editorIndentGuide-background1: #404040; --vscode-editorIndentGuide-activeBackground1: #707070; --vscode-editor-selectionHighlightBackground: rgba(173, 214, 255, 0.15); --vscode-list-dropBackground: #383b3d; --vscode-activityBarBadge-background: #0078d4; --vscode-sideBarTitle-foreground: #cccccc; --vscode-input-placeholderForeground: #989898; --vscode-menu-background: #1f1f1f; --vscode-menu-foreground: #cccccc; --vscode-menu-separatorBackground: #454545; --vscode-menu-border: #454545; --vscode-menu-selectionBackground: #0078d4; --vscode-statusBarItem-remoteForeground: #ffffff; --vscode-statusBarItem-remoteBackground: #0078d4; --vscode-ports-iconRunningProcessForeground: #369432; --vscode-sideBarSectionHeader-background: #181818; --vscode-sideBarSectionHeader-border: #2b2b2b; --vscode-tab-selectedBackground: #222222; --vscode-tab-selectedForeground: rgba(255, 255, 255, 0.63); --vscode-tab-lastPinnedBorder: rgba(204, 204, 204, 0.2); --vscode-list-activeSelectionIconForeground: #ffffff; --vscode-terminal-inactiveSelectionBackground: #3a3d41; --vscode-widget-border: #313131; --vscode-actionBar-toggledBackground: #383a49; --vscode-activityBar-activeBorder: #0078d4; --vscode-activityBar-background: #181818; --vscode-activityBar-border: #2b2b2b; --vscode-activityBar-foreground: #d7d7d7; --vscode-activityBar-inactiveForeground: #868686; --vscode-activityBarBadge-foreground: #ffffff; --vscode-badge-background: #616161; --vscode-badge-foreground: #f8f8f8; --vscode-button-background: #0078d4; --vscode-button-border: rgba(255, 255, 255, 0.07); --vscode-button-foreground: #ffffff; --vscode-button-hoverBackground: #026ec1; --vscode-button-secondaryBackground: #313131; --vscode-button-secondaryForeground: #cccccc; --vscode-button-secondaryHoverBackground: #3c3c3c; --vscode-chat-slashCommandBackground: rgba(38, 71, 120, 0.4); --vscode-chat-slashCommandForeground: #85b6ff; --vscode-chat-editedFileForeground: #e2c08d; --vscode-checkbox-background: #313131; --vscode-debugToolBar-background: #181818; --vscode-descriptionForeground: #9d9d9d; --vscode-dropdown-background: #313131; --vscode-dropdown-border: #3c3c3c; --vscode-dropdown-foreground: #cccccc; --vscode-dropdown-listBackground: #1f1f1f; --vscode-editor-findMatchBackground: #9e6a03; --vscode-editorGroup-border: rgba(255, 255, 255, 0.09); --vscode-editorGroupHeader-tabsBackground: #181818; --vscode-editorGroupHeader-tabsBorder: #2b2b2b; --vscode-editorGutter-addedBackground: #2ea043; --vscode-editorGutter-deletedBackground: #f85149; --vscode-editorGutter-modifiedBackground: #0078d4; --vscode-editorLineNumber-activeForeground: #cccccc; --vscode-editorLineNumber-foreground: #6e7681; --vscode-editorOverviewRuler-border: #010409; --vscode-editorWidget-background: #202020; --vscode-errorForeground: #f85149; --vscode-focusBorder: #0078d4; --vscode-icon-foreground: #cccccc; --vscode-input-background: #313131; --vscode-input-border: #3c3c3c; --vscode-input-foreground: #cccccc; --vscode-inputOption-activeBackground: rgba(36, 137, 219, 0.51); --vscode-inputOption-activeBorder: #2488db; --vscode-keybindingLabel-foreground: #cccccc; --vscode-notificationCenterHeader-background: #1f1f1f; --vscode-notificationCenterHeader-foreground: #cccccc; --vscode-notifications-background: #1f1f1f; --vscode-notifications-border: #2b2b2b; --vscode-notifications-foreground: #cccccc; --vscode-panel-background: #181818; --vscode-panel-border: #2b2b2b; --vscode-panelInput-border: #2b2b2b; --vscode-panelTitle-activeBorder: #0078d4; --vscode-panelTitle-activeForeground: #cccccc; --vscode-panelTitle-inactiveForeground: #9d9d9d; --vscode-peekViewEditor-background: #1f1f1f; --vscode-peekViewEditor-matchHighlightBackground: rgba(187, 128, 9, 0.4); --vscode-peekViewResult-background: #1f1f1f; --vscode-peekViewResult-matchHighlightBackground: rgba(187, 128, 9, 0.4); --vscode-pickerGroup-border: #3c3c3c; --vscode-progressBar-background: #0078d4; --vscode-quickInput-background: #222222; --vscode-quickInput-foreground: #cccccc; --vscode-settings-dropdownBackground: #313131; --vscode-settings-dropdownBorder: #3c3c3c; --vscode-settings-headerForeground: #ffffff; --vscode-settings-modifiedItemIndicator: rgba(187, 128, 9, 0.4); --vscode-sideBar-border: #2b2b2b; --vscode-sideBar-foreground: #cccccc; --vscode-sideBarSectionHeader-foreground: #cccccc; --vscode-statusBar-background: #181818; --vscode-statusBar-border: #2b2b2b; --vscode-statusBarItem-hoverBackground: rgba(241, 241, 241, 0.2); --vscode-statusBarItem-hoverForeground: #ffffff; --vscode-statusBar-debuggingBackground: #0078d4; --vscode-statusBar-debuggingForeground: #ffffff; --vscode-statusBar-focusBorder: #0078d4; --vscode-statusBar-foreground: #cccccc; --vscode-statusBar-noFolderBackground: #1f1f1f; --vscode-statusBarItem-focusBorder: #0078d4; --vscode-statusBarItem-prominentBackground: rgba(110, 118, 129, 0.4); --vscode-tab-activeBackground: #1f1f1f; --vscode-tab-activeBorder: #1f1f1f; --vscode-tab-activeBorderTop: #0078d4; --vscode-tab-activeForeground: #ffffff; --vscode-tab-selectedBorderTop: #6caddf; --vscode-tab-border: #2b2b2b; --vscode-tab-hoverBackground: #1f1f1f; --vscode-tab-inactiveBackground: #181818; --vscode-tab-inactiveForeground: #9d9d9d; --vscode-tab-unfocusedActiveBorder: #1f1f1f; --vscode-tab-unfocusedActiveBorderTop: #2b2b2b; --vscode-tab-unfocusedHoverBackground: #1f1f1f; --vscode-terminal-foreground: #cccccc; --vscode-terminal-tab-activeBorder: #0078d4; --vscode-textBlockQuote-background: #2b2b2b; --vscode-textBlockQuote-border: #616161; --vscode-textCodeBlock-background: #2b2b2b; --vscode-textLink-activeForeground: #4daafc; --vscode-textLink-foreground: #4daafc; --vscode-textPreformat-foreground: #d0d0d0; --vscode-textPreformat-background: #3c3c3c; --vscode-textSeparator-foreground: #21262d; --vscode-titleBar-activeForeground: #cccccc; --vscode-titleBar-border: #2b2b2b; --vscode-titleBar-inactiveBackground: #1f1f1f; --vscode-titleBar-inactiveForeground: #9d9d9d; --vscode-welcomePage-tileBackground: #2b2b2b; --vscode-welcomePage-progress-foreground: #0078d4; --vscode-starkButton-background: #cacaca; --vscode-starkButton-foreground: #303030; --vscode-starkButton-hoverBackground: #dedede; --vscode-list-hoverBackground-subtle: rgba(42, 45, 46, 0.5); --vscode-disabledForeground: rgba(204, 204, 204, 0.5); --vscode-sash-hoverBorder: #0078d4; --vscode-activityWarningBadge-foreground: #ffffff; --vscode-activityWarningBadge-background: #b27c00; --vscode-activityErrorBadge-foreground: #000000; --vscode-activityErrorBadge-background: #f14c4c; --vscode-scrollbar-shadow: #000000; --vscode-scrollbarSlider-background: rgba(121, 121, 121, 0.4); --vscode-scrollbarSlider-hoverBackground: rgba(100, 100, 100, 0.7); --vscode-scrollbarSlider-activeBackground: rgba(191, 191, 191, 0.4); --vscode-chart-line: #236b8e; --vscode-chart-axis: rgba(191, 191, 191, 0.4); --vscode-chart-guide: rgba(191, 191, 191, 0.2); --vscode-editorStickyScroll-background: #1f1f1f; --vscode-editorStickyScrollGutter-background: #1f1f1f; --vscode-editorStickyScrollHover-background: #2a2d2e; --vscode-editorStickyScroll-shadow: #000000; --vscode-editorWidget-foreground: #cccccc; --vscode-editorWidget-border: #454545; --vscode-editorError-foreground: #f14c4c; --vscode-editorWarning-foreground: #cca700; --vscode-editorInfo-foreground: #59a4f9; --vscode-editorHint-foreground: rgba(238, 238, 238, 0.7); --vscode-editorLink-activeForeground: #4e94ce; --vscode-editor-selectionBackground: #264f78; --vscode-editor-compositionBorder: #ffffff; --vscode-editor-findMatchHighlightBackground: rgba(234, 92, 0, 0.33); --vscode-editor-findRangeHighlightBackground: rgba(58, 61, 65, 0.4); --vscode-editor-hoverHighlightBackground: rgba(38, 79, 120, 0.25); --vscode-editorHoverWidget-background: #202020; --vscode-editorHoverWidget-foreground: #cccccc; --vscode-editorHoverWidget-border: #454545; --vscode-editorHoverWidget-statusBarBackground: #262626; --vscode-editorInlayHint-foreground: #969696; --vscode-editorInlayHint-background: rgba(97, 97, 97, 0.1); --vscode-editorInlayHint-typeForeground: #969696; --vscode-editorInlayHint-typeBackground: rgba(97, 97, 97, 0.1); --vscode-editorInlayHint-parameterForeground: #969696; --vscode-editorInlayHint-parameterBackground: rgba(97, 97, 97, 0.1); --vscode-editorLightBulb-foreground: #ffcc00; --vscode-editorLightBulbAutoFix-foreground: #75beff; --vscode-editorLightBulbAi-foreground: #ffcc00; --vscode-editor-snippetTabstopHighlightBackground: rgba(124, 124, 124, 0.3); --vscode-editor-snippetFinalTabstopHighlightBorder: #525252; --vscode-diffEditor-insertedTextBackground: rgba(156, 204, 44, 0.2); --vscode-diffEditor-removedTextBackground: rgba(255, 0, 0, 0.2); --vscode-diffEditor-insertedLineBackground: rgba(155, 185, 85, 0.2); --vscode-diffEditor-removedLineBackground: rgba(255, 0, 0, 0.2); --vscode-diffEditor-diagonalFill: rgba(204, 204, 204, 0.2); --vscode-diffEditor-unchangedRegionBackground: #181818; --vscode-diffEditor-unchangedRegionForeground: #cccccc; --vscode-diffEditor-unchangedCodeBackground: rgba(116, 116, 116, 0.16); --vscode-widget-shadow: rgba(0, 0, 0, 0.36); --vscode-toolbar-hoverBackground: rgba(90, 93, 94, 0.31); --vscode-toolbar-activeBackground: rgba(99, 102, 103, 0.31); --vscode-breadcrumb-foreground: rgba(204, 204, 204, 0.8); --vscode-breadcrumb-background: #1f1f1f; --vscode-breadcrumb-focusForeground: #e0e0e0; --vscode-breadcrumb-activeSelectionForeground: #e0e0e0; --vscode-breadcrumbPicker-background: #202020; --vscode-merge-currentHeaderBackground: rgba(64, 200, 174, 0.5); --vscode-merge-currentContentBackground: rgba(64, 200, 174, 0.2); --vscode-merge-incomingHeaderBackground: rgba(64, 166, 255, 0.5); --vscode-merge-incomingContentBackground: rgba(64, 166, 255, 0.2); --vscode-merge-commonHeaderBackground: rgba(96, 96, 96, 0.4); --vscode-merge-commonContentBackground: rgba(96, 96, 96, 0.16); --vscode-editorOverviewRuler-currentContentForeground: rgba(64, 200, 174, 0.5); --vscode-editorOverviewRuler-incomingContentForeground: rgba(64, 166, 255, 0.5); --vscode-editorOverviewRuler-commonContentForeground: rgba(96, 96, 96, 0.4); --vscode-editorOverviewRuler-findMatchForeground: rgba(209, 134, 22, 0.49); --vscode-editorOverviewRuler-selectionHighlightForeground: rgba(160, 160, 160, 0.8); --vscode-problemsErrorIcon-foreground: #f14c4c; --vscode-problemsWarningIcon-foreground: #cca700; --vscode-problemsInfoIcon-foreground: #59a4f9; --vscode-minimap-findMatchHighlight: #d18616; --vscode-minimap-selectionOccurrenceHighlight: #676767; --vscode-minimap-selectionHighlight: #264f78; --vscode-minimap-infoHighlight: #59a4f9; --vscode-minimap-warningHighlight: #cca700; --vscode-minimap-errorHighlight: rgba(255, 18, 18, 0.7); --vscode-minimap-foregroundOpacity: #000000; --vscode-minimapSlider-background: rgba(121, 121, 121, 0.2); --vscode-minimapSlider-hoverBackground: rgba(100, 100, 100, 0.35); --vscode-minimapSlider-activeBackground: rgba(191, 191, 191, 0.2); --vscode-charts-foreground: #cccccc; --vscode-charts-lines: rgba(204, 204, 204, 0.5); --vscode-charts-red: #f14c4c; --vscode-charts-blue: #59a4f9; --vscode-charts-yellow: #cca700; --vscode-charts-orange: #d18616; --vscode-charts-green: #89d185; --vscode-charts-purple: #b180d7; --vscode-inputOption-hoverBackground: rgba(90, 93, 94, 0.5); --vscode-inputOption-activeForeground: #ffffff; --vscode-inputValidation-infoBackground: #063b49; --vscode-inputValidation-infoBorder: #007acc; --vscode-inputValidation-warningBackground: #352a05; --vscode-inputValidation-warningBorder: #b89500; --vscode-inputValidation-errorBackground: #5a1d1d; --vscode-inputValidation-errorBorder: #be1100; --vscode-button-separator: rgba(255, 255, 255, 0.4); --vscode-radio-activeForeground: #ffffff; --vscode-radio-activeBackground: rgba(36, 137, 219, 0.51); --vscode-radio-activeBorder: #2488db; --vscode-radio-inactiveBorder: rgba(255, 255, 255, 0.2); --vscode-radio-inactiveHoverBackground: rgba(90, 93, 94, 0.5); --vscode-checkbox-selectBackground: #202020; --vscode-checkbox-foreground: #cccccc; --vscode-checkbox-selectBorder: #cccccc; --vscode-checkbox-disabled-background: #646464; --vscode-checkbox-disabled-foreground: #989898; --vscode-keybindingLabel-background: rgba(128, 128, 128, 0.17); --vscode-keybindingLabel-border: rgba(51, 51, 51, 0.6); --vscode-keybindingLabel-bottomBorder: rgba(68, 68, 68, 0.6); --vscode-list-focusOutline: #0078d4; --vscode-list-activeSelectionBackground: #04395e; --vscode-list-activeSelectionForeground: #ffffff; --vscode-list-inactiveSelectionBackground: #37373d; --vscode-list-hoverBackground: #2a2d2e; --vscode-list-dropBetweenBackground: #cccccc; --vscode-list-highlightForeground: #2aaaff; --vscode-list-focusHighlightForeground: #2aaaff; --vscode-list-invalidItemForeground: #b89500; --vscode-list-errorForeground: #f88070; --vscode-list-warningForeground: #cca700; --vscode-listFilterWidget-background: #202020; --vscode-listFilterWidget-outline: rgba(0, 0, 0, 0); --vscode-listFilterWidget-noMatchesOutline: #be1100; --vscode-listFilterWidget-shadow: rgba(0, 0, 0, 0.36); --vscode-list-filterMatchBackground: rgba(234, 92, 0, 0.33); --vscode-list-deemphasizedForeground: #8c8c8c; --vscode-tree-indentGuidesStroke: #585858; --vscode-tree-inactiveIndentGuidesStroke: rgba(88, 88, 88, 0.4); --vscode-tree-tableColumnsBorder: rgba(204, 204, 204, 0.13); --vscode-tree-tableOddRowsBackground: rgba(204, 204, 204, 0.04); --vscode-editorActionList-background: #202020; --vscode-editorActionList-foreground: #cccccc; --vscode-editorActionList-focusForeground: #ffffff; --vscode-editorActionList-focusBackground: #04395e; --vscode-menu-selectionForeground: #ffffff; --vscode-quickInputTitle-background: rgba(255, 255, 255, 0.1); --vscode-pickerGroup-foreground: #3794ff; --vscode-quickInputList-focusForeground: #ffffff; --vscode-quickInputList-focusIconForeground: #ffffff; --vscode-quickInputList-focusBackground: #04395e; --vscode-search-resultsInfoForeground: rgba(204, 204, 204, 0.65); --vscode-searchEditor-findMatchBackground: rgba(234, 92, 0, 0.22); --vscode-editor-lineHighlightBorder: #282828; --vscode-editor-rangeHighlightBackground: rgba(255, 255, 255, 0.04); --vscode-editor-symbolHighlightBackground: rgba(234, 92, 0, 0.33); --vscode-editorCursor-foreground: #aeafad; --vscode-editorMultiCursor-primary-foreground: #aeafad; --vscode-editorMultiCursor-secondary-foreground: #aeafad; --vscode-editorWhitespace-foreground: rgba(227, 228, 226, 0.16); --vscode-editorIndentGuide-background: rgba(227, 228, 226, 0.16); --vscode-editorIndentGuide-activeBackground: rgba(227, 228, 226, 0.16); --vscode-editorIndentGuide-background2: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-background3: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-background4: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-background5: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-background6: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-activeBackground2: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-activeBackground3: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-activeBackground4: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-activeBackground5: rgba(0, 0, 0, 0); --vscode-editorIndentGuide-activeBackground6: rgba(0, 0, 0, 0); --vscode-editorActiveLineNumber-foreground: #c6c6c6; --vscode-editorRuler-foreground: #5a5a5a; --vscode-editorCodeLens-foreground: #999999; --vscode-editorBracketMatch-background: rgba(0, 100, 0, 0.1); --vscode-editorBracketMatch-border: #888888; --vscode-editorGutter-background: #1f1f1f; --vscode-editorUnnecessaryCode-opacity: rgba(0, 0, 0, 0.67); --vscode-editorGhostText-foreground: rgba(255, 255, 255, 0.34); --vscode-editorOverviewRuler-rangeHighlightForeground: rgba(0, 122, 204, 0.6); --vscode-editorOverviewRuler-errorForeground: rgba(255, 18, 18, 0.7); --vscode-editorOverviewRuler-warningForeground: #cca700; --vscode-editorOverviewRuler-infoForeground: #59a4f9; --vscode-editorBracketHighlight-foreground1: #ffd700; --vscode-editorBracketHighlight-foreground2: #da70d6; --vscode-editorBracketHighlight-foreground3: #179fff; --vscode-editorBracketHighlight-foreground4: rgba(0, 0, 0, 0); --vscode-editorBracketHighlight-foreground5: rgba(0, 0, 0, 0); --vscode-editorBracketHighlight-foreground6: rgba(0, 0, 0, 0); --vscode-editorBracketHighlight-unexpectedBracket-foreground: rgba(255, 18, 18, 0.8); --vscode-editorBracketPairGuide-background1: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-background2: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-background3: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-background4: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-background5: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-background6: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-activeBackground1: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-activeBackground2: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-activeBackground3: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-activeBackground4: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-activeBackground5: rgba(0, 0, 0, 0); --vscode-editorBracketPairGuide-activeBackground6: rgba(0, 0, 0, 0); --vscode-editorUnicodeHighlight-border: #cca700; --vscode-tab-unfocusedActiveBackground: #1f1f1f; --vscode-tab-unfocusedInactiveBackground: #181818; --vscode-tab-unfocusedActiveForeground: rgba(255, 255, 255, 0.5); --vscode-tab-unfocusedInactiveForeground: rgba(157, 157, 157, 0.5); --vscode-tab-dragAndDropBorder: #ffffff; --vscode-tab-activeModifiedBorder: #3399cc; --vscode-tab-inactiveModifiedBorder: rgba(51, 153, 204, 0.5); --vscode-tab-unfocusedActiveModifiedBorder: rgba(51, 153, 204, 0.5); --vscode-tab-unfocusedInactiveModifiedBorder: rgba(51, 153, 204, 0.25); --vscode-editorPane-background: #1f1f1f; --vscode-editorGroupHeader-noTabsBackground: #1f1f1f; --vscode-editorGroup-dropBackground: rgba(83, 89, 93, 0.5); --vscode-editorGroup-dropIntoPromptForeground: #cccccc; --vscode-editorGroup-dropIntoPromptBackground: #202020; --vscode-sideBySideEditor-horizontalBorder: rgba(255, 255, 255, 0.09); --vscode-sideBySideEditor-verticalBorder: rgba(255, 255, 255, 0.09); --vscode-banner-background: #04395e; --vscode-banner-foreground: #ffffff; --vscode-banner-iconForeground: #59a4f9; --vscode-statusBar-noFolderForeground: #cccccc; --vscode-statusBar-noFolderBorder: #2b2b2b; --vscode-statusBarItem-activeBackground: rgba(255, 255, 255, 0.18); --vscode-statusBarItem-compactHoverBackground: rgba(255, 255, 255, 0.2); --vscode-statusBarItem-prominentForeground: #cccccc; --vscode-statusBarItem-prominentHoverForeground: #ffffff; --vscode-statusBarItem-prominentHoverBackground: rgba(241, 241, 241, 0.2); --vscode-statusBarItem-errorBackground: #b91007; --vscode-statusBarItem-errorForeground: #ffffff; --vscode-statusBarItem-errorHoverForeground: #ffffff; --vscode-statusBarItem-errorHoverBackground: rgba(241, 241, 241, 0.2); --vscode-statusBarItem-warningBackground: #7a6400; --vscode-statusBarItem-warningForeground: #ffffff; --vscode-statusBarItem-warningHoverForeground: #ffffff; --vscode-statusBarItem-warningHoverBackground: rgba(241, 241, 241, 0.2); --vscode-activityBar-dropBorder: #d7d7d7; --vscode-activityBarTop-foreground: #e7e7e7; --vscode-activityBarTop-activeBorder: #e7e7e7; --vscode-activityBarTop-inactiveForeground: rgba(231, 231, 231, 0.6); --vscode-activityBarTop-dropBorder: #e7e7e7; --vscode-panelTitleBadge-background: #0078d4; --vscode-panelTitleBadge-foreground: #ffffff; --vscode-panel-dropBorder: #cccccc; --vscode-panelSection-dropBackground: rgba(83, 89, 93, 0.5); --vscode-panelSectionHeader-background: rgba(128, 128, 128, 0.2); --vscode-panelSection-border: #2b2b2b; --vscode-panelStickyScroll-background: #181818; --vscode-panelStickyScroll-shadow: #000000; --vscode-profileBadge-background: #4d4d4d; --vscode-profileBadge-foreground: #ffffff; --vscode-statusBarItem-remoteHoverForeground: #ffffff; --vscode-statusBarItem-remoteHoverBackground: rgba(241, 241, 241, 0.2); --vscode-statusBarItem-offlineBackground: #6c1717; --vscode-statusBarItem-offlineForeground: #ffffff; --vscode-statusBarItem-offlineHoverForeground: #ffffff; --vscode-statusBarItem-offlineHoverBackground: rgba(241, 241, 241, 0.2); --vscode-extensionBadge-remoteBackground: #0078d4; --vscode-extensionBadge-remoteForeground: #ffffff; --vscode-sideBarTitle-background: #181818; --vscode-sideBar-dropBackground: rgba(83, 89, 93, 0.5); --vscode-sideBarActivityBarTop-border: #2b2b2b; --vscode-sideBarStickyScroll-background: #181818; --vscode-sideBarStickyScroll-shadow: #000000; --vscode-menubar-selectionForeground: #cccccc; --vscode-menubar-selectionBackground: rgba(90, 93, 94, 0.31); --vscode-commandCenter-foreground: #cccccc; --vscode-commandCenter-activeForeground: #cccccc; --vscode-commandCenter-inactiveForeground: #9d9d9d; --vscode-commandCenter-background: rgba(255, 255, 255, 0.05); --vscode-commandCenter-activeBackground: rgba(255, 255, 255, 0.08); --vscode-commandCenter-border: rgba(204, 204, 204, 0.2); --vscode-commandCenter-activeBorder: rgba(204, 204, 204, 0.3); --vscode-commandCenter-inactiveBorder: rgba(157, 157, 157, 0.25); --vscode-notificationCenter-border: #313131; --vscode-notificationToast-border: #313131; --vscode-notificationLink-foreground: #4daafc; --vscode-notificationsErrorIcon-foreground: #f14c4c; --vscode-notificationsWarningIcon-foreground: #cca700; --vscode-notificationsInfoIcon-foreground: #59a4f9; --vscode-terminal-selectionBackground: #264f78; --vscode-terminalCommandDecoration-defaultBackground: rgba(255, 255, 255, 0.25); --vscode-terminalCommandDecoration-successBackground: #1b81a8; --vscode-terminalCommandDecoration-errorBackground: #f14c4c; --vscode-terminalOverviewRuler-cursorForeground: rgba(160, 160, 160, 0.8); --vscode-terminal-border: #2b2b2b; --vscode-terminalOverviewRuler-border: #010409; --vscode-terminal-findMatchBackground: #9e6a03; --vscode-terminal-hoverHighlightBackground: rgba(38, 79, 120, 0.13); --vscode-terminal-findMatchHighlightBackground: rgba(234, 92, 0, 0.33); --vscode-terminalOverviewRuler-findMatchForeground: rgba(209, 134, 22, 0.49); --vscode-terminal-dropBackground: rgba(83, 89, 93, 0.5); --vscode-terminal-initialHintForeground: rgba(255, 255, 255, 0.34); --vscode-gitDecoration-addedResourceForeground: #81b88b; --vscode-gitDecoration-modifiedResourceForeground: #e2c08d; --vscode-gitDecoration-deletedResourceForeground: #c74e39; --vscode-gitDecoration-untrackedResourceForeground: #73c991; --vscode-gitDecoration-renamedResourceForeground: #73c991; --vscode-gitDecoration-ignoredResourceForeground: #8c8c8c; --vscode-gitDecoration-stageModifiedResourceForeground: #e2c08d; --vscode-gitDecoration-stageDeletedResourceForeground: #c74e39; --vscode-gitDecoration-conflictingResourceForeground: #e4676b; --vscode-gitDecoration-submoduleResourceForeground: #8db9e2; --vscode-terminal-ansiBlack: #000000; --vscode-terminal-ansiRed: #cd3131; --vscode-terminal-ansiGreen: #0dbc79; --vscode-terminal-ansiYellow: #e5e510; --vscode-terminal-ansiBlue: #2472c8; --vscode-terminal-ansiMagenta: #bc3fbc; --vscode-terminal-ansiCyan: #11a8cd; --vscode-terminal-ansiWhite: #e5e5e5; --vscode-terminal-ansiBrightBlack: #666666; --vscode-terminal-ansiBrightRed: #f14c4c; --vscode-terminal-ansiBrightGreen: #23d18b; --vscode-terminal-ansiBrightYellow: #f5f543; --vscode-terminal-ansiBrightBlue: #3b8eea; --vscode-terminal-ansiBrightMagenta: #d670d6; --vscode-terminal-ansiBrightCyan: #29b8db; --vscode-terminal-ansiBrightWhite: #e5e5e5;"
+    }
+  },
+  {
+    "tagName": "HEAD",
+    "text": "Launchpad",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "META",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "charset": "utf-8"
+    }
+  },
+  {
+    "tagName": "META",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "http-equiv": "Content-Security-Policy",
+      "content": "\n\t\t\t\tdefault-src\n\t\t\t\t\t'none'\n\t\t\t\t;\n\t\t\t\timg-src\n\t\t\t\t\t'self'\n\t\t\t\t\tdata:\n\t\t\t\t\tblob:\n\t\t\t\t\tvscode-remote-resource:\n\t\t\t\t\tvscode-managed-remote-resource:\n\t\t\t\t\thttps:\n\t\t\t\t;\n\t\t\t\tmedia-src\n\t\t\t\t\t'self'\n\t\t\t\t\tdata:\n\t\t\t\t\tblob:\n\t\t\t\t\thttps://www.gstatic.com\n\t\t\t\t\thttps://127.0.0.1:*\n\t\t\t\t\tvscode-remote-resource:\n\t\t\t\t\tvscode-managed-remote-resource:\n\t\t\t\t;\n\t\t\t\tframe-src\n\t\t\t\t\t'self'\n\t\t\t\t\tvscode-webview:\n\t\t\t\t\tdata:\n\t\t\t\t;\n\t\t\t\tscript-src\n\t\t\t\t\t'self'\n\t\t\t\t\t'unsafe-eval'\n\t\t\t\t\tblob:\n\t\t\t\t;\n\t\t\t\tstyle-src\n\t\t\t\t\t'self'\n\t\t\t\t\t'unsafe-inline'\n\t\t\t\t\thttps://fonts.googleapis.com\n\t\t\t\t;\n\t\t\t\tconnect-src\n\t\t\t\t\t'self'\n\t\t\t\t\tdata:\n\t\t\t\t\thttp://127.0.0.1:*\n\t\t\t\t\thttp://localhost:*\n\t\t\t\t\thttp://jetski-unleash.corp.goog/\n\t\t\t\t\thttp://antigravity-unleash.goog/\n\t\t\t\t\thttps:\n\t\t\t\t\tws:\n\t\t\t\t;\n\t\t\t\tfont-src\n\t\t\t\t\t'self'\n\t\t\t\t\tvscode-remote-resource:\n\t\t\t\t\tvscode-managed-remote-resource:\n\t\t\t\t\thttps://*.vscode-unpkg.net\n\t\t\t\t\thttps://fonts.gstatic.com\n\t\t\t\t;\n\t\t\t\trequire-trusted-types-for\n\t\t\t\t\t'script'\n\t\t\t\t;\n\t\t\t\ttrusted-types\n\t\t\t\t\tamdLoader\n\t\t\t\t\tcellRendererEditorText\n\t\t\t\t\tdefaultWorkerFactory\n\t\t\t\t\tdiffEditorWidget\n\t\t\t\t\tdiffReview\n\t\t\t\t\tdomLineBreaksComputer\n\t\t\t\t\tdompurify\n\t\t\t\t\tdompurifyMermaid\n\t\t\t\t\teditorGhostText\n\t\t\t\t\teditorViewLayer\n\t\t\t\t\tmermaid\n\t\t\t\t\tnotebookRenderer\n\t\t\t\t\tstickyScrollViewLayer\n\t\t\t\t\ttokenizeToString\n\t\t\t\t\tnotebookChatEditController\n\t\t\t\t\trenderCodeBlock\n\t\t\t\t\tgoogle#safe\n\t\t\t\t;\n\t\t"
+    }
+  },
+  {
+    "tagName": "LINK",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "rel": "stylesheet",
+      "href": "../../../../tw-base.tailwind.css"
+    }
+  },
+  {
+    "tagName": "LINK",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "rel": "stylesheet",
+      "href": "../../../../jetskiMain.tailwind.css"
+    }
+  },
+  {
+    "tagName": "TITLE",
+    "text": "Launchpad",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "SCRIPT",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "async": "async",
+      "type": "text/javascript",
+      "src": "vscode-file://vscode-app/Applications/Antigravity IDE.app/Contents/Resources/app/node_modules/vscode-textmate/release/main.js"
+    }
+  },
+  {
+    "tagName": "SCRIPT",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "async": "async",
+      "type": "text/javascript",
+      "src": "vscode-file://vscode-app/Applications/Antigravity IDE.app/Contents/Resources/app/node_modules/vscode-oniguruma/release/main.js"
+    }
+  },
+  {
+    "tagName": "BODY",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "aria-label": "",
+      "style": "color: var(--vscode-foreground); background-color: transparent; scrollbar-color: rgba(128, 128, 128, 0.4) rgba(0, 0, 0, 0);"
+    }
+  },
+  {
+    "tagName": "SCRIPT",
+    "text": "",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {
+      "src": "./jetskiAgent.js",
+      "type": "module"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "relative w-screen h-screen overflow-hidden",
+    "path": "document",
+    "attributes": {
+      "class": "relative w-screen h-screen overflow-hidden"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "absolute inset-0 flex justify-center items-start z-[2600]",
+    "path": "document",
+    "attributes": {
+      "class": "absolute inset-0 flex justify-center items-start z-[2600]",
+      "style": "padding-top: 0px;"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "bg-muted rounded-lg border border-border w-[40rem] flex flex-col overflow-visible h-fit",
+    "path": "document",
+    "attributes": {
+      "tabindex": "0",
+      "class": "bg-muted rounded-lg border border-border w-[40rem] flex flex-col overflow-visible h-fit",
+      "style": "box-shadow: rgba(0, 0, 0, 0.15) 0px 8px 32px, rgba(255, 255, 255, 0.05) 0px 0px 0px 1px; outline: none;"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "",
+    "id": "",
+    "className": "box-border",
+    "path": "document",
+    "attributes": {
+      "class": "box-border"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "",
+    "id": "",
+    "className": "flex items-center gap-1 w-full py-1 px-2",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-1 w-full py-1 px-2"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "",
+    "id": "",
+    "className": "relative flex items-center w-full bg-muted rounded-lg border border-border",
+    "path": "document",
+    "attributes": {
+      "class": "relative flex items-center w-full bg-muted rounded-lg border border-border"
+    }
+  },
+  {
+    "tagName": "INPUT",
+    "text": "",
+    "id": "",
+    "className": "w-full bg-transparent text-foreground border-none outline-none p-1.5 text-sm rounded-lg",
+    "path": "document",
+    "attributes": {
+      "type": "text",
+      "role": "combobox",
+      "data-autofocus": "true",
+      "aria-autocomplete": "list",
+      "aria-expanded": "true",
+      "aria-controls": "fastpick-listbox",
+      "aria-activedescendant": "fastpick-item-file:///windows",
+      "placeholder": "Open window...",
+      "class": "w-full bg-transparent text-foreground border-none outline-none p-1.5 text-sm rounded-lg"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "border-t border-border h-fit",
+    "path": "document",
+    "attributes": {
+      "class": "border-t border-border h-fit"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "fastpick-listbox",
+    "className": "flex flex-col gap-1 overflow-auto overflow-y-scroll max-h-[50vh] px-1.5 pb-1",
+    "path": "document",
+    "attributes": {
+      "role": "listbox",
+      "id": "fastpick-listbox",
+      "class": "flex flex-col gap-1 overflow-auto overflow-y-scroll max-h-[50vh] px-1.5 pb-1",
+      "style": "scrollbar-color: rgba(128, 128, 128, 0.4) transparent; scrollbar-width: thin;"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent windows /windows Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav FeedWriter /Volumes/EXTER",
+    "id": "",
+    "className": "flex flex-col gap-0.5",
+    "path": "document",
+    "attributes": {
+      "class": "flex flex-col gap-0.5"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Recent",
+    "id": "",
+    "className": "text-muted-foreground text-xs px-2.5 pt-4",
+    "path": "document",
+    "attributes": {
+      "class": "text-muted-foreground text-xs px-2.5 pt-4"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "windows /windows",
+    "id": "fastpick-item-file:///windows",
+    "className": "px-2.5 cursor-pointer flex items-start justify-between rounded bg-secondary text-foreground py-2",
+    "path": "document",
+    "attributes": {
+      "role": "option",
+      "aria-selected": "true",
+      "id": "fastpick-item-file:///windows",
+      "class": "px-2.5 cursor-pointer flex items-start justify-between rounded bg-secondary text-foreground py-2"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "windows /windows",
+    "id": "",
+    "className": "flex items-center gap-2 min-w-0 flex-1",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-2 min-w-0 flex-1"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "windows /windows",
+    "id": "",
+    "className": "flex min-w-0 flex-1 flex-col",
+    "path": "document",
+    "attributes": {
+      "class": "flex min-w-0 flex-1 flex-col"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "windows",
+    "id": "",
+    "className": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5",
+    "path": "document",
+    "attributes": {
+      "class": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "windows",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/windows",
+    "id": "",
+    "className": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1",
+    "path": "document",
+    "attributes": {
+      "class": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/windows",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "DIV",
+    "text": "Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+    "id": "fastpick-item-file:///Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+    "className": "px-2.5 cursor-pointer flex items-start justify-between rounded text-foreground hover:bg-secondary py-2",
+    "path": "document",
+    "attributes": {
+      "role": "option",
+      "aria-selected": "false",
+      "id": "fastpick-item-file:///Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+      "class": "px-2.5 cursor-pointer flex items-start justify-between rounded text-foreground hover:bg-secondary py-2"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+    "id": "",
+    "className": "flex items-center gap-2 min-w-0 flex-1",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-2 min-w-0 flex-1"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "Grav /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+    "id": "",
+    "className": "flex min-w-0 flex-1 flex-col",
+    "path": "document",
+    "attributes": {
+      "class": "flex min-w-0 flex-1 flex-col"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "Grav",
+    "id": "",
+    "className": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5",
+    "path": "document",
+    "attributes": {
+      "class": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "Grav",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+    "id": "",
+    "className": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1",
+    "path": "document",
+    "attributes": {
+      "class": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/Grav",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "DIV",
+    "text": "FeedWriter /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+    "id": "fastpick-item-file:///Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+    "className": "px-2.5 cursor-pointer flex items-start justify-between rounded text-foreground hover:bg-secondary py-2",
+    "path": "document",
+    "attributes": {
+      "role": "option",
+      "aria-selected": "false",
+      "id": "fastpick-item-file:///Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+      "class": "px-2.5 cursor-pointer flex items-start justify-between rounded text-foreground hover:bg-secondary py-2"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "FeedWriter /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+    "id": "",
+    "className": "flex items-center gap-2 min-w-0 flex-1",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-2 min-w-0 flex-1"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "FeedWriter /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+    "id": "",
+    "className": "flex min-w-0 flex-1 flex-col",
+    "path": "document",
+    "attributes": {
+      "class": "flex min-w-0 flex-1 flex-col"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "FeedWriter",
+    "id": "",
+    "className": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5",
+    "path": "document",
+    "attributes": {
+      "class": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "FeedWriter",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+    "id": "",
+    "className": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1",
+    "path": "document",
+    "attributes": {
+      "class": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/FeedWriter",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "DIV",
+    "text": "dtcn-v2 /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+    "id": "fastpick-item-file:///Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+    "className": "px-2.5 cursor-pointer flex items-start justify-between rounded text-foreground hover:bg-secondary py-2",
+    "path": "document",
+    "attributes": {
+      "role": "option",
+      "aria-selected": "false",
+      "id": "fastpick-item-file:///Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+      "class": "px-2.5 cursor-pointer flex items-start justify-between rounded text-foreground hover:bg-secondary py-2"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "dtcn-v2 /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+    "id": "",
+    "className": "flex items-center gap-2 min-w-0 flex-1",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-2 min-w-0 flex-1"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "dtcn-v2 /Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+    "id": "",
+    "className": "flex min-w-0 flex-1 flex-col",
+    "path": "document",
+    "attributes": {
+      "class": "flex min-w-0 flex-1 flex-col"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "dtcn-v2",
+    "id": "",
+    "className": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5",
+    "path": "document",
+    "attributes": {
+      "class": "text-sm min-w-0 truncate flex-shrink-0 max-w-full flex items-center gap-1.5"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "dtcn-v2",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+    "id": "",
+    "className": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1",
+    "path": "document",
+    "attributes": {
+      "class": "text-xs min-w-0 opacity-50 truncate mt-0.5 flex-shrink-1"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "/Volumes/EXTERNAL/01_DEV_PROJECTS/MyApps/dtcn-v2",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "DIV",
+    "text": "to navigate to select",
+    "id": "",
+    "className": "flex items-center justify-between px-3 py-1.5 border-t border-border select-none",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center justify-between px-3 py-1.5 border-t border-border select-none"
+    }
+  },
+  {
+    "tagName": "DIV",
+    "text": "to navigate",
+    "id": "",
+    "className": "flex items-center gap-1 text-xs opacity-40",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-1 text-xs opacity-40"
+    }
+  },
+  {
+    "tagName": "svg",
+    "text": "",
+    "id": "",
+    "className": {},
+    "path": "document",
+    "attributes": {
+      "xmlns": "http://www.w3.org/2000/svg",
+      "width": "14",
+      "height": "14",
+      "viewBox": "0 -960 960 960",
+      "fill": "currentColor",
+      "style": "transform: rotate(90deg);"
+    }
+  },
+  {
+    "tagName": "path",
+    "text": "",
+    "id": "",
+    "className": {},
+    "path": "document",
+    "attributes": {
+      "d": "M320-180.39l-42.15-42.77L391.23-336.54H100v-60H391.23L277.85-509.92L320-552.69L506.15-366.54L320-180.39ZM640-407.69L453.85-593.85L640-780l42.15,42.77L568.77-623.84H860v60H568.77L682.15-450.46L640-407.69Z"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "to navigate",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "DIV",
+    "text": "to select",
+    "id": "",
+    "className": "flex items-center gap-1 text-xs opacity-40",
+    "path": "document",
+    "attributes": {
+      "class": "flex items-center gap-1 text-xs opacity-40"
+    }
+  },
+  {
+    "tagName": "svg",
+    "text": "",
+    "id": "",
+    "className": {},
+    "path": "document",
+    "attributes": {
+      "xmlns": "http://www.w3.org/2000/svg",
+      "width": "14",
+      "height": "14",
+      "viewBox": "0 -960 960 960",
+      "fill": "currentColor"
+    }
+  },
+  {
+    "tagName": "path",
+    "text": "",
+    "id": "",
+    "className": {},
+    "path": "document",
+    "attributes": {
+      "d": "M366.15-253.85L140-480L366.15-706.15L408.31-664l-154,154H760V-670h60v220H254.31l154,154l-42.15,42.15Z"
+    }
+  },
+  {
+    "tagName": "SPAN",
+    "text": "to select",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  },
+  {
+    "tagName": "STYLE",
+    "text": ".mtk1 { color: #cccccc; } .mtk2 { color: #1f1f1f; } .mtk3 { color: #d4d4d4; } .mtk4 { color: #000080",
+    "id": "",
+    "className": "",
+    "path": "document",
+    "attributes": {}
+  }
+]

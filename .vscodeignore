@@ -6,6 +6,8 @@ node_modules/.package-lock.json
 .agent
 _agents
 _agent
+.kiro/**
+.kluster/**
 .claude/**
 .qoder/**
 ._*
@@ -29,5 +31,10 @@ CLAUDE-CODE-FREE-GUIDE.md
 ACCURACY-REPORT.md
 codebase-audit-report.md
 CLAUDE.md
+AGENTS.md
 .DS_Store
 scratch/**
+scratch_*.py
+build-vsce.js
+build.log
+media/dashboard-mock.html

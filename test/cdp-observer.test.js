@@ -59,6 +59,11 @@ assert(script.includes('function labelOf('), 'has labelOf function');
 assert(script.includes('function scanAndClick('), 'has scanAndClick function');
 assert(script.includes('function executeClick('), 'has executeClick function');
 
+section('Scope guards');
+assert(!script.includes("btn.closest('body')"), 'does not fall back to body-wide agent context');
+assert(script.includes("matched === 'Run' || matched === 'Run Task' || matched === 'Execute'"), 'Execute uses terminal safety guard');
+assert(script.includes("if (matched === 'Skip' && !browserContext) continue;"), 'Skip only runs in browser tool context');
+
 section('Dry run mode');
 const dryScript = buildObserverScript(
     C.DEFAULT_PATTERNS,

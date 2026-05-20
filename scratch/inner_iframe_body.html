@@ -1,0 +1,368 @@
+
+				<a id="scroll-to-top" role="button" aria-label="scroll to top" href="#" title="#"><span class="icon"></span></a>
+				<h1 id="grav--ai-autopilot-for-windsurf--antigravity-ide">Grav — AI Autopilot for Windsurf / Antigravity IDE</h1>
+<p><strong>Stop babysitting your AI agent.</strong> Grav auto-clicks approval buttons, keeps your chat pinned to the latest response, and blocks dangerous terminal commands — completely hands-free.</p>
+<p><a href="https://github.com/anlvdt/grav" title="https://github.com/anlvdt/grav"><img src="https://img.shields.io/badge/version-4.0.15-blue" alt="Version"></a> <a href="https://github.com/anlvdt/grav/blob/HEAD/LICENSE" title="https://github.com/anlvdt/grav/blob/HEAD/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License: MIT"></a></p>
+<hr>
+<h2 id="why-grav">Why Grav?</h2>
+<p>Windsurf / Antigravity runs its agent panel inside an Out-of-Process IFrame (OOPIF) — standard VS Code extensions can't reach it. Grav connects directly via <strong>Chrome DevTools Protocol (CDP)</strong>, injecting an observer into the webview to reliably interact with every button regardless of Shadow DOM or iframe boundaries.</p>
+<blockquote>
+<p><strong>Works with:</strong> Windsurf IDE, Antigravity IDE, VS Code Native Chat (Copilot Edits), and any VS Code fork that exposes a CDP debug port.</p>
+</blockquote>
+<hr>
+<h2 id="features">Features</h2>
+<h3 id="-auto-click-agent-buttons">🤖 Auto-Click Agent Buttons</h3>
+<p>Automatically clicks <code>Accept</code>, <code>Accept All</code>, <code>Run</code>, <code>Run Task</code>, <code>Execute</code>, <code>Approve</code>, <code>Retry</code>, <code>Proceed</code>, <code>Allow</code>, <code>Allow Once</code>, <code>Always Allow</code>, <code>Allow in Workspace</code>, and more. Four-layer click strategy for maximum reliability across React, web components, and native DOM.</p>
+<h3 id="️-safety-guard-terminal-protection">🛡️ Safety Guard (Terminal Protection)</h3>
+<p>Reads every terminal command <strong>before</strong> clicking <code>Run</code> or <code>Execute</code>. Blocks 30+ destructive patterns:</p>
+<ul>
+<li><code>rm -rf /</code>, <code>rm -rf *</code>, <code>rm -rf ~</code></li>
+<li><code>dd if=/dev/zero</code>, <code>kill -9 -1</code>, fork bombs (<code>:(){:|:&amp;};:</code>)</li>
+<li><code>DROP DATABASE</code>, <code>TRUNCATE TABLE</code></li>
+<li><code>git push --force</code>, <code>git push -f</code>, <code>git clean -fdx</code>, <code>git reset --hard</code></li>
+<li><code>curl &lt;url&gt; | bash</code>, <code>wget &lt;url&gt; | sh</code>, <code>curl &lt;url&gt; | zsh</code> — pipe-to-shell detection</li>
+<li><code>docker system prune -a --volumes</code></li>
+<li>Windows: <code>reg delete hk</code>, <code>vssadmin delete shadows</code>, PowerShell execution bypass</li>
+<li><code>su -</code>, <code>su root</code> (interactive shell deadlock)</li>
+</ul>
+<p>Custom patterns via <code>grav.terminalBlacklist</code> support plain substrings and <code>/regex/</code> syntax.</p>
+<h3 id="-skip-browser-subagent">🌐 Skip Browser SubAgent</h3>
+<p>When the AI agent attempts to use a browser automation tool (<code>browser_subagent</code>, <code>computer_use</code>, <code>use_browser</code>), Grav detects it and clicks <strong>Skip</strong> instead of <strong>Run</strong> — preventing unintended browser sessions. Toggle via status bar or <code>Grav: Toggle Skip Browser SubAgent</code>.</p>
+<h3 id="-auto-scroll">📜 Auto-Scroll</h3>
+<p>Keeps the chat panel pinned to the bottom while AI responds. Automatically pauses when you scroll up and resumes when you scroll back down.</p>
+<h3 id="-adaptive-learning">🧠 Adaptive Learning</h3>
+<p>Observes which terminal commands you approve or reject. Builds a confidence model and suggests promoting safe commands to the whitelist — fewer interruptions over time.</p>
+<h3 id="️-auto-fixer">🛠️ Auto-Fixer</h3>
+<p>If the AI Agent makes a typo in the terminal and the command fails, Grav evaluates the error and <strong>automatically injects the corrected command</strong>. No wasted turns asking for permission.</p>
+<ul>
+<li><code>gti status</code> → auto-runs <code>git status</code></li>
+<li><code>npm instal</code> → auto-runs <code>npm install</code></li>
+<li><code>python script.py</code> (missing alias on macOS) → auto-runs <code>python3 script.py</code></li>
+<li>Parses Git suggestions: <code>"The most similar command is..."</code></li>
+</ul>
+<h3 id="-vs-code-native-chat--copilot-edits">💬 VS Code Native Chat &amp; Copilot Edits</h3>
+<p>Fully supports Microsoft's native <strong>Copilot Edits</strong> and Chat tools. Automatically detects native VS Code permission boundaries and auto-clicks <code>workbench.action.chat.applyAll</code>, <code>github.copilot.acceptWorkspaceEdit</code>, and inline chat accept buttons.</p>
+<h3 id="️-per-project-patterns">🗂️ Per-Project Patterns</h3>
+<p>Define custom button patterns and blacklists per workspace via <code>.vscode/grav.json</code>. Changes reload live without restarting the extension.</p>
+<pre><code class="language-json"><div class="monaco-tokenized-source"><span class="mtk1">{</span><br><span class="mtk1">  </span><span class="mtk10">"patterns"</span><span class="mtk1">: [</span><span class="mtk12">"Deploy"</span><span class="mtk1">, </span><span class="mtk12">"Apply"</span><span class="mtk1">, </span><span class="mtk12">"Confirm Deploy"</span><span class="mtk1">],</span><br><span class="mtk1">  </span><span class="mtk10">"blacklist"</span><span class="mtk1">: [</span><span class="mtk12">"Drop DB"</span><span class="mtk1">],</span><br><span class="mtk1">  </span><span class="mtk10">"dryRun"</span><span class="mtk1">: </span><span class="mtk6">false</span><br><span class="mtk1">}</span></div>
+</code></pre><h3 id="-adaptive-accept-loop">⚡ Adaptive Accept Loop</h3>
+<p>Detects when the AI agent fires a <code>run_command</code> tool call and <strong>instantly drops its scan interval to 800ms for 10 seconds</strong> — then returns to normal. Eliminates the race condition where an approval dialog appears and disappears before the next poll cycle.</p>
+<h3 id="-smart-terminal-kill-guard">🧩 Smart Terminal Kill Guard</h3>
+<p>When a notification containing blocking keywords appears, Grav <strong>inspects the actual DOM</strong> before sending any kill signal. Only fires if the element contains a visible <code>&lt;input&gt;</code> or <code>&lt;textarea&gt;</code>. Antigravity's approval toasts are silently dismissed, leaving your terminal untouched.</p>
+<h3 id="-dry-run-mode">🔍 Dry Run Mode</h3>
+<p>Scan and match buttons without clicking. See exactly what Grav would click before enabling auto-approval on a new project.</p>
+<h3 id="-real-time-dashboard-cmdshiftd">📊 Real-Time Dashboard (<code>Cmd+Shift+D</code>)</h3>
+<ul>
+<li>Toggle Auto-Click, Auto-Scroll, Dry Run, Skip Browser SubAgent</li>
+<li>Enable/disable individual button patterns</li>
+<li>Live activity log, learning engine stats, CDP connection status</li>
+<li>ROI tracker, idle detection</li>
+</ul>
+<hr>
+<h2 id="installation">Installation</h2>
+<ol>
+<li><code>Cmd+Shift+P</code> → <strong>Extensions: Install from VSIX</strong> → select <code>grav-4.0.15.vsix</code></li>
+<li>Fully quit Windsurf/Antigravity (<code>Cmd+Q</code> on macOS, <code>Alt+F4</code> on Windows)</li>
+<li>Reopen the IDE — Grav auto-patches <code>argv.json</code> with the debug port</li>
+<li>Status bar shows <code>🚀 Grav</code> — you're done</li>
+</ol>
+<blockquote>
+<p><strong>Status bar shows <code>CDP off</code>?</strong> The IDE wasn't fully restarted. Quit completely and reopen.</p>
+</blockquote>
+<hr>
+<h2 id="configuration">Configuration</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>grav.enabled</code></td>
+<td><code>true</code></td>
+<td>Master on/off switch</td>
+</tr>
+<tr>
+<td><code>grav.autoScroll</code></td>
+<td><code>true</code></td>
+<td>Keep chat pinned to bottom</td>
+</tr>
+<tr>
+<td><code>grav.dryRun</code></td>
+<td><code>false</code></td>
+<td>Scan without clicking</td>
+</tr>
+<tr>
+<td><code>grav.skipBrowserAgent</code></td>
+<td><code>false</code></td>
+<td>Click Skip instead of Run on browser_subagent steps</td>
+</tr>
+<tr>
+<td><code>grav.approvePatterns</code></td>
+<td><code>[Accept, Run, ...]</code></td>
+<td>Button labels to auto-click</td>
+</tr>
+<tr>
+<td><code>grav.presetMode</code></td>
+<td><code>1.19.6</code></td>
+<td>Button preset: <code>1.19.6</code>, <code>1.23.2</code>, <code>1.24+</code>, <code>custom</code></td>
+</tr>
+<tr>
+<td><code>grav.approveIntervalMs</code></td>
+<td><code>3000</code></td>
+<td>Scan interval (ms, minimum enforced: 3000)</td>
+</tr>
+<tr>
+<td><code>grav.scrollPauseMs</code></td>
+<td><code>15000</code></td>
+<td>Pause after manual scroll-up (ms)</td>
+</tr>
+<tr>
+<td><code>grav.learnEnabled</code></td>
+<td><code>true</code></td>
+<td>Adaptive learning engine</td>
+</tr>
+<tr>
+<td><code>grav.terminalWhitelist</code></td>
+<td><code>[]</code></td>
+<td>Always-allow command patterns</td>
+</tr>
+<tr>
+<td><code>grav.terminalBlacklist</code></td>
+<td><code>[]</code></td>
+<td>Always-block command patterns (supports <code>/regex/</code>)</td>
+</tr>
+<tr>
+<td><code>grav.cdpEnabled</code></td>
+<td><code>true</code></td>
+<td>CDP engine (required for OOPIF access)</td>
+</tr>
+<tr>
+<td><code>grav.cdpPort</code></td>
+<td><code>9333</code></td>
+<td>CDP debug port</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="commands">Commands</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Shortcut</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Grav: Dashboard</code></td>
+<td><code>Cmd+Shift+D</code></td>
+<td>Open monitoring dashboard</td>
+</tr>
+<tr>
+<td><code>Grav: Diagnostics</code></td>
+<td>—</td>
+<td>CDP sessions, button detection state, conflict report</td>
+</tr>
+<tr>
+<td><code>Grav: Pause Auto-Accept</code></td>
+<td>—</td>
+<td>Temporarily pause clicking</td>
+</tr>
+<tr>
+<td><code>Grav: Resume Auto-Accept</code></td>
+<td>—</td>
+<td>Resume clicking</td>
+</tr>
+<tr>
+<td><code>Grav: Accept All</code></td>
+<td>—</td>
+<td>Force-click all accept commands once</td>
+</tr>
+<tr>
+<td><code>Grav: Toggle Dry Run</code></td>
+<td>—</td>
+<td>Toggle dry run mode</td>
+</tr>
+<tr>
+<td><code>Grav: Toggle Auto-Scroll</code></td>
+<td>—</td>
+<td>Toggle auto-scroll</td>
+</tr>
+<tr>
+<td><code>Grav: Toggle Skip Browser SubAgent</code></td>
+<td>—</td>
+<td>Toggle browser agent bypass</td>
+</tr>
+<tr>
+<td><code>Grav: Refresh Observer</code></td>
+<td>—</td>
+<td>Force re-inject observer into all sessions</td>
+</tr>
+<tr>
+<td><code>Grav: Force Reconnect CDP</code></td>
+<td>—</td>
+<td>Manually reconnect CDP</td>
+</tr>
+<tr>
+<td><code>Grav: Init Project Config</code></td>
+<td>—</td>
+<td>Create <code>.vscode/grav.json</code> template</td>
+</tr>
+<tr>
+<td><code>Grav: Purge Bad Learning Data</code></td>
+<td>—</td>
+<td>Clean up incorrectly learned entries</td>
+</tr>
+<tr>
+<td><code>Grav: Learning Stats</code></td>
+<td>—</td>
+<td>View command confidence scores</td>
+</tr>
+<tr>
+<td><code>Grav: Manage Terminal Commands</code></td>
+<td>—</td>
+<td>Interactively manage whitelist/blacklist</td>
+</tr>
+<tr>
+<td><code>Grav: Stop All Terminals</code></td>
+<td><code>Cmd+Shift+Q</code></td>
+<td>Send Ctrl+C to agent terminals</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="status-bar">Status Bar</h2>
+<table>
+<thead>
+<tr>
+<th>Display</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>🚀 Grav</code></td>
+<td>Active — auto-clicking</td>
+</tr>
+<tr>
+<td><code>⏸ Grav</code></td>
+<td>Paused</td>
+</tr>
+<tr>
+<td><code>🚫 Grav</code></td>
+<td>Disabled</td>
+</tr>
+<tr>
+<td><code>$(plug) N $(fold-down)</code></td>
+<td>CDP connected, N sessions, auto-scroll ON</td>
+</tr>
+<tr>
+<td><code>$(debug-disconnect)</code></td>
+<td>CDP disconnected</td>
+</tr>
+<tr>
+<td><code>$(exclude) SKIP</code></td>
+<td>Skip Browser SubAgent ON</td>
+</tr>
+<tr>
+<td><code>$(eye) DRY</code></td>
+<td>Dry Run mode ON</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>CDP off / disconnected:</strong> Fully quit the IDE (<code>Cmd+Q</code>), not just close the window. Reopen. If still failing: <code>Grav: Force Reconnect CDP</code>.</p>
+<p><strong>Buttons not being clicked:</strong> Check Dry Run in Dashboard. Open Activity log. Run <code>Grav: Diagnostics</code>. Verify label case matches exactly.</p>
+<p><strong>Learning store has garbage:</strong> Run <code>Grav: Purge Bad Learning Data</code> (also runs automatically on startup).</p>
+<p><strong>Terminal being killed unexpectedly:</strong> The Smart Terminal Kill Guard verifies DOM input presence before firing — approval toasts will never trigger a kill. If still happening, check <code>grav.terminalBlacklist</code> for conflicting entries via <code>Grav: Diagnostics</code>.</p>
+<hr>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>Windsurf IDE or Antigravity (VS Code fork with CDP debug port support)</li>
+<li>No additional setup — <code>ws</code> WebSocket module is bundled in the VSIX</li>
+</ul>
+<hr>
+<h2 id="changelog">Changelog</h2>
+<h3 id="v4015">v4.0.15</h3>
+<ul>
+<li>Hardened target selection for CDP injection to avoid broad webview matching.</li>
+<li>Native <code>Accept All</code> / accept-loop commands now respect <code>skipTerminalAccept</code> and <code>skipBrowserAgent</code>, so blind command-level accepts no longer bypass the safer CDP path by default.</li>
+<li>Dashboard dynamic rows now render via DOM/text nodes instead of raw <code>innerHTML</code>.</li>
+<li>VSIX packaging excludes local scratch/index artifacts, and activation smoke test now runs against the local repo.</li>
+</ul>
+<h3 id="v4014">v4.0.14</h3>
+<ul>
+<li><strong>Fix CDP disconnection under load:</strong> Heartbeat ticks (<code>setInterval</code> + async) were running concurrently — each spawning CDP commands that cascaded into timeouts, marking sessions dead, and triggering more discovery loops. Fixed with <code>_heartbeatRunning</code> guard that skips a tick if the previous is still in flight.</li>
+<li><strong>Fix concurrent <code>discoverTargets()</code>:</strong> Added <code>_discoverRunning</code> guard to prevent the heartbeat, <code>Target.targetCreated</code> events, and <code>hotUpdate()</code> from running overlapping discovery loops.</li>
+<li><strong>Fast heartbeat ping:</strong> Observer alive-check (<code>window.__grav3</code>) now uses 2s timeout (was 5s) so a dead session fails fast without blocking the full heartbeat tick for 5s.</li>
+<li><strong>Longer session pruning window:</strong> <code>DEAD_AFTER_MS</code> raised from 15s → 30s, giving sessions more time to recover when Antigravity is busy processing a long AI turn.</li>
+<li><strong>Reconnecting status indicator:</strong> Status bar now shows <code>$(sync~spin)</code> (spinning icon) while CDP is reconnecting, with attempt count. Previously showed <code>$(debug-disconnect)</code> immediately, causing confusion between "genuinely disconnected" and "momentarily reconnecting."</li>
+<li><strong>Cleanup guard:</strong> <code>cleanup()</code> resets <code>_heartbeatRunning</code> and <code>_discoverRunning</code> so no stale "lock" blocks the next connection attempt after a WS close.</li>
+</ul>
+<h3 id="v4013">v4.0.13</h3>
+<ul>
+<li><strong>Security fix — pipe-to-shell detection:</strong> <code>curl url | bash</code>, <code>wget url | sh</code>, <code>curl url | zsh</code> were silently passing the blacklist due to a regex anchor bug. All 8 pipe-to-shell patterns (<code>| bash</code>, <code>| sh</code>, <code>| zsh</code>, <code>| pwsh</code>, <code>wget|sh</code>, <code>curl|sh</code>, <code>curl|bash</code>, <code>wget|bash</code>) now correctly block in both the CDP observer and the learning safety guard.</li>
+<li><strong>False positive fix:</strong> <code>git push --force</code> no longer incorrectly blocks <code>git push --force-with-lease</code> (trailing word-boundary lookahead added).</li>
+<li><strong><code>Execute</code> button support:</strong> Added to <code>DEFAULT_PATTERNS</code> and <code>PRESET_PATTERNS['1.24+']</code> — Antigravity variants that use <code>Execute</code> instead of <code>Run</code> are now auto-clicked.</li>
+<li><strong><code>Allow This Workspace</code> added to 1.24+ preset</strong> — covers Antigravity versions that use this label variant.</li>
+<li><strong><code>HIGH_CONF</code> cleanup:</strong> Removed dead entries <code>'Go'</code> (too generic, no matching pattern) and <code>'Approved'</code>. Added <code>'Allow This Workspace'</code> to match new preset entry.</li>
+</ul>
+<h3 id="v4012">v4.0.12</h3>
+<ul>
+<li><strong>Fix SKIP_BROWSER_AGENT false blocking:</strong> When Skip Browser SubAgent was ON and an AI response contained multiple tool calls (e.g., <code>browser_subagent</code> followed by <code>run_terminal</code>), the terminal <code>Run</code> button was incorrectly blocked. Root cause: <code>b.closest('[class*=message], [class*=container]')</code> found a broad parent wrapping all steps; its <code>innerText</code> contained <code>browser_subagent</code> from the earlier step. Fix: narrowed selector to <code>[class*=tool], [class*=step]</code> only — per-step scope, no cross-step bleed.</li>
+<li><strong>Observer version bumped to v4.0.12</strong> for force-reload on update.</li>
+</ul>
+<h3 id="v4011">v4.0.11</h3>
+<ul>
+<li>Restore JS click fallback alongside CDP native click for maximum compatibility.</li>
+<li>Fix iframe discovery for nested OOPIF targets in Antigravity 1.24+.</li>
+</ul>
+<h3 id="v4010--v407">v4.0.10 — v4.0.7</h3>
+<ul>
+<li>CDP click: trigger native <code>Input.dispatchMouseEvent</code> directly to bypass Antigravity's permission guard.</li>
+<li>Human-like click sequence to avoid anti-automation detection on Antigravity update.</li>
+<li>Split status bar into 4 independent items (main, CDP, Skip, Dry Run).</li>
+<li>Skip Browser SubAgent feature: detect <code>browser_subagent</code>/<code>computer_use</code> tool calls and click Skip instead of Run.</li>
+<li>Fix activation crash introduced by Antigravity internal update.</li>
+</ul>
+<h3 id="v400">v4.0.0</h3>
+<ul>
+<li><strong>Auto-Fixer Engine:</strong> Evaluates failed terminal commands (exit code &gt; 0) and automatically injects corrections for common typos, missing aliases, and Git suggestions.</li>
+<li><strong>VS Code Native Chat Support:</strong> Full support for Copilot Edits (<code>workbench.action.chat.applyAll</code>, <code>github.copilot.acceptWorkspaceEdit</code>) and Inline Chat.</li>
+</ul>
+<h3 id="v370">v3.7.0</h3>
+<ul>
+<li>Adaptive Accept Loop: scan interval drops to 800ms for 10s on <code>run_command</code> tool-call event.</li>
+<li>Smart Terminal Kill Guard: DOM-verified kill — only fires when <code>&lt;input&gt;</code>/<code>&lt;textarea&gt;</code> is visible.</li>
+<li>Diagnostics Conflict Report: surfaces conflicts between <code>SAFE_TERMINAL_CMDS</code> and user <code>terminalBlacklist</code>.</li>
+</ul>
+<h3 id="v363">v3.6.3</h3>
+<ul>
+<li>Dev Server Protection: <code>grav.stopAllTerminals</code> filters out user dev servers.</li>
+<li>Enhanced Blacklist: Added <code>su -</code> and <code>git reset --hard</code>.</li>
+<li>Optimized word-boundary matching in <code>matchesBlacklist</code>.</li>
+</ul>
+<h3 id="v360">v3.6.0</h3>
+<ul>
+<li>Per-project patterns via <code>.vscode/grav.json</code> with live file watcher.</li>
+<li>Dry Run mode with Dashboard toggle and status bar indicator.</li>
+<li>Notification suppression: debounced <code>MutationObserver</code> replaces polling.</li>
+</ul>
+<h3 id="v350">v3.5.0</h3>
+<ul>
+<li>CDP engine rewrite: exponential backoff reconnect, session pruning, heartbeat re-inject.</li>
+<li>Safety Guard: reads <code>&lt;code&gt;</code> blocks adjacent to Run buttons.</li>
+<li>Adaptive Learning Engine: mini-batch SGD, confidence scoring, promote/demote.</li>
+</ul>
+<hr>
+<p><strong>Author:</strong> An Le · <a href="https://github.com/anlvdt/grav" title="https://github.com/anlvdt/grav">GitHub</a> · <a href="https://github.com/anlvdt/grav/issues" title="https://github.com/anlvdt/grav/issues">Issues</a> · <a href="mailto:anlvdt@gmail.com" title="mailto:anlvdt@gmail.com">anlvdt@gmail.com</a></p>
+<p>☕️ <strong>Support the Developer</strong>
+If Grav saves you time, consider supporting:</p>
+<ul>
+<li>💳 <strong>MB Bank</strong>: <code>0360126996868</code> (LE VAN AN)<p align="left">
+<img src="https://img.vietqr.io/image/970422-0360126996868-compact2.png" width="250" alt="MB Bank QR">
+</p></li>
+</ul>
+
+			
+		

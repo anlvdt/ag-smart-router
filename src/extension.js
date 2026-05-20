@@ -25,9 +25,10 @@ try { cdp = require('./cdp'); } catch (_) { /* optional CDP module */ }
 
 const CDP_PORT = 9333;
 let _ctx, _enabled = true, _scrollOn = true, _stats = {}, _log = [], _totalClicks = 0;
-let _acceptTimer, _lastQuotaMs = 0, _termLog = [], _acceptPaused = false, _dynamicAcceptCmds = [], _failedCmds = new Set();
+let _acceptTimer, _termLog = [], _acceptPaused = false, _dynamicAcceptCmds = [], _failedCmds = new Set();
 let _dryRun = false;  // Dry run: scan buttons but don't click
 let _skipBrowserAgent = false;  // Skip auto-click when browser agent is active
+let _nextAcceptDue = 0;         // Timestamp for next slow-cycle accept tick
 let _sessionState = { startMs: 0, msgCount: 0, toolCalls: [], responseTimes: [], lastActivityMs: 0, aiTyping: false, approveCount: 0, rejectCount: 0, toolBreakdown: {} };
 let _sbMain, _sbCdp, _sbScroll, _sbSkip, _sbDry, _isAntigravity = false;
 let _observability = createObservabilityState();
@@ -36,7 +37,7 @@ const _nativeTraceCooldown = new Map();
 
 // ── Detection & Config ───────────────────────────────────────
 const isAntigravity = (() => {
-    const checkPaths = ['.antigravity', '.windsurf'];
+    const checkPaths = ['.antigravity', '.antigravity-ide', '.windsurf'];
     return () => {
         const n = (vscode.env.appName || '') + ' ' + (vscode.env.appRoot || '');
         const l = n.toLowerCase();
@@ -46,7 +47,7 @@ const isAntigravity = (() => {
 })();
 
 const ensureCdpInArgv = (() => {
-    const candidates = () => ['.antigravity', '.windsurf'].map(p => path.join(os.homedir(), p, 'argv.json')).filter(fs.existsSync);
+    const candidates = () => ['.antigravity-ide', '.antigravity', '.windsurf'].map(p => path.join(os.homedir(), p, 'argv.json')).filter(fs.existsSync);
     return () => {
         const argvPath = candidates()[0];
         if (!argvPath) return false;
@@ -177,7 +178,7 @@ const refreshBar = () => {
 
 const onStatsUpdated = () => { _totalClicks = Object.values(_stats).reduce((a, b) => a + b, 0); refreshBar(); if (_ctx) { _ctx.globalState.update('stats', _stats); _ctx.globalState.update('totalClicks', _totalClicks); } };
 const onClickLogged = (d) => { if (_ctx) _ctx.globalState.update('clickLog', _log); dashboard.postMessage({ command: 'logUpdated', log: _log }); if (d.pattern) roi.recordClick(d.pattern); if (cfg('learnEnabled', true) && d.button) { const btn = d.button.trim(); const cmdMatch = btn.match(/[`']([^`']+)[`']/) || btn.match(/^(?:Run|Allow|Execute)\s+(.+)/i); if (cmdMatch) learning.recordAction(cmdMatch[1].trim(), 'approve', { project: vscode.workspace.workspaceFolders?.[0]?.name }); } };
-const onQuotaDetected = () => {};
+
 const onChatEvent = (d) => {
     const now = Date.now();
     _sessionState.lastActivityMs = now;
@@ -439,7 +440,6 @@ const startAcceptLoop = () => {
         }
     }, FAST_INTERVAL);
 };
-let _nextAcceptDue = 0;
 
 // ── Activate ─────────────────────────────────────────────────
 async function activate(ctx) {
@@ -537,7 +537,7 @@ async function activate(ctx) {
     // Bridge
     bridge.start(ctx, {
         learning, wiki, injection, getState, setState, getSessionSafe,
-        onStatsUpdated, onClickLogged, onQuotaDetected, onChatEvent,
+        onStatsUpdated, onClickLogged, onChatEvent,
         onTerminalEvent, onPatternsDiscovered,
         onCommandBlocked: (cmd, reason) => {
             console.log(`[Grav Safety] Blocked: ${reason}`);

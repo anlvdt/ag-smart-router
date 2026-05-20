@@ -23,12 +23,19 @@ const { escapeRegex, elevatedWrite, workbenchPath, cfg } = require('./utils');
 function buildRuntime(ctx) {
     const dp = ctx.globalState.get('disabledPatterns', []);
     const pats = cfg('approvePatterns', DEFAULT_PATTERNS).filter(p => !dp.includes(p));
+    const runtimeSafePatterns = new Set([
+        'Accept', 'Accept All', 'Accept all', 'ACCEPT ALL',
+        'Approve', 'Retry', 'Proceed', 'Expand',
+    ]);
+    const runtimePatterns = pats.filter(p => runtimeSafePatterns.has(p));
     let src = fs.readFileSync(path.join(ctx.extensionPath, 'media', 'runtime.js'), 'utf8');
     // Config values
     src = src.replace(/\/\*\{\{PAUSE_MS\}\}\*\/\d+/,    String(cfg('scrollPauseMs', 7000)));
     src = src.replace(/\/\*\{\{SCROLL_MS\}\}\*\/\d+/,   String(cfg('scrollIntervalMs', 500)));
     src = src.replace(/\/\*\{\{APPROVE_MS\}\}\*\/\d+/,  String(cfg('approveIntervalMs', 1000)));
-    src = src.replace(/\/\*\{\{PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(pats));
+    // Keep the legacy workbench runtime on edit-safe buttons only.
+    // Tool and terminal approvals should flow through the CDP observer, which has the safety guard.
+    src = src.replace(/\/\*\{\{PATTERNS\}\}\*\/\[.*?\]/, JSON.stringify(runtimePatterns));
     src = src.replace(/\/\*\{\{ENABLED\}\}\*\/\w+/,     String(cfg('enabled', true)));
     // Shared constants from constants.js
     src = src.replace(/\/\*\{\{REJECT_WORDS\}\}\*\/\[.*?\]/, JSON.stringify(REJECT_WORDS));
@@ -146,13 +153,24 @@ function patchChecksums() {
 /** Clear IDE code cache to force reload of injected runtime. */
 function clearCodeCache() {
     try {
-        const base = process.platform === 'win32'
-            ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Antigravity')
+        const paths = process.platform === 'win32'
+            ? [
+                path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Antigravity IDE'),
+                path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Antigravity')
+              ]
             : process.platform === 'darwin'
-                ? path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity')
-                : path.join(os.homedir(), '.config', 'Antigravity');
-        const d = path.join(base, 'Code Cache', 'js');
-        if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
+                ? [
+                    path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity IDE'),
+                    path.join(os.homedir(), 'Library', 'Application Support', 'Antigravity')
+                  ]
+                : [
+                    path.join(os.homedir(), '.config', 'Antigravity IDE'),
+                    path.join(os.homedir(), '.config', 'Antigravity')
+                  ];
+        for (const base of paths) {
+            const d = path.join(base, 'Code Cache', 'js');
+            if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true });
+        }
     } catch (_) { /* non-critical */ }
 }
 

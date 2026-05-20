@@ -1,0 +1,1898 @@
+[
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Customize Layout...",
+    "id": "",
+    "className": "action-label codicon codicon-configure-layout-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Toggle Primary Side Bar (⌘B)",
+    "id": "",
+    "className": "action-label checked codicon codicon-panel-left",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Toggle Panel (⌘J)",
+    "id": "",
+    "className": "action-label codicon codicon-panel-layout-icon-off",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Toggle Agent (⌥⌘B)",
+    "id": "",
+    "className": "action-label checked codicon codicon-layout-sidebar-right",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Open in Cider",
+    "id": "",
+    "className": "action-label disabled codicon codicon-code",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Reload Window",
+    "id": "",
+    "className": "action-label disabled codicon codicon-refresh",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Quick Open",
+    "id": "",
+    "className": "action-label codicon codicon-search",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Open Browser (Preview)",
+    "id": "",
+    "className": "action-label codicon codicon-chrome",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Editor-Specific Settings",
+    "id": "",
+    "className": "action-label codicon codicon-gear",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "LI",
+    "text": "Profile",
+    "id": "",
+    "className": "action-item icon antigravity-profile",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Profile",
+    "id": "",
+    "className": "action-label codicon codicon-chevron-down",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Log in",
+    "id": "",
+    "className": "action-nudge-button actionable",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "None",
+    "id": "",
+    "className": "action-nudge-button",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "View Changelog",
+    "id": "",
+    "className": "action-nudge-button dismissible",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Explorer (⇧⌘E)",
+    "id": "",
+    "className": "action-label codicon codicon-explorer-view-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Code Search (⇧⌘F)",
+    "id": "",
+    "className": "action-label codicon codicon-search-view-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Source Control (⌃⇧G) - 37 pending changes",
+    "id": "",
+    "className": "action-label codicon codicon-source-control-view-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Remote Explorer",
+    "id": "",
+    "className": "action-label codicon codicon-remote-explorer-view-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Extensions (⇧⌘X)",
+    "id": "",
+    "className": "action-label codicon codicon-extensions-view-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Testing",
+    "id": "",
+    "className": "action-label codicon codicon-test-view-icon",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Refresh",
+    "id": "",
+    "className": "action-label codicon codicon-extensions-refresh",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Views and More Actions...",
+    "id": "",
+    "className": "action-label codicon codicon-toolbar-more",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Extensions Search Results",
+    "id": "",
+    "className": "action-label disabled codicon codicon-extensions-clear-search-results",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Filter Extensions...",
+    "id": "",
+    "className": "action-label codicon codicon-extensions-filter",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Open VSX",
+    "id": "",
+    "className": "",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Antigravity IDE settings",
+    "id": "",
+    "className": "",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "DIV",
+    "text": "Installed\n14",
+    "id": "",
+    "className": "pane-header extension-view-header expanded",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label prominent install action-dropdown",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label prominent install action-dropdown",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label prominent install action-dropdown",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label prominent install action-dropdown",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label prominent install action-dropdown",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label prominent install action-dropdown",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "DIV",
+    "text": "Recommended\n5",
+    "id": "",
+    "className": "pane-header extension-view-header expanded",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install action-dropdown",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install action-dropdown",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install action-dropdown",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install action-dropdown",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action text extension-status-label hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Migrate",
+    "id": "",
+    "className": "action-label codicon extension-action label migrate disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action label reload disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Update",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent update disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install action-dropdown",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label dropdown codicon codicon-drop-down-button extension-action label prominent install action-dropdown hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Installing",
+    "id": "",
+    "className": "action-label codicon disabled extension-action label install installing hide",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Set Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Clear Display Language",
+    "id": "",
+    "className": "action-label codicon extension-action label language disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Install",
+    "id": "",
+    "className": "action-label codicon extension-action label prominent install-other-server disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "action-label codicon extension-action icon extension-status hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Manage",
+    "id": "",
+    "className": "action-label codicon extension-action icon manage codicon-extensions-manage hide disabled",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "label-name",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Close (⌘W)",
+    "id": "",
+    "className": "action-label codicon codicon-close",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Open Changes",
+    "id": "",
+    "className": "action-label codicon codicon-compare-changes",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Split Editor Right (⌘\\)\n[⌥] Split Editor Down",
+    "id": "",
+    "className": "action-label codicon codicon-split-horizontal",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Go Back (⌃-)",
+    "id": "",
+    "className": "action-label codicon codicon-arrow-left",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Go Forward (⌃⇧-)",
+    "id": "",
+    "className": "action-label codicon codicon-arrow-right",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "More Actions...",
+    "id": "",
+    "className": "action-label codicon codicon-toolbar-more",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "scratch",
+    "id": "",
+    "className": "label-name",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "label-name",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Maximize Panel Size",
+    "id": "",
+    "className": "action-label codicon codicon-panel-maximize",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Hide Panel (⌘J)",
+    "id": "",
+    "className": "action-label codicon codicon-panel-close",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Maximize Secondary Side Bar Size",
+    "id": "",
+    "className": "action-label codicon codicon-auxiliarybar-maximize",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Hide Secondary Side Bar",
+    "id": "",
+    "className": "action-label codicon codicon-auxiliarybar-close",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "DIV",
+    "text": "Agent",
+    "id": "",
+    "className": "pane-header expanded hidden",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "remote",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "main*",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Grav (Git) - Synchronize Changes",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "0 \n 0",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "PLOEditor",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Notifications",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "2",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Grav",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Antigravity - Settings",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "JavaScript",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Editor Language Status: No jsconfig, next: 5.9.3, TypeScript version, next: $(copilot) No inline sug",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "LF",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "UTF-8",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Spaces: 4",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "Ln 1, Col 1",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "anlvdt@gmail.com (Google)",
+    "id": "",
+    "className": "statusbar-item-label",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "group relative text-sm text-foreground font-medium !hover:text-ide-icon-color flex w-4 items-center justify-center !text-ide-icon-color !opacity-100 cursor-pointer hover:bg-muted",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "group relative text-sm text-foreground font-medium !hover:text-ide-icon-color flex w-4 items-center justify-center !text-ide-icon-color cursor-pointer hover:bg-muted",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "DIV",
+    "text": "",
+    "id": "",
+    "className": "",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "group relative text-sm text-foreground font-medium !hover:text-ide-icon-color flex w-4 items-center justify-center !text-ide-icon-color cursor-pointer hover:bg-muted",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "A",
+    "text": "",
+    "id": "",
+    "className": "group relative text-sm text-foreground font-medium !hover:text-ide-icon-color flex w-4 items-center justify-center !text-ide-icon-color cursor-pointer hover:bg-muted",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Copy",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Worked for 2m",
+    "id": "",
+    "className": "group flex items-center gap-1 w-full text-left text-sm px-2 min-h-8 py-1 rounded-lg tabular-nums select-none text-foreground hover:bg-muted transition-[opacity,background-color] hidden",
+    "isVisible": false
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Explored\n1 file, 1 folder",
+    "id": "",
+    "className": "group flex items-center gap-1 w-full text-left text-sm px-2 min-h-8 py-1 rounded-lg tabular-nums select-none text-foreground hover:bg-muted transition-[opacity,background-color]",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "probe_dom.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Review Changes",
+    "id": "",
+    "className": "rounded px-1 py-0.5 text-xs font-medium",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Add context",
+    "id": "",
+    "className": "p-1.5 rounded-full text-secondary-foreground hover:bg-secondary cursor-pointer",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "DIV",
+    "text": "Gemini 3.5 Flash (High)",
+    "id": "",
+    "className": "",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Gemini 3.5 Flash (High)",
+    "id": "",
+    "className": "flex min-w-0 max-w-full cursor-pointer items-center h-7 gap-1 rounded-lg pr-1 pl-2 text-xs outline-none hover:bg-secondary transition-colors",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Record voice memo",
+    "id": "",
+    "className": "flex items-center p-1.5 rounded-full transition-all duration-150 hover:bg-secondary cursor-pointer bg-transparent opacity-70",
+    "isVisible": true
+  },
+  {
+    "path": "top",
+    "tagName": "BUTTON",
+    "text": "Cancel (⌃C)",
+    "id": "",
+    "className": "bg-secondary hover:opacity-90 w-6 h-6 rounded-full cursor-pointer flex items-center justify-center transition-colors",
+    "isVisible": true
+  }
+]

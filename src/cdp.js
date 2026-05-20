@@ -40,18 +40,21 @@ let _onChatEvent = null;
 let _totalClicks = 0;
 let _clickLog = [];
 let _lastError = '';       // last connect/WS error (for diagnostics)
-let _lastPhase = 'init';   // init|disabled|discoverPort|fetchVersion|connecting|open|closed|error
+let _lastPhase = 'init';   // init|disabled|discoverPort|fetchVersion|connecting|open|closed|error|reconnecting
 let _debugLog = [];       // observer debug payloads (last N)
 const MAX_DEBUG_LOG = 20;
 let _connectWatchdog = null;
 let _lastTargets = [];       // last discovered targets (for diagnostics)
+let _heartbeatRunning = false;  // prevent concurrent heartbeat ticks
+let _discoverRunning = false;   // prevent concurrent discoverTargets() calls
 
 const CDP_PORTS = [9333, 9222, 9229, 9230, 9234, 9235, 9236];
 const WS_TIMEOUT = 5000;
-const HEARTBEAT_MS = 5000;     // 5s — aggressive self-healing
-const RECONNECT_MS = 3000;     // 3s — fast reconnect
+const HEARTBEAT_MS = 5000;       // 5s — aggressive self-healing
+const HEARTBEAT_PING_MS = 2000;  // 2s — fast fail for session alive-checks
+const RECONNECT_MS = 3000;       // 3s — fast reconnect
 const MAX_BLOCKED = 50;
-const DEAD_AFTER_MS = 15000;    // prune dead sessions after 15s
+const DEAD_AFTER_MS = 30000;     // prune dead sessions after 30s (was 15s)
 
 let _reconnectAttempts = 0;
 let _phaseAtMs = 0;
@@ -78,6 +81,8 @@ function init(opts = {}) {
 function isEnabled() { return _enabled; }
 function isConnected() { return !!(_ws && _ws.readyState === 1); }
 function getLastError() { return _lastError || ''; }
+function getPhase() { return _lastPhase; }
+function getReconnectAttempts() { return _reconnectAttempts; }
 function getDebugLog() { return _debugLog; }
 function getLastTargets() { return _lastTargets; }
 function getSessionSummaries() {
@@ -241,7 +246,20 @@ function cleanup() {
     // NOTE: Do NOT reset _reconnectAttempts here — it must persist across
     // disconnect/reconnect cycles so the warning message triggers after 5 fails.
     // It's reset only on successful connection in connect().
+
+    // Properly detach from all CDP sessions before clearing — prevents session leak
+    // accumulation across reconnect cycles (each reconnect would orphan the old sessions
+    // unless explicitly detached).
+    if (_ws && _ws.readyState === 1 /* OPEN */) {
+        for (const [, s] of _sessions) {
+            if (s.sessionId) {
+                try { _ws.send(JSON.stringify({ id: 0, method: 'Target.detachFromTarget', params: { sessionId: s.sessionId } })); } catch (_) { }
+            }
+        }
+    }
     _sessions.clear();
+    _heartbeatRunning = false;
+    _discoverRunning = false;
     for (const [, cb] of _callbacks) {
         clearTimeout(cb.timer);
         try { cb.reject(new Error('closed')); } catch (_) { }
@@ -251,6 +269,7 @@ function cleanup() {
 
 function scheduleReconnect() {
     if (_reconnectTimer) return;
+    setPhase('reconnecting');
     // Exponential backoff: 3s, 6s, 12s, 24s... capped at 30s
     const delay = Math.min(RECONNECT_MS * Math.pow(2, Math.min(_reconnectAttempts, 4)), 30000);
     console.log(`[Grav CDP] Reconnect in ${delay}ms (attempt ${_reconnectAttempts + 1})`);
@@ -289,7 +308,7 @@ function httpGet(url) {
 }
 
 // ── CDP Messaging ────────────────────────────────────────────
-function send(method, params = {}, sessionId = null) {
+function send(method, params = {}, sessionId = null, timeoutMs = WS_TIMEOUT) {
     if (!_ws || _ws.readyState !== 1) return Promise.reject(new Error('not connected'));
     const id = ++_msgId;
     const msg = { id, method, params };
@@ -299,7 +318,7 @@ function send(method, params = {}, sessionId = null) {
         const timer = setTimeout(() => {
             _callbacks.delete(id);
             reject(new Error('timeout'));
-        }, WS_TIMEOUT);
+        }, timeoutMs);
         _callbacks.set(id, { resolve, reject, timer });
         _ws.send(JSON.stringify(msg));
     });
@@ -329,10 +348,7 @@ function handleMessage(msg) {
             send('Target.attachToTarget', { targetId: info.targetId, flatten: true })
                 .then(r => {
                     if (r && r.sessionId) {
-                        send('Target.setAutoAttach', { 
-                            autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                            filter: [{ type: 'page' }, { type: 'iframe' }, { type: 'webview' }, { type: 'other' }]
-                        }, r.sessionId).catch(() => {});
+                        enableAutoAttach(r.sessionId).catch(() => {});
                     }
                 }).catch(() => {});
         }
@@ -357,10 +373,7 @@ function handleMessage(msg) {
                     console.log('[Grav CDP] Auto-attached:', info.targetId, info.title || '', info.url || '');
                     // CRITICAL: Recursively enable auto-attach on this session too
                     // This allows nested OOPIFs (webviews inside webviews) to be discovered
-                    send('Target.setAutoAttach', {
-                        autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                        filter: [{ type: 'page' }, { type: 'iframe' }, { type: 'webview' }, { type: 'other' }]
-                    }, sessionId).catch(() => { });
+                    enableAutoAttach(sessionId).catch(() => {});
                     // Enable domains and inject observer
                     send('Runtime.enable', {}, sessionId).catch(() => { });
                     send('DOM.enable', {}, sessionId).catch(() => { });
@@ -369,10 +382,7 @@ function handleMessage(msg) {
                 }
             } else if (sessionId) {
                 // Even for non-agent targets, enable auto-attach to discover nested webviews
-                send('Target.setAutoAttach', {
-                    autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                    filter: [{ type: 'page' }, { type: 'iframe' }, { type: 'webview' }, { type: 'other' }]
-                }, sessionId).catch(() => { });
+                enableAutoAttach(sessionId).catch(() => {});
             }
         } catch (_) { }
     }
@@ -402,12 +412,12 @@ function handleMessage(msg) {
 
     // Event: console message from injected observer
     if (msg.method === 'Runtime.consoleAPICalled') {
-        handleConsoleEvent(msg.params);
+        handleConsoleEvent(msg.params, msg.sessionId);
     }
 }
 
 // ── Console Event Handler (communication from observer) ──────
-function handleConsoleEvent(params) {
+function handleConsoleEvent(params, sessionId) {
     if (!params.args || !params.args.length) return;
     const text = params.args[0]?.value || '';
     if (typeof text !== 'string') return;
@@ -433,12 +443,6 @@ function handleConsoleEvent(params) {
             _clickLog.unshift({ time: ts, pattern: payload, button: payload });
             if (_clickLog.length > 50) _clickLog.pop();
         }
-    }
-
-    if (type === 'KILL_TERMINAL') {
-        try {
-            vscode.commands.executeCommand('grav.stopAllTerminals');
-        } catch (_) {}
     }
 
     // RETRY: Observer click failed — escalate to CDP Input.dispatchMouseEvent
@@ -476,18 +480,16 @@ function handleConsoleEvent(params) {
         try { _onChatEvent(JSON.parse(payload)); } catch (e) { console.error('[Grav CDP] CHAT parse error:', e.message); }
     }
 
-    if (type === 'QUOTA') {
-        console.log('[Grav CDP] Quota detected:', payload);
-    }
-
     // DEBUG/BOOT: capture observer introspection (labels, counts, url)
+    // Tag each entry with sessionId (first 12 chars) so dashboard can group by webview.
     if (type === 'DEBUG' || type === 'BOOT') {
+        const sid = sessionId ? sessionId.slice(0, 12) : '';
         try {
             const obj = JSON.parse(payload);
-            _debugLog.unshift({ ts: Date.now(), type, ...obj });
+            _debugLog.unshift({ ts: Date.now(), type, sid, ...obj });
             if (_debugLog.length > MAX_DEBUG_LOG) _debugLog.pop();
         } catch (_) {
-            _debugLog.unshift({ ts: Date.now(), type, raw: payload });
+            _debugLog.unshift({ ts: Date.now(), type, sid, raw: payload });
             if (_debugLog.length > MAX_DEBUG_LOG) _debugLog.pop();
         }
     }
@@ -596,7 +598,7 @@ function isAgentTarget(info) {
     if (url.includes('windsurf') && url.includes('workbench')) return true;
     if (url.includes('workbench.html')) return true;
     // Windsurf main window — type=page with no specific workbench keyword
-    if (type === 'page' && !url.startsWith('http') && !url.startsWith('chrome') && !url.startsWith('devtools')) return true;
+    if (type === 'page' && !url.startsWith('http') && !url.startsWith('chrome') && !url.startsWith('devtools') && !url.startsWith('vscode-webview://')) return true;
 
     // ══════════════════════════════════════════════════════════
     //  HARD BLOCK LIST — NEVER inject into these targets
@@ -604,7 +606,7 @@ function isAgentTarget(info) {
     // ══════════════════════════════════════════════════════════
     const BLOCK_URLS = [
         // Grav dashboard (MUST SKIP — otherwise auto-clicks its own buttons!)
-        'grav', 'gravdashboard', 'grav-dashboard',
+        'gravdashboard', 'grav-dashboard',
         // Settings panels (all variants)
         'settings', 'preferences', 'preference',
         // Browser / Simple Browser panel
@@ -636,16 +638,26 @@ function isAgentTarget(info) {
         if (title.includes(blocked)) return false;
     }
 
-    // ── vscode-webview:// targets ──
-    if (url.startsWith('vscode-webview://')) {
-        // Check hard block list ONLY for titles to be safe, but aggressively accept iframes
-        if (type === 'iframe' || type === 'webview') return true;
-        
+    // ── vscode webview targets (supporting various schemes in Antigravity 2.0) ──
+    const isVscodeScheme = url.startsWith('vscode-webview://') || url.startsWith('vscode-file://') || url.startsWith('vscode-resource://') || url.startsWith('vscode-co-host://');
+    if (isVscodeScheme || url.includes('webview') || url.includes('co-host')) {
         for (const blocked of BLOCK_URLS) {
             if (url.includes(blocked) || title.includes(blocked)) return false;
         }
-        // Passed block list → likely agent/chat panel → accept
-        return true;
+
+        if (type === 'iframe' || type === 'webview' || type === 'other') return true;
+
+        const POSITIVE_WEBVIEW_HINTS = [
+            'antigravity', 'windsurf', 'codeium', 'agent', 'chat',
+            'cascade', 'cortex', 'assistant', 'copilot', 'tool',
+            'grav', 'launchpad',
+        ];
+        if (POSITIVE_WEBVIEW_HINTS.some((hint) => url.includes(hint) || title.includes(hint))) {
+            return true;
+        }
+
+        // Non-iframe vscode webviews still need a positive hint.
+        return false;
     }
 
     // ── OOPIF/webview targets with empty/blank URL ──
@@ -654,7 +666,7 @@ function isAgentTarget(info) {
     if (!url || url === 'about:blank') {
         const POSITIVE_TITLES = [
             'agent', 'chat', 'cascade', 'cortex', 'assistant', 'claude', 'copilot',
-            'tool', 'approval', 'approve', 'accept',
+            'tool', 'approval', 'approve', 'accept', 'grav', 'launchpad',
         ];
         for (const w of POSITIVE_TITLES) {
             if (title.includes(w)) return true;
@@ -684,8 +696,8 @@ function isAgentTarget(info) {
     if (url.startsWith('https://')) return false;
     // url blank handled above
 
-    // Default: aggressively accept iframes/webviews to ensure we don't miss OOPIF chat panels
-    if (type === 'iframe' || type === 'webview') return true;
+    // Unknown iframes/webviews are too broad to trust without positive hints.
+    if (type === 'iframe' || type === 'webview') return false;
 
     // Default for others: check blocklist
     for (const blocked of BLOCK_URLS) {
@@ -694,7 +706,33 @@ function isAgentTarget(info) {
     return true;
 }
 
+async function enableAutoAttach(sessionId = null) {
+    try {
+        await send('Target.setAutoAttach', {
+            autoAttach: true,
+            waitForDebuggerOnStart: false,
+            flatten: true,
+            filter: [
+                { type: 'page', exclude: false },
+                { type: 'iframe', exclude: false },
+                { type: 'webview', exclude: false },
+                { type: 'other', exclude: false }
+            ]
+        }, sessionId);
+    } catch (_) {
+        try {
+            await send('Target.setAutoAttach', {
+                autoAttach: true,
+                waitForDebuggerOnStart: false,
+                flatten: true
+            }, sessionId);
+        } catch (_) { }
+    }
+}
+
 async function discoverTargets() {
+    if (_discoverRunning) return;
+    _discoverRunning = true;
     try {
         // ══════════════════════════════════════════════════════════
         //  CRITICAL: Enable auto-attach BEFORE discovering targets
@@ -707,26 +745,8 @@ async function discoverTargets() {
         //  3. getTargets (gets current list)
         //  4. Attach to main pages first (they contain nested webviews)
         // ══════════════════════════════════════════════════════════
-        try {
-            // Enable auto-attach with flatten=true for OOPIF support
-            await send('Target.setAutoAttach', { 
-                autoAttach: true, 
-                waitForDebuggerOnStart: false, 
-                flatten: true,
-                // CRITICAL: filter parameter helps discover webview targets
-                filter: [
-                    { type: 'page' },
-                    { type: 'iframe' },
-                    { type: 'webview' },
-                    { type: 'other' },
-                ]
-            });
-        } catch (_) {
-            // Fallback without filter (older CDP versions)
-            try {
-                await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
-            } catch (_) { }
-        }
+        // Enable auto-attach with flatten=true for OOPIF support
+        await enableAutoAttach();
         await send('Target.setDiscoverTargets', { discover: true });
         const { targetInfos } = await send('Target.getTargets');
         _lastTargets = (targetInfos || []).map(t => ({
@@ -770,16 +790,15 @@ async function discoverTargets() {
                         targetId: info.targetId, flatten: true,
                     });
                     // Enable auto-attach on this page to discover nested webviews
-                    await send('Target.setAutoAttach', {
-                        autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                        filter: [{ type: 'page' }, { type: 'iframe' }, { type: 'webview' }, { type: 'other' }]
-                    }, sessionId);
+                    await enableAutoAttach(sessionId);
                     console.log('[Grav CDP] Force-attached to page for nested discovery:', info.targetId);
                 } catch (_) { }
             }
         }
     } catch (e) {
         console.error('[Grav CDP] Target discovery failed:', e.message);
+    } finally {
+        _discoverRunning = false;
     }
 }
 
@@ -797,12 +816,7 @@ async function attachToTarget(targetId, url, title = '') {
 
         // CRITICAL: Enable auto-attach recursively on THIS session
         // This allows OOPIF/webview frames nested inside this target to be discovered
-        try {
-            await send('Target.setAutoAttach', {
-                autoAttach: true, waitForDebuggerOnStart: false, flatten: true,
-                filter: [{ type: 'page' }, { type: 'iframe' }, { type: 'webview' }, { type: 'other' }]
-            }, sessionId);
-        } catch (_) { }
+        await enableAutoAttach(sessionId);
 
         // Enable Runtime + Console + DOM + Input for this session
         await send('Runtime.enable', {}, sessionId);
@@ -950,43 +964,53 @@ const FULL_DISCOVERY_INTERVAL = 15000; // Full re-discovery every 15s
 function startHeartbeat() {
     if (_heartbeat) clearInterval(_heartbeat);
     _heartbeat = setInterval(async () => {
+        // Prevent overlapping ticks — if the previous tick is still running, skip this one.
+        // Without this guard, setInterval fires every 5s regardless of async completion,
+        // causing concurrent ticks that each issue CDP commands and cascade timeouts.
+        if (_heartbeatRunning) return;
         if (!_ws || _ws.readyState !== 1) return;
+        _heartbeatRunning = true;
+        try {
+            // Check each attached session
+            for (const [targetId, session] of _sessions) {
+                try {
+                    // Use short timeout for ping — if observer is alive it responds instantly.
+                    // Fast failure prevents blocking the entire heartbeat tick.
+                    const result = await send('Runtime.evaluate', {
+                        expression: 'window.__grav3',
+                        returnByValue: true,
+                    }, session.sessionId, HEARTBEAT_PING_MS);
 
-        // Check each attached session
-        for (const [targetId, session] of _sessions) {
-            try {
-                const result = await send('Runtime.evaluate', {
-                    expression: 'window.__grav3',
-                    returnByValue: true,
-                }, session.sessionId);
-
-                if (!result || !result.result || typeof result.result.value !== 'string' || !result.result.value.startsWith('v')) {
-                    // Observer died or was never injected — re-inject
-                    console.log('[Grav CDP] Re-injecting observer for', targetId);
-                    await injectObserver(session.sessionId);
-                }
-                session.alive = true;
-                session.lastCheck = Date.now();
-            } catch (e) {
-                session.alive = false;
-                if (Date.now() - session.lastCheck > DEAD_AFTER_MS) {
-                    _sessions.delete(targetId);
-                    console.log('[Grav CDP] Pruned dead session:', targetId);
+                    if (!result || !result.result || typeof result.result.value !== 'string' || !result.result.value.startsWith('v')) {
+                        // Observer died or was never injected — re-inject
+                        console.log('[Grav CDP] Re-injecting observer for', targetId);
+                        await injectObserver(session.sessionId);
+                    }
+                    session.alive = true;
+                    session.lastCheck = Date.now();
+                } catch (e) {
+                    session.alive = false;
+                    if (Date.now() - session.lastCheck > DEAD_AFTER_MS) {
+                        _sessions.delete(targetId);
+                        console.log('[Grav CDP] Pruned dead session:', targetId);
+                    }
                 }
             }
-        }
 
-        // Re-discover targets (new webviews may have appeared)
-        // Do full discovery less frequently to avoid overwhelming CDP
-        const now = Date.now();
-        if (now - _lastFullDiscovery > FULL_DISCOVERY_INTERVAL || _sessions.size === 0) {
-            _lastFullDiscovery = now;
-            discoverTargets();
-        }
-        
-        // If no sessions after discovery, something is wrong - log diagnostic
-        if (_sessions.size === 0) {
-            console.log('[Grav CDP] WARNING: No active sessions. Targets:', _lastTargets.length);
+            // Re-discover targets (new webviews may have appeared)
+            // Do full discovery less frequently to avoid overwhelming CDP
+            const now = Date.now();
+            if (now - _lastFullDiscovery > FULL_DISCOVERY_INTERVAL || _sessions.size === 0) {
+                _lastFullDiscovery = now;
+                await discoverTargets();
+            }
+
+            // If no sessions after discovery, something is wrong - log diagnostic
+            if (_sessions.size === 0) {
+                console.log('[Grav CDP] WARNING: No active sessions. Targets:', _lastTargets.length);
+            }
+        } finally {
+            _heartbeatRunning = false;
         }
     }, HEARTBEAT_MS);
 }
@@ -1027,11 +1051,12 @@ module.exports = {
     init, connect, disconnect, forceReconnect,
     isEnabled, isConnected, setEnabled,
     getBlockedLog, getTotalClicks, getClickLog, getSessionCount,
-    getLastError,
+    getLastError, getPhase, getReconnectAttempts,
     getDebugState,
     getDebugLog,
     getLastTargets,
     getSessionSummaries,
     probeAcceptLike,
+    isAgentTarget,
     hotUpdate, cdpNativeClick,
 };

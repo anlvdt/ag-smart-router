@@ -1,0 +1,240 @@
+[
+  {
+    "tagName": "INPUT",
+    "text": "",
+    "id": "",
+    "className": "input empty",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "⌥H probe_webview.js",
+    "id": "",
+    "className": "previous-file secondary",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "View 5 edited files",
+    "id": "",
+    "className": "center-button secondary",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "probe_structure.js ⌥L",
+    "id": "",
+    "className": "next-file secondary",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "dataTooltipId": "copy-user-message-P0-6"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "dataTooltipId": "undo-tooltip-P0-7"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Worked for 10m",
+    "id": "",
+    "className": "group flex items-center gap-1 w-full text-left text-sm px-2 min-h-8 py-1 rounded-lg tabular-nums select-none text-foreground hover:bg-muted transition-[opacity,background-color]",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Review",
+    "id": "",
+    "className": "shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-sm cursor-pointer select-none border bg-muted hover:bg-secondary transition-colors text-secondary-foreground hover:text-foreground review-button",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex justify-center items-center p-0.5 rounded-md text-secondary-foreground hover:text-foreground",
+    "dataTooltipId": "copy-P0-128"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex justify-center items-center p-0.5 rounded-md transition-[opacity,transform] duration-100 cursor-pointer opacity-70 hover:opacity-100",
+    "dataTooltipId": "up-P0-128"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex justify-center items-center p-0.5 rounded-md transition-[opacity,transform] duration-100 cursor-pointer opacity-70 hover:opacity-100",
+    "dataTooltipId": "down-P0-128"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "dataTooltipId": "copy-user-message-P0-130"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "dataTooltipId": "undo-tooltip-P0-131"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Worked for 5s",
+    "id": "",
+    "className": "group flex items-center gap-1 w-full text-left text-sm px-2 min-h-8 py-1 rounded-lg tabular-nums select-none text-foreground hover:bg-muted transition-[opacity,background-color]",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Review",
+    "id": "",
+    "className": "shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-sm cursor-pointer select-none border bg-muted hover:bg-secondary transition-colors text-secondary-foreground hover:text-foreground review-button",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex justify-center items-center p-0.5 rounded-md text-secondary-foreground hover:text-foreground",
+    "dataTooltipId": "copy-P0-137"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex justify-center items-center p-0.5 rounded-md transition-[opacity,transform] duration-100 cursor-pointer opacity-70 hover:opacity-100",
+    "dataTooltipId": "up-P0-137"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex justify-center items-center p-0.5 rounded-md transition-[opacity,transform] duration-100 cursor-pointer opacity-70 hover:opacity-100",
+    "dataTooltipId": "down-P0-137"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "dataTooltipId": "copy-user-message-P0-139"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "text-muted-foreground hover:text-secondary-foreground transition-opacity pointer-events-auto p-0.5",
+    "dataTooltipId": "undo-tooltip-P0-140"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Worked for 1m",
+    "id": "",
+    "className": "group flex items-center gap-1 w-full text-left text-sm px-2 min-h-8 py-1 rounded-lg tabular-nums select-none text-foreground hover:bg-muted transition-[opacity,background-color] hidden",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "click_submit.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "dataTooltipId": "P0-146"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "dataTooltipId": "P0-157"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "click_submit_top.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "dataTooltipId": "P0-170"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "probe_shadow_dom.js",
+    "id": "",
+    "className": "appearance-none bg-transparent border-0 p-0 inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-secondary select-none",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "cursor-pointer items-center justify-center rounded-md p-1 text-secondary-foreground hover:text-foreground pointer-events-auto",
+    "dataTooltipId": "P0-183"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Review Changes",
+    "id": "",
+    "className": "rounded px-1 py-0.5 text-xs font-medium",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "p-1.5 rounded-full text-secondary-foreground hover:bg-secondary cursor-pointer",
+    "dataTooltipId": "P0-187"
+  },
+  {
+    "tagName": "INPUT",
+    "text": "",
+    "id": "",
+    "className": "hidden",
+    "dataTooltipId": null
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "Gemini 3.5 Flash (High)",
+    "id": "",
+    "className": "flex min-w-0 max-w-full cursor-pointer items-center h-7 gap-1 rounded-lg pr-1 pl-2 text-xs outline-none hover:bg-secondary transition-colors",
+    "dataTooltipId": "P0-189"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "flex items-center p-1.5 rounded-full transition-all duration-150 hover:bg-secondary cursor-pointer bg-transparent opacity-70",
+    "dataTooltipId": "input-send-button-record-tooltip"
+  },
+  {
+    "tagName": "BUTTON",
+    "text": "",
+    "id": "",
+    "className": "bg-secondary hover:opacity-90 w-6 h-6 rounded-full cursor-pointer flex items-center justify-center transition-colors",
+    "dataTooltipId": "input-send-button-cancel-tooltip"
+  }
+]

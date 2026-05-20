@@ -29,24 +29,24 @@ const DEFAULT_PATTERNS = Object.freeze([
     //   Run > Accept > Always Allow > Allow > Proceed
     //
     // === SAFE: File edits — accept code changes, revertible ===
-    'Accept', 'Accept All', 'Accept all',
+    'Accept', 'Accept All', 'Accept all', 'Review Changes', 'Review All', 'Review all',
     // === SAFE: Agent flow — continue/retry execution ===
-    'Retry', 'Proceed',
-    // === CAUTION: Per-request permissions (Safety Guard protects Run) ===
-    'Run Task', 'Run',
+    'Retry', 'Proceed', 'Submit',
+    // === CAUTION: Per-request permissions (Safety Guard protects Run/Execute) ===
+    'Run Task', 'Run', 'Execute',
     // === Antigravity-specific: Agent Manager / Cortex step buttons ===
     'Approve', 'Expand', 'Allow in Workspace', 'Allow', 'Allow Once', 'Always Allow',
 ]);
 
 const PRESET_PATTERNS = Object.freeze({
     '1.19.6': [
-        'Accept all', 'Accept All', 'Accept', 'Retry', 'Proceed', 'Run', 'Approve', 'Expand', 'Allow in Workspace',
+        'Accept all', 'Accept All', 'Accept', 'Review Changes', 'Review All', 'Review all', 'Retry', 'Proceed', 'Run', 'Approve', 'Expand', 'Allow in Workspace',
     ],
     '1.23.2': [
-        'Accept All', 'Accept', 'Retry', 'Run', 'Approve', 'Allow This Workspace', 'Allow in Workspace',
+        'Accept All', 'Accept', 'Review Changes', 'Review All', 'Review all', 'Retry', 'Run', 'Approve', 'Allow This Workspace', 'Allow in Workspace',
     ],
     '1.24+': [
-        'Accept', 'Accept All', 'Accept all', 'ACCEPT ALL', 'Retry', 'Run Task', 'Run', 'Approve', 'Allow in Workspace', 'Allow', 'Allow Once', 'Always Allow',
+        'Accept', 'Accept All', 'Accept all', 'ACCEPT ALL', 'Review Changes', 'Review All', 'Review all', 'Retry', 'Run Task', 'Run', 'Execute', 'Approve', 'Allow in Workspace', 'Allow This Workspace', 'Allow', 'Allow Once', 'Always Allow', 'Submit',
     ],
 });
 
@@ -167,10 +167,11 @@ const LEARN = Object.freeze({
 // These only appear in agent approval contexts
 const HIGH_CONF = Object.freeze({
     'Accept All': 1, 'Accept all': 1, 'ACCEPT ALL': 1, 'Accept': 1,
-    'Approve': 1, 'Approved': 1, 'Expand': 1,
+    'Review Changes': 1, 'Review All': 1, 'Review all': 1,
+    'Approve': 1, 'Expand': 1,
     'Run': 1, 'Run Task': 1, 'Execute': 1,
-    'Retry': 1, 'Proceed': 1, 'Go': 1,
-    'Allow': 1, 'Allow Once': 1, 'Always Allow': 1, 'Allow in Workspace': 1,
+    'Retry': 1, 'Proceed': 1, 'Submit': 1,
+    'Allow': 1, 'Allow Once': 1, 'Always Allow': 1, 'Allow in Workspace': 1, 'Allow This Workspace': 1,
 });
 
 // Cooldown durations (ms) — time to wait before clicking same pattern again
@@ -207,7 +208,7 @@ const EDITOR_SKIP = Object.freeze([
 // NOTE: Do NOT add 'requires input' / 'waiting for user input' here —
 // those are Antigravity tool approval prompts that Grav needs to click.
 const SUPPRESS_KEYWORDS = Object.freeze([
-    'corrupt', 'reinstall',
+    'corrupt', 'reinstall', 'mcp error',
 ]);
 
 // Numeric limits — replaces magic numbers
