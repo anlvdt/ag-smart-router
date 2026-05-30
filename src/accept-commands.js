@@ -5,6 +5,7 @@ const SKIP_DISCOVERY_TERMS = Object.freeze([
     'open', 'show', 'toggle', 'enable', 'disable', 'edit', 'view',
     'list', 'reset', 'clear', 'input', 'prompt', 'dialog', 'confirm',
     'ask', 'select', 'pick', 'choose',
+    'chatediting',  // chatEditing.acceptAllFiles opens Review tab — block discovery
 ]);
 
 const ACCEPT_COMMAND_WHITELIST = Object.freeze([
