@@ -10,7 +10,7 @@ const {
 
 function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, dryRun, skipBrowserAgent) {
     // Version tag - increment this when observer logic changes
-    const OBSERVER_VERSION = 'v4.0.17';
+    const OBSERVER_VERSION = 'v4.0.18';
     return `(function() {
     'use strict';
     // Version-based guard: allows new observer to replace old one
@@ -268,8 +268,24 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             btn.closest('[class*=welcome]') ||
             btn.closest('[class*=walkthrough]') ||
             btn.closest('[class*=getting-started]') ||
-            // ── Output panel ──
-            btn.closest('[class*=output]') ||
+            // ── Output panel (specific selectors — avoid [class*=output] which
+            //    blocks agent tool-output / command-output containers) ──
+            btn.closest('.output-view-container') ||
+            btn.closest('[id*=output]') ||
+            // ── Source Control panel ──
+            btn.closest('.scm-view') ||
+            btn.closest('[class*=scm-view]') ||
+            btn.closest('[class*=source-control]') ||
+            // ── Debug / Run panel ──
+            btn.closest('.debug-toolbar') ||
+            btn.closest('[class*=debug-view]') ||
+            btn.closest('[class*=debug-pane]') ||
+            // ── Problems / Markers panel ──
+            btn.closest('[class*=problems-panel]') ||
+            btn.closest('[class*=markers-panel]') ||
+            // ── Search panel ──
+            btn.closest('[class*=search-view]') ||
+            btn.closest('[class*=search-widget]') ||
             // ── Notebook ──
             btn.closest('[class*=notebook]')
         );
@@ -397,7 +413,15 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         }
 
         // ── Positive match: Antigravity agent panel containers ──
+        // NOTE: Selectors must be TIGHT. Broad selectors like [class*=toolbar],
+        // [class*=action-bar], [class*=tool], [class*=command], [class*=terminal]
+        // match non-agent VS Code UI (editor toolbar, command palette, terminal tabs)
+        // and would cause false-positive clicks in settings/editor/terminal.
         return !!(
+            // Standalone / Orchestrator layout contexts
+            btn.closest('[class*=desktop]') ||
+            btn.closest('[class*=orchestrator]') ||
+            btn.closest('[class*=scheduler]') ||
             // Antigravity-specific
             btn.closest('.antigravity-agent-side-panel') ||
             btn.closest('[class*=agent-panel]') ||
@@ -412,23 +436,15 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
             btn.closest('.quick-input-container') ||
             btn.closest('.monaco-dialog-box') ||
             btn.closest('.dialog-buttons') ||
-            btn.closest('.context-view') ||
             // Approval dialogs and notifications
             btn.closest('[class*=dialog]') ||
             btn.closest('[class*=notification]') ||
-            btn.closest('[class*=overlay]') ||
             btn.closest('[class*=popup]') ||
             btn.closest('[class*=modal]') ||
-            btn.closest('[class*=toast]') ||
-            btn.closest('[class*=tool]') ||
+            // Agent step containers (tool steps, approval steps)
             btn.closest('[class*=step]') ||
-            btn.closest('[class*=command]') ||
-            btn.closest('[class*=terminal]') ||
             // React app container (Antigravity agent UI root)
-            btn.closest('.react-app-container') ||
-            // Action bars within agent panel
-            btn.closest('[class*=action-bar]') ||
-            btn.closest('[class*=toolbar]')
+            btn.closest('.react-app-container')
         );
     }
 
@@ -708,25 +724,22 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
 
             if (matched === 'Skip' && !browserContext) continue;
 
-            // Skip editor context (unless it's a high-confidence button like Accept all)
-            if (!isHighConf && inEditorContext(b)) continue;
+            // Skip editor context — applies to ALL buttons including HIGH_CONF.
+            // Previously HIGH_CONF bypassed this, but that allowed clicks on
+            // Run/Accept buttons in editor toolbars, settings, SCM panels etc.
+            // when combined with broad inAgentContext() selectors.
+            if (inEditorContext(b)) continue;
 
             // Skip already clicked (multi-layer check)
             if (isAlreadyClicked(b, text)) continue;
 
-            // Skip editor-specific accept patterns
-            if (isEditorAccept(text)) {
-                var isReviewInAgent = (text === 'Review Changes' || text === 'Review all' || text === 'Review All') && inAgentContext(b);
-                if (!isReviewInAgent) continue;
-            }
+            // Skip editor-specific accept patterns (merge conflicts, diff review, etc.)
+            if (isEditorAccept(text)) continue;
 
             // Secondary check: if visible text differs from resolved label (e.g. aria-label="Run"
             // but innerText="Review Changes"), block on visible text too
             var visibleText = ((b.innerText || b.textContent || '').trim().split('\\n')[0] || '').trim();
-            if (visibleText && visibleText !== text && visibleText.length <= 60 && isEditorAccept(visibleText)) {
-                var isReviewInAgent = (visibleText === 'Review Changes' || visibleText === 'Review all' || visibleText === 'Review All') && inAgentContext(b);
-                if (!isReviewInAgent) continue;
-            }
+            if (visibleText && visibleText !== text && visibleText.length <= 60 && isEditorAccept(visibleText)) continue;
 
             // Expand: one-shot per element, but allow re-expand after 5s
             // (React may reuse DOM nodes for new steps)
@@ -851,8 +864,8 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
         });
     } catch(_) {}
 
-    // Enhanced safety net poll — 4s interval (almost 0% CPU overhead, highly responsive)
-    setInterval(safeScanner, 4000);
+    // Enhanced safety net poll — 15s interval (almost 0% CPU overhead, event-driven MutationObserver handles fast scan)
+    setInterval(safeScanner, 15000);
 
     // Initial scan with delay (let page settle)
     setTimeout(safeScanner, 1000);
@@ -938,11 +951,11 @@ function buildObserverScript(patterns, blacklist, scrollEnabled, scrollPauseMs, 
     setInterval(function() {
         _healTick++;
         // Refresh open shadow roots explicitly
-        if (_healTick >= 30) {
+        if (_healTick >= 10) {
             _healTick = 0;
             collectShadowRoots(document.body);
         }
-    }, 1500);
+    }, 15000); // 15s interval, healing every 150s (2.5 mins)
 
     // ── Suppress Corrupt Banner + "Requires Input" Notifications ──
     // FIX: Use MutationObserver (event-driven) instead of setInterval (polling)

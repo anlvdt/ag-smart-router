@@ -161,6 +161,11 @@ async function connect() {
         const wsUrl = parsed.webSocketDebuggerUrl;
         if (!wsUrl) throw new Error('No webSocketDebuggerUrl in /json/version response');
 
+        // Security check: DNS Rebinding protection (Must point to localhost/127.0.0.1/[::1])
+        if (!wsUrl.startsWith('ws://127.0.0.1:') && !wsUrl.startsWith('ws://localhost:') && !wsUrl.startsWith('ws://[::1]:')) {
+            throw new Error(`Security Alert: Non-local WebSocket connection blocked: ${wsUrl.slice(0, 80)}`);
+        }
+
         return new Promise((resolve) => {
             const WebSocket = require('ws');
             _lastError = '';
@@ -281,13 +286,30 @@ function scheduleReconnect() {
 
 // ── Port Discovery ───────────────────────────────────────────
 async function discoverPort() {
-    for (const port of CDP_PORTS) {
-        try {
-            const res = await httpGet(`http://127.0.0.1:${port}/json/version`);
-            if (res && res.includes('webSocketDebuggerUrl')) return port;
-        } catch (_) { }
-    }
-    return 0;
+    return new Promise((resolve) => {
+        let resolved = false;
+        let pending = CDP_PORTS.length;
+        if (pending === 0) return resolve(0);
+        
+        CDP_PORTS.forEach(port => {
+            const check = async (host) => {
+                try {
+                    const res = await httpGet(`http://${host}:${port}/json/version`);
+                    if (res && res.includes('webSocketDebuggerUrl') && !resolved) {
+                        resolved = true;
+                        resolve(port);
+                    }
+                } catch (_) {}
+            };
+            
+            Promise.all([check('127.0.0.1'), check('[::1]')]).finally(() => {
+                pending--;
+                if (pending === 0 && !resolved) {
+                    resolve(0);
+                }
+            });
+        });
+    });
 }
 
 function httpGet(url) {
@@ -651,6 +673,7 @@ function isAgentTarget(info) {
             'antigravity', 'windsurf', 'codeium', 'agent', 'chat',
             'cascade', 'cortex', 'assistant', 'copilot', 'tool',
             'grav', 'launchpad',
+            'desktop-agent', 'orchestrator', 'scheduler' // Standalone UI indicators
         ];
         if (POSITIVE_WEBVIEW_HINTS.some((hint) => url.includes(hint) || title.includes(hint))) {
             return true;

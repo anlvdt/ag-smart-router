@@ -6,6 +6,7 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const { DEFAULT_PATTERNS, SAFE_TERMINAL_CMDS, DEFAULT_BLACKLIST, PATTERN_GROUPS, PATTERN_DISPLAY, RISKY_PATTERNS } = require('./constants');
 const { cfg } = require('./utils');
@@ -16,6 +17,8 @@ let _ctx = null;
 let _deps = null;
 let _statsTicker = null;
 let _brainTicker = null;
+let _lastSentStatsState = '';
+let _lastSentBrainState = '';
 
 /**
  * Get unique display patterns (hide variants, show only primary name)
@@ -51,12 +54,18 @@ function toggle(ctx, deps) {
     _ctx = ctx;
     _deps = deps;
 
+    const mediaPath = vscode.Uri.file(path.join(_ctx.extensionPath, 'media'));
     _panel = vscode.window.createWebviewPanel(
         'gravDashboard', 'Grav — Dashboard',
-        vscode.ViewColumn.One, { enableScripts: true }
+        vscode.ViewColumn.One, {
+            enableScripts: true,
+            localResourceRoots: [mediaPath],
+        }
     );
     _panel.onDidDispose(() => {
         _panel = null;
+        _lastSentStatsState = '';
+        _lastSentBrainState = '';
         if (_statsTicker) clearInterval(_statsTicker);
         if (_brainTicker) clearInterval(_brainTicker);
     });
@@ -116,15 +125,24 @@ function render() {
         operationPresets: getOperationPresets(),
         operationPresetConfigs: ['safe', 'balanced', 'fast'].map((mode) => buildOperationPreset(mode)).filter(Boolean),
         trace: _deps.getTraceSnapshot ? _deps.getTraceSnapshot() : {},
+        roi: _deps.roi ? _deps.roi.getSummary() : {},
+        session: _deps.getSessionSafe ? _deps.getSessionSafe() : {},
     });
 }
 
 function buildHtml(c) {
-    let h = fs.readFileSync(path.join(__dirname, '..', 'media', 'dashboard-v2.html'), 'utf8');
+    let h;
+    try {
+        h = fs.readFileSync(path.join(__dirname, '..', 'media', 'dashboard-v2.html'), 'utf8');
+    } catch (e) {
+        return `<html><body style="padding:40px;color:#ccc;font-family:sans-serif"><h2>Dashboard load failed</h2><p>${e.message}</p></body></html>`;
+    }
+    const nonce = crypto.randomBytes(16).toString('hex');
     const lang = 'en';
     function replaceTag(str, tag, val) {
         return str.replace(new RegExp('\\{\\{\\s*' + tag + '\\s*\\}\\}', 'g'), () => val);
     }
+    h = replaceTag(h, 'NONCE', nonce);
 
     h = replaceTag(h, 'LANG', lang);
     h = replaceTag(h, 'VERSION', c.version || '0');
@@ -163,6 +181,8 @@ function buildHtml(c) {
     h = replaceTag(h, 'DRYRUN_VAL', c.dryRun ? 'true' : 'false');
     h = replaceTag(h, 'SKIP_BROWSER_CHK', c.skipBrowser ? 'checked' : '');
     h = replaceTag(h, 'SKIP_BROWSER_VAL', c.skipBrowser ? 'true' : 'false');
+    h = replaceTag(h, 'ROI_JSON', JSON.stringify(c.roi || {}));
+    h = replaceTag(h, 'SESSION_JSON', JSON.stringify(c.session || {}));
     return h;
 }
 
@@ -173,38 +193,27 @@ function setupMessageHandler() {
         const state = _deps.getState();
 
         switch (msg.command) {
-            case 'toggle':
-                _deps.setState({ enabled: msg.enabled });
-                await c.update('enabled', msg.enabled, vscode.ConfigurationTarget.Global);
-                _deps.onSave(); break;
-            case 'scrollToggle':
-                _deps.setState({ scrollOn: msg.enabled });
-                await c.update('autoScroll', msg.enabled, vscode.ConfigurationTarget.Global);
-                _deps.onSave(); break;
-            case 'toggleDryRun':
-                await c.update('dryRun', msg.enabled, vscode.ConfigurationTarget.Global);
-                _deps.onSave(); break;
-            case 'toggleSkipBrowser':
-                await c.update('skipBrowserAgent', msg.enabled, vscode.ConfigurationTarget.Global);
-                _deps.onSave(); break;
             case 'save': {
                 const d = msg.data;
-                await c.update('enabled', d.enabled, vscode.ConfigurationTarget.Global);
-                await c.update('autoScroll', d.scrollOn, vscode.ConfigurationTarget.Global);
-                await c.update('skipBrowserAgent', d.skipBrowser, vscode.ConfigurationTarget.Global);
-                await c.update('skipTerminalAccept', d.skipTerminalAccept !== false, vscode.ConfigurationTarget.Global);
-                await c.update('scrollPauseMs', d.pauseMs, vscode.ConfigurationTarget.Global);
-                await c.update('scrollIntervalMs', d.scrollMs, vscode.ConfigurationTarget.Global);
-                await c.update('approveIntervalMs', d.approveMs, vscode.ConfigurationTarget.Global);
-                await c.update('approvePatterns', d.patterns, vscode.ConfigurationTarget.Global);
-                await c.update('operationMode', d.operationMode || 'custom', vscode.ConfigurationTarget.Global);
-                await _ctx.globalState.update('disabledPatterns', d.disabledPatterns);
-                _deps.setState({ enabled: d.enabled, scrollOn: d.scrollOn !== false });
-                _deps.onSave(); break;
+                try {
+                    await c.update('enabled', d.enabled, vscode.ConfigurationTarget.Global);
+                    await c.update('autoScroll', d.scrollOn, vscode.ConfigurationTarget.Global);
+                    await c.update('skipBrowserAgent', d.skipBrowser, vscode.ConfigurationTarget.Global);
+                    await c.update('skipTerminalAccept', d.skipTerminalAccept !== false, vscode.ConfigurationTarget.Global);
+                    await c.update('scrollPauseMs', d.pauseMs, vscode.ConfigurationTarget.Global);
+                    await c.update('scrollIntervalMs', d.scrollMs, vscode.ConfigurationTarget.Global);
+                    await c.update('approveIntervalMs', d.approveMs, vscode.ConfigurationTarget.Global);
+                    await c.update('approvePatterns', d.patterns, vscode.ConfigurationTarget.Global);
+                    await c.update('operationMode', d.operationMode || 'custom', vscode.ConfigurationTarget.Global);
+                    await _ctx.globalState.update('disabledPatterns', d.disabledPatterns);
+                    _deps.setState({ enabled: d.enabled, scrollOn: d.scrollOn !== false });
+                    _deps.onSave();
+                    postMessage({ command: 'saveResult', success: true });
+                } catch (e) {
+                    postMessage({ command: 'saveResult', success: false, error: e.message || 'Save failed' });
+                }
+                break;
             }
-            case 'changeLang':
-                await c.update('language', msg.lang, vscode.ConfigurationTarget.Global);
-                render(); break;
             case 'reload':
                 vscode.commands.executeCommand('workbench.action.reloadWindow'); break;
             case 'resetStats':
@@ -244,25 +253,60 @@ function startTickers() {
 
     // Tier 1: Stats — 2.5s (reduced from 1s to avoid VSCode webview postMessage lag)
     _statsTicker = setInterval(() => {
-        postMessage({ command: 'statsUpdated', stats: state.stats, totalClicks: state.totalClicks });
+        const statsStr = JSON.stringify({ stats: state.stats, totalClicks: state.totalClicks });
+        if (statsStr !== _lastSentStatsState) {
+            _lastSentStatsState = statsStr;
+            postMessage({ command: 'statsUpdated', stats: state.stats, totalClicks: state.totalClicks });
+        }
     }, 2500);
 
     // Tier 2: Brain/Wiki — 5s
     _brainTicker = setInterval(() => {
         try {
             const w = wiki.getWiki();
+
+            // Build current brain stats first to check if anything changed
+            const currentBrain = {
+                epoch: learning.getEpoch(),
+                tracking: Object.keys(learning.getData()).length,
+                whiteCount: SAFE_TERMINAL_CMDS.length + learning.getWhitelist().length,
+                blackCount: DEFAULT_BLACKLIST.length + learning.getBlacklist().length,
+                promoted: learning.getPromotedCommands().length,
+                patterns: learning.getPatternCache().length,
+                wikiPages: Object.keys(w.index).length,
+                wikiConcepts: Object.keys(w.concepts).length,
+                wikiContradictions: wiki.getContradictions().length,
+                roi: _deps.roi ? _deps.roi.getSummary() : null,
+                idle: _deps.idle ? _deps.idle.isIdle() : null,
+                session: _deps.getSessionSafe ? _deps.getSessionSafe() : null,
+            };
+
+            // Compare with last sent brain stats + trace + logs
+            const brainStr = JSON.stringify(currentBrain);
+            const traceStr = _deps.getTraceSnapshot ? JSON.stringify(_deps.getTraceSnapshot()) : '';
+            const logsStr = JSON.stringify({
+                wikiLog: (w.log || []).slice(-30),
+                termLog: (state.termLog || []).slice(0, 30)
+            });
+
+            const combinedState = brainStr + traceStr + logsStr;
+            if (combinedState === _lastSentBrainState) {
+                return; // Zero diff - skip postMessage!
+            }
+            _lastSentBrainState = combinedState;
+
             const msg = { command: 'brainUpdated' };
-            msg.epoch = learning.getEpoch();
-            msg.tracking = Object.keys(learning.getData()).length;
-            msg.whiteCount = SAFE_TERMINAL_CMDS.length + learning.getWhitelist().length;
-            msg.blackCount = DEFAULT_BLACKLIST.length + learning.getBlacklist().length;
+            msg.epoch = currentBrain.epoch;
+            msg.tracking = currentBrain.tracking;
+            msg.whiteCount = currentBrain.whiteCount;
+            msg.blackCount = currentBrain.blackCount;
             msg.terminalWhitelist = [...SAFE_TERMINAL_CMDS, ...learning.getWhitelist()];
             msg.terminalBlacklist = [...DEFAULT_BLACKLIST, ...learning.getBlacklist()];
-            msg.promoted = learning.getPromotedCommands().length;
-            msg.patterns = learning.getPatternCache().length;
-            msg.wikiPages = Object.keys(w.index).length;
-            msg.wikiConcepts = Object.keys(w.concepts).length;
-            msg.wikiContradictions = wiki.getContradictions().length;
+            msg.promoted = currentBrain.promoted;
+            msg.patterns = currentBrain.patterns;
+            msg.wikiPages = currentBrain.wikiPages;
+            msg.wikiConcepts = currentBrain.wikiConcepts;
+            msg.wikiContradictions = currentBrain.wikiContradictions;
 
             // Safe concept serialization
             const concepts = {};
@@ -280,9 +324,9 @@ function startTickers() {
                 time: l.time || '', op: l.op || '', cmd: l.cmd || '',
                 action: l.action || '', conf: l.conf, detail: l.detail || '',
             }));
-            msg.session = _deps.getSessionSafe();
-            if (_deps.roi) msg.roi = _deps.roi.getSummary();
-            if (_deps.idle) msg.idle = _deps.idle.isIdle();
+            msg.session = currentBrain.session;
+            if (_deps.roi) msg.roi = currentBrain.roi;
+            if (_deps.idle) msg.idle = currentBrain.idle;
             if (_deps.getTraceSnapshot) msg.trace = _deps.getTraceSnapshot();
             msg.termLog = (state.termLog || []).slice(0, 30).map(t => ({
                 time: t.time || '', cmd: t.cmd || '', source: t.source || 'ui',

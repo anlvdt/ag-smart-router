@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{{NONCE}}'; img-src data:; font-src data:;">
 <title>Grav Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: var(--vscode-editor-background, #1e1e1e);
@@ -30,7 +30,7 @@
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background: var(--bg); color: var(--text-primary);
   line-height: 1.5; -webkit-font-smoothing: antialiased;
   min-height: 100vh;
@@ -41,7 +41,8 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 
 /* ── Layout ── */
-.root { max-width: 860px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.root { max-width: 860px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-x: hidden; }
+.root > *:first-child + * { scroll-margin-top: 80px; }
 .bento { display: block; }
 .bento-wide { display: block; }
 .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -259,13 +260,13 @@ body {
   background: var(--text-primary); color: var(--bg);
   padding: 8px 16px; font-size: 0.85rem; font-weight: 500;
   border-radius: 20px; opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  pointer-events: none; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
   display: flex; align-items: center; gap: 8px;
 }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 .toast.warn { background: var(--yellow); color: var(--bg); }
 
-.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 150; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
 .confirm-overlay.show { opacity: 1; pointer-events: auto; }
 .confirm-box { background: #111; border: 1px solid var(--border-light); border-radius: var(--radius); padding: 24px; text-align: center; width: 300px; }
 .confirm-box p { font-size: 0.9rem; margin-bottom: 20px; color: var(--text-primary); }
@@ -575,9 +576,9 @@ body {
 
 <!-- TOAST -->
 <div class="toast" id="toast"><span class="toast-icon" id="toastIcon">✓</span><span id="toastMsg">Saved</span></div>
-<div class="confirm-overlay" id="confirmOverlay"><div class="confirm-box"><p id="confirmMsg">Are you sure?</p><div class="confirm-btns"><button class="confirm-no" onclick="closeConfirm()">Cancel</button><button class="confirm-yes" id="confirmYes">Confirm</button></div></div></div>
+<div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmMsg"><div class="confirm-box"><p id="confirmMsg">Are you sure?</p><div class="confirm-btns"><button class="confirm-no" id="confirmNo" onclick="closeConfirm()">Cancel</button><button class="confirm-yes" id="confirmYes">Confirm</button></div></div></div>
 
-<script>
+<script nonce="{{NONCE}}">
 const vscode = acquireVsCodeApi();
 const $ = id => document.getElementById(id);
 
@@ -606,27 +607,41 @@ let _traceState = {{TRACE_JSON}};
 let _operationPresets = {{OPERATION_PRESETS_JSON}};
 let _operationPresetConfigs = {{OPERATION_PRESET_CONFIGS_JSON}};
 let _operationMode = {{OPERATION_MODE_JSON}};
+let _roiState = {{ROI_JSON}};
+let _sessionState = {{SESSION_JSON}};
 let _savedSnapshot = '';
 
+var _toastTimer = null;
 function showToast(msg, icon='✓', type='success') {
+    if (_toastTimer) clearTimeout(_toastTimer);
     const t = $('toast');
     $('toastMsg').textContent = msg;
     $('toastIcon').textContent = icon;
     t.className = 'toast ' + type + ' show';
-    setTimeout(() => t.className = 'toast', 2200);
+    _toastTimer = setTimeout(() => { t.className = 'toast'; _toastTimer = null; }, 3500);
 }
 
 var _confirmCb = null;
-function confirmAction(msg, cb) { $('confirmMsg').textContent = msg; _confirmCb = cb; $('confirmOverlay').classList.add('show'); $('confirmYes').onclick = function() { closeConfirm(); if (_confirmCb) _confirmCb(); }; }
-function closeConfirm() { $('confirmOverlay').classList.remove('show'); _confirmCb = null; }
-
-function togSec(id) {
-    const body = $(id);
-    const arrow = $('arr' + id.slice(3));
-    if (!body || !arrow) return;
-    const isOpen = body.classList.toggle('open');
-    arrow.classList.toggle('open', isOpen);
+function confirmAction(msg, cb) {
+    $('confirmMsg').textContent = msg; _confirmCb = cb;
+    $('confirmOverlay').classList.add('show');
+    $('confirmYes').onclick = function() { closeConfirm(); if (_confirmCb) _confirmCb(); };
+    // Focus trap: focus the cancel button and trap Tab within dialog
+    setTimeout(() => { $('confirmNo').focus(); }, 50);
+    $('confirmOverlay').onkeydown = function(e) {
+        if (e.key === 'Escape') { closeConfirm(); return; }
+        if (e.key === 'Tab') {
+            var btns = [$('confirmNo'), $('confirmYes')];
+            var idx = btns.indexOf(document.activeElement);
+            if (e.shiftKey) { btns[(idx - 1 + btns.length) % btns.length].focus(); }
+            else { btns[(idx + 1) % btns.length].focus(); }
+            e.preventDefault();
+        }
+    };
 }
+function closeConfirm() { $('confirmOverlay').classList.remove('show'); $('confirmOverlay').onkeydown = null; _confirmCb = null; }
+
+
 
 function currentSettingsSnapshot() {
     return JSON.stringify({
@@ -664,7 +679,16 @@ function updateDirtyState(reason) {
 }
 
 function markDirty(reason) {
-    if (_operationMode !== 'custom') _operationMode = 'custom';
+    // Check if current values still match a preset before forcing custom
+    var matchesPreset = false;
+    for (var i = 0; i < (_operationPresetConfigs || []).length; i++) {
+        var preset = _operationPresetConfigs[i];
+        if (!preset) continue;
+        var pats = (preset.patterns || []).slice().sort();
+        var cur = (_patterns || []).slice().sort();
+        if (JSON.stringify(pats) === JSON.stringify(cur)) { matchesPreset = true; break; }
+    }
+    if (!matchesPreset && _operationMode !== 'custom') _operationMode = 'custom';
     renderOperationPresets();
     updateDirtyState(reason || 'Unsaved changes');
 }
@@ -945,23 +969,7 @@ function sendFeedback(kind) {
     showToast(kind === 'falseNegative' ? 'Missed click noted' : 'False positive noted', '⊘', 'warn');
 }
 
-function instantToggle() {
-    markDirty();
-}
 
-function scrollToggle() {
-    markDirty();
-}
-
-function skipBrowserToggle() {
-    markDirty();
-}
-
-function toggleMaster() {
-    const chk = $('chkEnabled');
-    chk.checked = !chk.checked;
-    instantToggle();
-}
 
 function save() {
     const d = {
@@ -969,9 +977,9 @@ function save() {
         scrollOn: $('chkScroll').checked,
         skipBrowser: $('chkSkipBrowser').checked,
         skipTerminalAccept: $('chkSkipTerminal').checked,
-        pauseMs: parseInt($('rngPause').value),
-        scrollMs: parseInt($('rngScroll').value),
-        approveMs: parseInt($('rngApprove').value),
+        pauseMs: parseInt($('rngPause').value, 10) || 7000,
+        scrollMs: parseInt($('rngScroll').value, 10) || 500,
+        approveMs: parseInt($('rngApprove').value, 10) || 1000,
         patterns: _patterns,
         disabledPatterns: _disabled,
         operationMode: _operationMode || 'custom',
@@ -980,7 +988,9 @@ function save() {
     syncSavedStateBadges();
     _savedSnapshot = currentSettingsSnapshot();
     updateDirtyState();
-    showToast('Settings saved', '✓');
+    // Visual feedback handled by saveResult message from backend
+    var btn = $('btnSave');
+    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 }
 
 function resetStats() {
@@ -1017,6 +1027,42 @@ function formatNumber(n) {
     return String(n);
 }
 
+function updateRoiUI(r) {
+    if (!r) return;
+    if ($('roiSaved')) $('roiSaved').textContent = formatDuration((r.timeSavedSec || 0) * 1000);
+    if ($('roiClicks')) $('roiClicks').textContent = String(r.clicks || 0);
+    if ($('roiGain')) $('roiGain').textContent = (r.productivityGain || 0) + '%';
+    if ($('roiDaily')) $('roiDaily').textContent = formatDuration((r.dailyEstimateSec || 0) * 1000);
+    if ($('roiLifeSaved')) $('roiLifeSaved').textContent = formatDuration((r.lifetimeSavedSec || 0) * 1000);
+    if ($('roiLifeClicks')) $('roiLifeClicks').textContent = formatNumber(r.lifetimeClicks || 0);
+    if ($('roiLifeSessions')) $('roiLifeSessions').textContent = String(r.lifetimeSessions || 0);
+}
+
+function updateSessionUI(s) {
+    if (!s) return;
+    if ($('sessDuration')) $('sessDuration').textContent = formatDuration(s.sessionMs || 0);
+    if ($('sessMsg')) $('sessMsg').textContent = String(s.msgCount || 0);
+    if ($('sessApprove')) $('sessApprove').textContent = String(s.approveCount || 0);
+    if ($('sessAvgResp')) $('sessAvgResp').textContent = s.avgResponseMs ? String(s.avgResponseMs) + 'ms' : '—';
+    if ($('aiTyping')) $('aiTyping').classList.toggle('on', !!s.aiTyping);
+    if ($('idleStatus')) $('idleStatus').textContent = s.idle ? 'Idle' : 'Active';
+    const hb = $('healthBadge');
+    if (hb) {
+        const health = s.learningHealth || 'unknown';
+        hb.className = 'status-badge ' + (health === 'good' ? 'on' : health === 'poor' ? 'warn' : '');
+        hb.textContent = health === 'good' ? 'Healthy' : health === 'poor' ? 'Degraded' : '—';
+    }
+    renderToolBreakdown(s.toolBreakdown);
+    if (s.cdpConnected !== undefined) {
+        const cdpBadge = $('cdpBadge');
+        if (cdpBadge) {
+            cdpBadge.style.display = 'inline-flex';
+            cdpBadge.className = 'status-badge ' + (s.cdpConnected ? 'on' : 'off');
+            cdpBadge.innerHTML = '<span class="dot"></span>CDP ' + (s.cdpConnected ? s.cdpSessions : 'off');
+        }
+    }
+}
+
 window.addEventListener('message', e => {
     const m = e.data;
     switch (m.command) {
@@ -1045,49 +1091,38 @@ window.addEventListener('message', e => {
             if (b.terminalWhitelist) { _terminalWhitelist = b.terminalWhitelist; }
             if (b.terminalBlacklist) { _terminalBlacklist = b.terminalBlacklist; }
             if (b.trace) { _traceState = b.trace; renderTrace(); renderTraceDiagnostics(); }
+            if (b.roi) updateRoiUI(b.roi);
+            if (b.session) updateSessionUI(b.session);
             renderTerminalRules();
             break;
-        case 'sessionUpdated': {
-            const s = m.session || {};
-            if ($('sessDuration')) $('sessDuration').textContent = formatDuration(s.sessionMs || 0);
-            if ($('sessMsg')) $('sessMsg').textContent = String(s.msgCount || 0);
-            if ($('sessApprove')) $('sessApprove').textContent = String(s.approveCount || 0);
-            if ($('sessAvgResp')) $('sessAvgResp').textContent = s.avgResponseMs ? String(s.avgResponseMs) + 'ms' : '—';
-            if ($('aiTyping')) $('aiTyping').classList.toggle('on', !!s.aiTyping);
-            if ($('idleStatus')) $('idleStatus').textContent = s.idle ? 'Idle' : 'Active';
-            const hb = $('healthBadge');
-            if (hb) {
-                const health = s.learningHealth || 'unknown';
-                hb.className = 'status-badge ' + (health === 'good' ? 'on' : health === 'poor' ? 'warn' : '');
-                hb.textContent = health === 'good' ? 'Healthy' : health === 'poor' ? 'Degraded' : '—';
-            }
-            renderToolBreakdown(s.toolBreakdown);
-            if (s.cdpConnected !== undefined) {
-                const cdpBadge = $('cdpBadge');
-                if (cdpBadge) {
-                    cdpBadge.style.display = 'inline-flex';
-                    cdpBadge.className = 'status-badge ' + (s.cdpConnected ? 'on' : 'off');
-                    cdpBadge.innerHTML = '<span class="dot"></span>CDP ' + (s.cdpConnected ? s.cdpSessions : 'off');
-                }
-            }
+        case 'sessionUpdated':
+            updateSessionUI(m.session);
             break;
-        }
-        case 'roiUpdated': {
-            const r = m.roi || {};
-            if ($('roiSaved')) $('roiSaved').textContent = formatDuration((r.timeSavedSec || 0) * 1000);
-            if ($('roiClicks')) $('roiClicks').textContent = String(r.clicks || 0);
-            if ($('roiGain')) $('roiGain').textContent = (r.productivityGain || 0) + '%';
-            if ($('roiDaily')) $('roiDaily').textContent = formatDuration((r.dailyEstimateSec || 0) * 1000);
-            if ($('roiLifeSaved')) $('roiLifeSaved').textContent = formatDuration((r.lifetimeSavedSec || 0) * 1000);
-            if ($('roiLifeClicks')) $('roiLifeClicks').textContent = formatNumber(r.lifetimeClicks || 0);
-            if ($('roiLifeSessions')) $('roiLifeSessions').textContent = String(r.lifetimeSessions || 0);
-            break;
-        }
         case 'commandBlocked':
             showToast('Blocked: ' + (m.reason || ''), '⊘', 'warn');
             break;
-        case 'termLogUpdated':
-            // Could render terminal log separately
+        case 'idleChanged':
+            if ($('sessionIdle')) $('sessionIdle').textContent = m.idle ? 'Yes' : 'No';
+            break;
+        case 'saveResult':
+            var saveBtn = $('btnSave');
+            if (m.success) {
+                showToast('Settings saved successfully', '✓');
+                if (saveBtn) {
+                    saveBtn.textContent = '✓ Saved';
+                    saveBtn.classList.add('success');
+                    saveBtn.classList.remove('primary');
+                    setTimeout(function() {
+                        saveBtn.textContent = 'Save Changes';
+                        saveBtn.classList.remove('success');
+                        saveBtn.classList.add('primary');
+                        updateDirtyState();
+                    }, 2000);
+                }
+            } else {
+                showToast('Save failed: ' + (m.error || 'unknown'), '✗', 'warn');
+                if (saveBtn) { saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; }
+            }
             break;
         case 'traceUpdated':
             _traceState = m.trace || {};
@@ -1103,9 +1138,11 @@ renderStats();
 renderConcepts();
 renderWikiLog();
 renderTerminalRules();
-renderToolBreakdown();
+renderToolBreakdown(_sessionState ? _sessionState.toolBreakdown : null);
 renderTrace();
 renderTraceDiagnostics();
+updateRoiUI(_roiState);
+updateSessionUI(_sessionState);
 syncSavedStateBadges();
 _savedSnapshot = currentSettingsSnapshot();
 updateDirtyState();

@@ -398,6 +398,13 @@ const startAcceptLoop = () => {
     const FAST_INTERVAL = 800;
     _acceptTimer = setInterval(() => {
         if (!_enabled || _acceptPaused || !idle.isIdle()) return;
+        // Skip native accept when Grav dashboard is the active panel
+        if (dashboard.getPanel()?.visible) return;
+        // Skip when CDP observer is connected and has active sessions —
+        // CDP handles clicking Accept/Run buttons directly in the DOM.
+        // Firing native commands on top causes the Accept chip to flash
+        // repeatedly with no actual effect.
+        if (cdp && cdp.isConnected() && cdp.getSessionCount() > 0) return;
         const now = Date.now();
         // Adaptive: if a run_command/tool event just fired, skip slow cycles
         if (now < _adaptiveBoostUntil) {
@@ -477,6 +484,17 @@ async function activate(ctx) {
         for (const p of DEFAULT_PATTERNS) { if (!merged.includes(p) && !dp.includes(p)) { RISKY_PATTERNS.includes(p) ? dp.push(p) : merged.push(p); changed = true; } }
         for (const p of RISKY_PATTERNS) { if (!merged.includes(p) && !dp.includes(p)) { dp.push(p); changed = true; } }
         if (changed) { await vscode.workspace.getConfiguration('grav').update('approvePatterns', merged, vscode.ConfigurationTarget.Global); await ctx.globalState.update('disabledPatterns', dp); }
+    }
+
+    // Migration: strip 'Review Changes' variants (removed from defaults in 4.0.18)
+    {
+        const REVIEW_REMOVE = ['Review Changes', 'Review All', 'Review all'];
+        const curPatterns = cfg('approvePatterns', []);
+        const cleaned = curPatterns.filter(p => !REVIEW_REMOVE.includes(p));
+        if (cleaned.length !== curPatterns.length) {
+            await vscode.workspace.getConfiguration('grav').update('approvePatterns', cleaned, vscode.ConfigurationTarget.Global);
+            console.log('[Grav] Migration: removed Review Changes from patterns');
+        }
     }
 
     // Load project config

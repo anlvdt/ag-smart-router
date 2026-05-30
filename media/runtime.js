@@ -231,14 +231,18 @@
             '[class*="accounts"]', '[class*="authentication"]', '.account-picker',
             // Welcome/Getting started
             '[class*="welcome"]', '[class*="walkthrough"]', '[class*="getting-started"]',
-            // Output and debug
-            '[class*="output"]', '[class*="debug"]', '.debug-toolbar',
+            // Output (specific — NOT [class*="output"] which blocks agent tool-output)
+            '.output-view-container', '[id*="output"]',
+            // Debug
+            '[class*="debug-view"]', '[class*="debug-pane"]', '.debug-toolbar',
             // Notebooks
             '[class*="notebook"]', '.notebook-cell',
             // Problems panel
             '[class*="problems-panel"]', '[class*="markers-panel"]',
             // Search panel
-            '[class*="search-view"]', '[class*="search-widget"]'
+            '[class*="search-view"]', '[class*="search-widget"]',
+            // Source Control panel
+            '.scm-view', '[class*="scm-view"]', '[class*="source-control"]'
         ];
         
         for (var i = 0; i < EDITOR_SELECTORS.length; i++) {
@@ -354,7 +358,7 @@
                     for (var up = 0; up < 5 && el; up++) {
                         var cls = (el.className || '').toLowerCase();
                         if (cls.indexOf('agent') !== -1 || cls.indexOf('chat') !== -1 || cls.indexOf('cascade') !== -1 ||
-                            cls.indexOf('terminal') !== -1 || cls.indexOf('panel') !== -1 || cls.indexOf('antigravity') !== -1) {
+                            cls.indexOf('cortex') !== -1 || cls.indexOf('antigravity') !== -1) {
                             inAgentPanel = true; break;
                         }
                         el = el.parentElement;

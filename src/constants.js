@@ -29,24 +29,26 @@ const DEFAULT_PATTERNS = Object.freeze([
     //   Run > Accept > Always Allow > Allow > Proceed
     //
     // === SAFE: File edits — accept code changes, revertible ===
-    'Accept', 'Accept All', 'Accept all', 'Review Changes', 'Review All', 'Review all',
+    'Accept', 'Accept All', 'Accept all',
     // === SAFE: Agent flow — continue/retry execution ===
     'Retry', 'Proceed', 'Submit',
     // === CAUTION: Per-request permissions (Safety Guard protects Run/Execute) ===
     'Run Task', 'Run', 'Execute',
     // === Antigravity-specific: Agent Manager / Cortex step buttons ===
     'Approve', 'Expand', 'Allow in Workspace', 'Allow', 'Allow Once', 'Always Allow',
+    // === Scheduler: Antigravity 2.0 task scheduling ===
+    'Schedule', 'Schedule Task', 'Confirm Schedule', 'Run Recurring',
 ]);
 
 const PRESET_PATTERNS = Object.freeze({
     '1.19.6': [
-        'Accept all', 'Accept All', 'Accept', 'Review Changes', 'Review All', 'Review all', 'Retry', 'Proceed', 'Run', 'Approve', 'Expand', 'Allow in Workspace',
+        'Accept all', 'Accept All', 'Accept', 'Retry', 'Proceed', 'Run', 'Approve', 'Expand', 'Allow in Workspace',
     ],
     '1.23.2': [
-        'Accept All', 'Accept', 'Review Changes', 'Review All', 'Review all', 'Retry', 'Run', 'Approve', 'Allow This Workspace', 'Allow in Workspace',
+        'Accept All', 'Accept', 'Retry', 'Run', 'Approve', 'Allow This Workspace', 'Allow in Workspace',
     ],
     '1.24+': [
-        'Accept', 'Accept All', 'Accept all', 'ACCEPT ALL', 'Review Changes', 'Review All', 'Review all', 'Retry', 'Run Task', 'Run', 'Execute', 'Approve', 'Allow in Workspace', 'Allow This Workspace', 'Allow', 'Allow Once', 'Always Allow', 'Submit',
+        'Accept', 'Accept All', 'Accept all', 'ACCEPT ALL', 'Retry', 'Run Task', 'Run', 'Execute', 'Approve', 'Allow in Workspace', 'Allow This Workspace', 'Allow', 'Allow Once', 'Always Allow', 'Submit', 'Schedule', 'Schedule Task', 'Confirm Schedule', 'Run Recurring',
     ],
 });
 
@@ -167,7 +169,6 @@ const LEARN = Object.freeze({
 // These only appear in agent approval contexts
 const HIGH_CONF = Object.freeze({
     'Accept All': 1, 'Accept all': 1, 'ACCEPT ALL': 1, 'Accept': 1,
-    'Review Changes': 1, 'Review All': 1, 'Review all': 1,
     'Approve': 1, 'Expand': 1,
     'Run': 1, 'Run Task': 1, 'Execute': 1,
     'Retry': 1, 'Proceed': 1, 'Submit': 1,
