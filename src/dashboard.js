@@ -36,13 +36,7 @@ function getDisplayPatterns(allPatterns) {
     return result;
 }
 
-/**
- * Check if a display pattern is enabled (any of its variants is in patterns list)
- */
-function isPatternEnabled(displayName, patterns) {
-    const variants = PATTERN_GROUPS[displayName] || [displayName];
-    return variants.some(v => patterns.includes(v));
-}
+
 
 /**
  * Open or close the dashboard panel.
@@ -138,51 +132,51 @@ function buildHtml(c) {
         return `<html><body style="padding:40px;color:#ccc;font-family:sans-serif"><h2>Dashboard load failed</h2><p>${e.message}</p></body></html>`;
     }
     const nonce = crypto.randomBytes(16).toString('hex');
-    const lang = 'en';
-    function replaceTag(str, tag, val) {
-        return str.replace(new RegExp('\\{\\{\\s*' + tag + '\\s*\\}\\}', 'g'), () => val);
-    }
-    h = replaceTag(h, 'NONCE', nonce);
+    
+    const replacements = {
+        NONCE: nonce,
+        LANG: 'en',
+        VERSION: c.version || '0',
+        TOTAL: String(c.totalClicks || 0),
+        ENABLED_CHK: c.enabled ? 'checked' : '',
+        SCROLL_CHK: c.scrollOn !== false ? 'checked' : '',
+        SKIP_TERMINAL_CHK: c.skipTerminalAccept !== false ? 'checked' : '',
+        APPROVE_MS: String(c.approveMs || 1000),
+        SCROLL_MS: String(c.scrollMs || 500),
+        PAUSE_MS: String(c.pauseMs || 7000),
+        PATTERNS_JSON: JSON.stringify(c.patterns || []),
+        DISABLED_JSON: JSON.stringify(c.disabledPatterns || []),
+        PATTERN_GROUPS_JSON: JSON.stringify(c.patternGroups || {}),
+        STATS_JSON: JSON.stringify(c.stats || {}),
+        WHITE_COUNT: String(c.whiteCount || 0),
+        BLACK_COUNT: String(c.blackCount || 0),
+        TERMINAL_WHITELIST_JSON: JSON.stringify(c.terminalWhitelist || []),
+        TERMINAL_BLACKLIST_JSON: JSON.stringify(c.terminalBlacklist || []),
+        LEARN_COUNT: String(c.learnCount || 0),
+        LEARN_EPOCH: String(c.learnEpoch || 0),
+        LEARN_TRACKING: String(c.learnTracking || 0),
+        LEARN_PATTERNS: String(c.learnPatterns || 0),
+        WIKI_PAGES: String(c.wikiPages || 0),
+        WIKI_CONCEPTS: String(c.wikiConcepts || 0),
+        WIKI_CONTRADICTIONS: String(c.wikiContradictions || 0),
+        CONCEPTS_JSON: JSON.stringify(c.concepts || {}),
+        WIKI_LOG_JSON: JSON.stringify(c.wikiLog || []),
+        ALL_PATTERNS_JSON: JSON.stringify(c.allPatterns || []),
+        PROJECT_PATTERNS_JSON: JSON.stringify(c.projectPatterns || []),
+        TRACE_JSON: JSON.stringify(c.trace || {}),
+        OPERATION_PRESETS_JSON: JSON.stringify(c.operationPresets || []),
+        OPERATION_PRESET_CONFIGS_JSON: JSON.stringify(c.operationPresetConfigs || []),
+        OPERATION_MODE_JSON: JSON.stringify(c.operationMode || 'custom'),
+        DRYRUN_CHK: c.dryRun ? 'checked' : '',
+        DRYRUN_VAL: c.dryRun ? 'true' : 'false',
+        SKIP_BROWSER_CHK: c.skipBrowser ? 'checked' : '',
+        SKIP_BROWSER_VAL: c.skipBrowser ? 'true' : 'false',
+        ROI_JSON: JSON.stringify(c.roi || {}),
+        SESSION_JSON: JSON.stringify(c.session || {}),
+    };
 
-    h = replaceTag(h, 'LANG', lang);
-    h = replaceTag(h, 'VERSION', c.version || '0');
-    h = replaceTag(h, 'TOTAL', String(c.totalClicks || 0));
-    h = replaceTag(h, 'ENABLED_CHK', c.enabled ? 'checked' : '');
-    h = replaceTag(h, 'SCROLL_CHK', c.scrollOn !== false ? 'checked' : '');
-    h = replaceTag(h, 'SKIP_TERMINAL_CHK', c.skipTerminalAccept !== false ? 'checked' : '');
-    h = replaceTag(h, 'APPROVE_MS', String(c.approveMs || 1000));
-    h = replaceTag(h, 'SCROLL_MS', String(c.scrollMs || 500));
-    h = replaceTag(h, 'PAUSE_MS', String(c.pauseMs || 7000));
-
-    h = replaceTag(h, 'PATTERNS_JSON', JSON.stringify(c.patterns || []));
-    h = replaceTag(h, 'DISABLED_JSON', JSON.stringify(c.disabledPatterns || []));
-    h = replaceTag(h, 'PATTERN_GROUPS_JSON', JSON.stringify(c.patternGroups || {}));
-    h = replaceTag(h, 'STATS_JSON', JSON.stringify(c.stats || {}));
-    h = replaceTag(h, 'WHITE_COUNT', String(c.whiteCount || 0));
-    h = replaceTag(h, 'BLACK_COUNT', String(c.blackCount || 0));
-    h = replaceTag(h, 'TERMINAL_WHITELIST_JSON', JSON.stringify(c.terminalWhitelist || []));
-    h = replaceTag(h, 'TERMINAL_BLACKLIST_JSON', JSON.stringify(c.terminalBlacklist || []));
-    h = replaceTag(h, 'LEARN_COUNT', String(c.learnCount || 0));
-    h = replaceTag(h, 'LEARN_EPOCH', String(c.learnEpoch || 0));
-    h = replaceTag(h, 'LEARN_TRACKING', String(c.learnTracking || 0));
-    h = replaceTag(h, 'LEARN_PATTERNS', String(c.learnPatterns || 0));
-    h = replaceTag(h, 'WIKI_PAGES', String(c.wikiPages || 0));
-    h = replaceTag(h, 'WIKI_CONCEPTS', String(c.wikiConcepts || 0));
-    h = replaceTag(h, 'WIKI_CONTRADICTIONS', String(c.wikiContradictions || 0));
-    h = replaceTag(h, 'CONCEPTS_JSON', JSON.stringify(c.concepts || {}));
-    h = replaceTag(h, 'WIKI_LOG_JSON', JSON.stringify(c.wikiLog || []));
-    h = replaceTag(h, 'ALL_PATTERNS_JSON', JSON.stringify(c.allPatterns || []));
-    h = replaceTag(h, 'PROJECT_PATTERNS_JSON', JSON.stringify(c.projectPatterns || []));
-    h = replaceTag(h, 'TRACE_JSON', JSON.stringify(c.trace || {}));
-    h = replaceTag(h, 'OPERATION_PRESETS_JSON', JSON.stringify(c.operationPresets || []));
-    h = replaceTag(h, 'OPERATION_PRESET_CONFIGS_JSON', JSON.stringify(c.operationPresetConfigs || []));
-    h = replaceTag(h, 'OPERATION_MODE_JSON', JSON.stringify(c.operationMode || 'custom'));
-    h = replaceTag(h, 'DRYRUN_CHK', c.dryRun ? 'checked' : '');
-    h = replaceTag(h, 'DRYRUN_VAL', c.dryRun ? 'true' : 'false');
-    h = replaceTag(h, 'SKIP_BROWSER_CHK', c.skipBrowser ? 'checked' : '');
-    h = replaceTag(h, 'SKIP_BROWSER_VAL', c.skipBrowser ? 'true' : 'false');
-    h = replaceTag(h, 'ROI_JSON', JSON.stringify(c.roi || {}));
-    h = replaceTag(h, 'SESSION_JSON', JSON.stringify(c.session || {}));
+    const pattern = new RegExp('\\{\\{\\s*(' + Object.keys(replacements).join('|') + ')\\s*\\}\\}', 'g');
+    h = h.replace(pattern, (_, key) => replacements[key] || '');
     return h;
 }
 
@@ -251,8 +245,9 @@ function startTickers() {
     const learning = _deps.learning;
     const wiki = _deps.wiki;
 
-    // Tier 1: Stats — 2.5s (reduced from 1s to avoid VSCode webview postMessage lag)
+    // Tier 1: Stats — 2.5s
     _statsTicker = setInterval(() => {
+        if (!_panel || !_panel.visible) return; // Skip updates if tab is hidden to save CPU/IPC overhead
         const statsStr = JSON.stringify({ stats: state.stats, totalClicks: state.totalClicks });
         if (statsStr !== _lastSentStatsState) {
             _lastSentStatsState = statsStr;
@@ -262,6 +257,7 @@ function startTickers() {
 
     // Tier 2: Brain/Wiki — 5s
     _brainTicker = setInterval(() => {
+        if (!_panel || !_panel.visible) return; // Skip updates if tab is hidden to save CPU/IPC overhead
         try {
             const w = wiki.getWiki();
 
@@ -283,7 +279,8 @@ function startTickers() {
 
             // Compare with last sent brain stats + trace + logs
             const brainStr = JSON.stringify(currentBrain);
-            const traceStr = _deps.getTraceSnapshot ? JSON.stringify(_deps.getTraceSnapshot()) : '';
+            const traceSnapshot = _deps.getTraceSnapshot ? _deps.getTraceSnapshot() : null;
+            const traceStr = traceSnapshot ? JSON.stringify(traceSnapshot) : '';
             const logsStr = JSON.stringify({
                 wikiLog: (w.log || []).slice(-30),
                 termLog: (state.termLog || []).slice(0, 30)
@@ -291,24 +288,28 @@ function startTickers() {
 
             const combinedState = brainStr + traceStr + logsStr;
             if (combinedState === _lastSentBrainState) {
-                return; // Zero diff - skip postMessage!
+                return; // Zero diff — skip postMessage
             }
             _lastSentBrainState = combinedState;
 
-            const msg = { command: 'brainUpdated' };
-            msg.epoch = currentBrain.epoch;
-            msg.tracking = currentBrain.tracking;
-            msg.whiteCount = currentBrain.whiteCount;
-            msg.blackCount = currentBrain.blackCount;
-            msg.terminalWhitelist = [...SAFE_TERMINAL_CMDS, ...learning.getWhitelist()];
-            msg.terminalBlacklist = [...DEFAULT_BLACKLIST, ...learning.getBlacklist()];
-            msg.promoted = currentBrain.promoted;
-            msg.patterns = currentBrain.patterns;
-            msg.wikiPages = currentBrain.wikiPages;
-            msg.wikiConcepts = currentBrain.wikiConcepts;
-            msg.wikiContradictions = currentBrain.wikiContradictions;
+            // ── Build message only after diff gate ──
+            const msg = {
+                command: 'brainUpdated',
+                epoch: currentBrain.epoch,
+                tracking: currentBrain.tracking,
+                whiteCount: currentBrain.whiteCount,
+                blackCount: currentBrain.blackCount,
+                promoted: currentBrain.promoted,
+                patterns: currentBrain.patterns,
+                wikiPages: currentBrain.wikiPages,
+                wikiConcepts: currentBrain.wikiConcepts,
+                wikiContradictions: currentBrain.wikiContradictions,
+                terminalWhitelist: [...SAFE_TERMINAL_CMDS, ...learning.getWhitelist()],
+                terminalBlacklist: [...DEFAULT_BLACKLIST, ...learning.getBlacklist()],
+                session: currentBrain.session,
+            };
 
-            // Safe concept serialization
+            // Concept serialization (only on diff)
             const concepts = {};
             for (const ck in w.concepts) {
                 const cv = w.concepts[ck];
@@ -324,10 +325,9 @@ function startTickers() {
                 time: l.time || '', op: l.op || '', cmd: l.cmd || '',
                 action: l.action || '', conf: l.conf, detail: l.detail || '',
             }));
-            msg.session = currentBrain.session;
             if (_deps.roi) msg.roi = currentBrain.roi;
             if (_deps.idle) msg.idle = currentBrain.idle;
-            if (_deps.getTraceSnapshot) msg.trace = _deps.getTraceSnapshot();
+            if (traceSnapshot) msg.trace = traceSnapshot;
             msg.termLog = (state.termLog || []).slice(0, 30).map(t => ({
                 time: t.time || '', cmd: t.cmd || '', source: t.source || 'ui',
             }));

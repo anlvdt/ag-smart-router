@@ -2,7 +2,7 @@
 
 **Stop babysitting your AI agent.** Grav auto-clicks approval buttons, keeps your chat pinned to the latest response, and blocks dangerous terminal commands — completely hands-free.
 
-[![Version](https://img.shields.io/badge/version-4.0.18-blue)](https://marketplace.visualstudio.com/items?itemName=ANLE.grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE) [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/ANLE.grav?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=ANLE.grav)
+[![Version](https://img.shields.io/badge/version-4.0.19-blue)](https://marketplace.visualstudio.com/items?itemName=ANLE.grav) [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE) [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/ANLE.grav?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=ANLE.grav)
 
 ---
 
@@ -89,7 +89,7 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 5. Status bar shows `🚀 Grav` — you're done
 
 ### From VSIX (Manual)
-1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-4.0.18.vsix`
+1. `Cmd+Shift+P` → **Extensions: Install from VSIX** → select `grav-4.0.19.vsix`
 2. Fully quit and reopen the IDE
 
 > **Status bar shows `CDP off`?** The IDE wasn't fully restarted. Quit completely and reopen.
@@ -172,6 +172,10 @@ Scan and match buttons without clicking. See exactly what Grav would click befor
 ---
 
 ## Changelog
+
+### v4.0.19
+- **Premium UI/UX Overhaul:** Introduced a completely redesigned modern dashboard with dynamic glassmorphism cards, interactive radial gradients, animated tab transitions, a larger integrated progress ring, and micro-interactions.
+- **Enhanced IDE Integration:** Fixed packaging and fully validated paths for Antigravity IDE compatibility.
 
 ### v4.0.18
 - **Fix Skip Browser SubAgent not clicking:** When `skipBrowserAgent` was ON, the Skip button failed to click because it lacked a reject-sibling (Skip itself is in `REJECT_WORDS`). Rewrote validation flow — Skip in browser context bypasses sibling check entirely.
